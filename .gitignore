@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+
+# SDK build outputs
+sdk/dist/

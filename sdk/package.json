@@ -1,0 +1,28 @@
+{
+  "name": "@octopus/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Railgun on Sui privacy protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "demo": "tsx src/demo.ts",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.20.0",
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/snarkjs": "^0.7.8",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

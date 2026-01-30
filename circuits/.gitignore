@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build artifacts (large files)
+build/*.ptau
+build/*.zkey
+build/*.wasm
+build/*.wtns
+build/*.r1cs
+build/*.sym
+build/*_js/
+
+# Keep hex outputs and JSON for reference
+!build/*.hex
+!build/*.json
