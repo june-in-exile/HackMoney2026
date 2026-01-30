@@ -2,7 +2,7 @@
 
 A privacy protocol implementation for the Sui blockchain, bringing Railgun-style shielded transactions using zero-knowledge proofs.
 
-**ETHGlobal HackMoney 2026**
+[**ETHGlobal HackMoney 2026**](https://ethglobal.com/events/hackmoney2026)
 
 ## Overview
 
