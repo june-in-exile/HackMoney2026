@@ -151,33 +151,62 @@ await initPoseidon();  // Required first!
 - ✅ Unshield UI: Note selection, amount input, recipient address
 - ✅ Balance: Reads shielded notes from blockchain, persists to localStorage
 
-### 🚧 Phase 2 & 3: ZK Proof Integration - PENDING
+### ✅ Phase 2 & 3: ZK Proof Integration - COMPLETE (2026-01-31)
+
+**Completed Tasks:**
+
+1. **✅ Merkle Proof Extraction** (Phase 2)
+   - Integrated `getMerkleProofForNote()` in unshield flow ([UnshieldForm.tsx:120-125](web/src/components/UnshieldForm.tsx#L120-L125))
+   - Extract proof path for selected note from on-chain state
+   - Reconstruct Merkle path with 16 sibling hashes
+
+2. **✅ Real ZK Proof Generation** (Phase 3)
+   - Updated [UnshieldForm.tsx:130-160](web/src/components/UnshieldForm.tsx#L130-L160) to use real proofs
+   - Integrated SDK's `generateUnshieldProof()` function
+   - Build `SpendInput` with note data and Merkle proof
+   - Added loading state for proof generation (lines 256-293)
+
+3. **✅ Circuit Artifacts Deployed** (Phase 3)
+   - Deployed `unshield.wasm` (2.1 MB) to [web/public/circuits/unshield_js/](web/public/circuits/unshield_js/)
+   - Deployed `unshield_final.zkey` (4.6 MB) to [web/public/circuits/](web/public/circuits/)
+   - Updated SDK to support browser environment via fetch
+
+4. **✅ Browser-Compatible Prover** (Phase 3)
+   - Enhanced [sdk/src/prover.ts](sdk/src/prover.ts) to detect Node.js vs browser
+   - Browser: Load artifacts via `fetch()` from `/circuits/` path
+   - Node.js: Load artifacts via `fs` from filesystem
+   - Both environments use same API (`generateUnshieldProof`)
+
+**Technical Implementation:**
+
+- [sdk/src/prover.ts](sdk/src/prover.ts):
+  - `isNodeEnvironment()` - Detects runtime environment
+  - `loadFileBrowser()` - Fetch-based artifact loading
+  - `generateUnshieldProof()` - Unified API for both environments
+- [web/src/components/UnshieldForm.tsx](web/src/components/UnshieldForm.tsx):
+  - Lines 120-125: Fetch Merkle proof from on-chain pool
+  - Lines 130-141: Build `SpendInput` with note + proof
+  - Lines 144-145: Generate real ZK proof (10-30 seconds)
+  - Lines 158-159: Use real proof bytes (128 bytes) and public inputs (96 bytes)
+
+### 🚧 Phase 4: End-to-End Testing - PENDING
 
 **Next Steps:**
 
-1. **Integrate Merkle Proof Extraction** (Phase 2)
-   - Use `getMerkleProofForNote()` in unshield flow
-   - Extract proof path for selected note
-   - Verify reconstructed path matches on-chain root
-
-2. **Replace Placeholder Proofs** (Phase 3)
-   - Update [web/src/components/UnshieldForm.tsx](web/src/components/UnshieldForm.tsx) lines 147-155
-   - Integrate SDK's `generateUnshieldProof()` function
-   - Build `SpendInput` with note data and Merkle proof
-   - Add loading state for proof generation (~10-30 seconds)
-
-3. **Deploy Circuit Artifacts** (Phase 3)
-   - Copy `circuits/build/unshield_js/unshield.wasm` to `web/public/circuits/`
-   - Copy `circuits/build/unshield_final.zkey` to `web/public/circuits/` (~100 MB)
-   - Update SDK to load artifacts from `/circuits/` path
-
-4. **End-to-End Testing** (Phase 4)
+1. **Manual Testing**
+   - Start dev server: `cd web && npm run dev`
    - Shield 1 SUI → verify commitment in Merkle tree
    - Unshield 0.5 SUI → generate real ZK proof → verify on-chain
    - Confirm nullifier prevents double-spend
-   - Validate transaction on Sui explorer
+   - Validate transaction on [Sui explorer](https://suiscan.xyz/testnet)
 
-**Blockers:**
+2. **Performance Validation**
+   - Measure proof generation time (expected: 10-30 seconds)
+   - Verify browser doesn't freeze during proof generation
+   - Check console logs for circuit artifact loading
 
-- Circuit artifacts need to be deployed to `web/public/circuits/`
-- Proof generation code needs integration in UnshieldForm
+3. **Error Handling**
+   - Test with insufficient balance
+   - Test with invalid recipient address
+   - Test double-spend attempt (should fail)
+   - Test with disconnected wallet

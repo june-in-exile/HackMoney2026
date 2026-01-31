@@ -164,7 +164,7 @@ async function main() {
       log(`  ${bytesToHex(suiProof.publicInputsBytes).slice(0, 64)}...`);
 
       // Load VK
-      const vk = loadVerificationKey();
+      const vk = await loadVerificationKey();
       log(`\nVerification Key (${vk.vkBytes.length} bytes):`);
       log(`  ${bytesToHex(vk.vkBytes).slice(0, 64)}...`);
 

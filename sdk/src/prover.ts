@@ -22,31 +22,55 @@ let fs: any;
 let path: any;
 let url: any;
 
-/** Get default paths to circuit artifacts (Node.js only) */
+/** Check if running in Node.js environment */
+function isNodeEnvironment(): boolean {
+  return typeof process !== 'undefined' &&
+         process.versions != null &&
+         process.versions.node != null;
+}
+
+/** Get default paths to circuit artifacts */
 function getDefaultPaths() {
-  // Check if running in Node.js environment
-  const isNode = typeof process !== 'undefined' &&
-                 process.versions != null &&
-                 process.versions.node != null;
+  if (isNodeEnvironment()) {
+    // Node.js: Load from filesystem
+    if (!fs) {
+      fs = require('fs');
+      path = require('path');
+      url = require('url');
+    }
 
-  if (!isNode) {
-    throw new Error('Proof generation is only supported in Node.js environment');
+    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+
+    return {
+      wasmPath: path.resolve(__dirname, "../../circuits/build/unshield_js/unshield.wasm"),
+      zkeyPath: path.resolve(__dirname, "../../circuits/build/unshield_final.zkey"),
+      vkPath: path.resolve(__dirname, "../../circuits/build/unshield_vk.json"),
+    };
+  } else {
+    // Browser: Load from public directory via fetch
+    return {
+      wasmPath: "/circuits/unshield_js/unshield.wasm",
+      zkeyPath: "/circuits/unshield_final.zkey",
+      vkPath: "/circuits/unshield_vk.json",
+    };
   }
+}
 
-  // Dynamically import Node.js modules
-  if (!fs) {
-    fs = require('fs');
-    path = require('path');
-    url = require('url');
+/** Load file in Node.js environment */
+async function loadFileNode(filePath: string): Promise<Buffer> {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
   }
+  return fs.readFileSync(filePath);
+}
 
-  const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-
-  return {
-    wasmPath: path.resolve(__dirname, "../../circuits/build/unshield_js/unshield.wasm"),
-    zkeyPath: path.resolve(__dirname, "../../circuits/build/unshield_final.zkey"),
-    vkPath: path.resolve(__dirname, "../../circuits/build/unshield_vk.json"),
-  };
+/** Load file in browser environment via fetch */
+async function loadFileBrowser(url: string): Promise<ArrayBuffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+  return await response.arrayBuffer();
 }
 
 /**
@@ -104,25 +128,45 @@ export async function generateUnshieldProof(
   const wasmPath = config.wasmPath ?? defaults.wasmPath;
   const zkeyPath = config.zkeyPath ?? defaults.zkeyPath;
 
-  // Check if circuit files exist
-  if (!fs.existsSync(wasmPath)) {
-    throw new Error(`Circuit WASM not found: ${wasmPath}`);
-  }
-  if (!fs.existsSync(zkeyPath)) {
-    throw new Error(`ZKey not found: ${zkeyPath}`);
-  }
-
   // Build circuit input
   const input = buildUnshieldInput(spendInput);
 
-  // Generate proof
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-    input as unknown as snarkjs.CircuitSignals,
-    wasmPath,
-    zkeyPath
-  );
+  // Generate proof (snarkjs supports both Node.js and browser)
+  if (isNodeEnvironment()) {
+    // Node.js: Check if files exist, then use file paths directly
+    if (!fs.existsSync(wasmPath)) {
+      throw new Error(`Circuit WASM not found: ${wasmPath}`);
+    }
+    if (!fs.existsSync(zkeyPath)) {
+      throw new Error(`ZKey not found: ${zkeyPath}`);
+    }
 
-  return { proof, publicSignals };
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input as unknown as snarkjs.CircuitSignals,
+      wasmPath,
+      zkeyPath
+    );
+
+    return { proof, publicSignals };
+  } else {
+    // Browser: Load files via fetch, then use snarkjs with buffers
+    console.log(`Loading circuit artifacts from ${wasmPath} and ${zkeyPath}...`);
+
+    const [wasmBuffer, zkeyBuffer] = await Promise.all([
+      loadFileBrowser(wasmPath),
+      loadFileBrowser(zkeyPath),
+    ]);
+
+    console.log(`Loaded WASM: ${wasmBuffer.byteLength} bytes, zkey: ${zkeyBuffer.byteLength} bytes`);
+
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input as unknown as snarkjs.CircuitSignals,
+      new Uint8Array(wasmBuffer),
+      new Uint8Array(zkeyBuffer)
+    );
+
+    return { proof, publicSignals };
+  }
 }
 
 /**
@@ -136,11 +180,23 @@ export async function verifyProofLocal(
   const defaults = getDefaultPaths();
   const vkPath = config.vkPath ?? defaults.vkPath;
 
-  if (!fs.existsSync(vkPath)) {
-    throw new Error(`Verification key not found: ${vkPath}`);
+  let vk: any;
+
+  if (isNodeEnvironment()) {
+    // Node.js: Load from filesystem
+    if (!fs.existsSync(vkPath)) {
+      throw new Error(`Verification key not found: ${vkPath}`);
+    }
+    vk = JSON.parse(fs.readFileSync(vkPath, "utf-8"));
+  } else {
+    // Browser: Load via fetch
+    const response = await fetch(vkPath);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch verification key: ${response.status}`);
+    }
+    vk = await response.json();
   }
 
-  const vk = JSON.parse(fs.readFileSync(vkPath, "utf-8"));
   return await snarkjs.groth16.verify(vk, publicSignals, proof);
 }
 
@@ -230,15 +286,26 @@ export function convertProofToSui(
 /**
  * Load and convert verification key to Sui format
  */
-export function loadVerificationKey(vkPath?: string): SuiVerificationKey {
+export async function loadVerificationKey(vkPath?: string): Promise<SuiVerificationKey> {
   const defaults = getDefaultPaths();
   const path_ = vkPath ?? defaults.vkPath;
 
-  if (!fs.existsSync(path_)) {
-    throw new Error(`Verification key not found: ${path_}`);
-  }
+  let vk: any;
 
-  const vk = JSON.parse(fs.readFileSync(path_, "utf-8"));
+  if (isNodeEnvironment()) {
+    // Node.js: Load from filesystem
+    if (!fs.existsSync(path_)) {
+      throw new Error(`Verification key not found: ${path_}`);
+    }
+    vk = JSON.parse(fs.readFileSync(path_, "utf-8"));
+  } else {
+    // Browser: Load via fetch
+    const response = await fetch(path_);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch verification key: ${response.status}`);
+    }
+    vk = await response.json();
+  }
 
   // Compress G1 point
   const compressG1 = (point: string[]): Uint8Array => {
