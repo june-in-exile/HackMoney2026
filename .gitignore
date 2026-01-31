@@ -8,9 +8,18 @@ node_modules/
 .idea/
 .vscode/
 
+# Claude Code
+.claude/
+
 # Environment
 .env
 .env.*
 
 # SDK build outputs
 sdk/dist/
+
+# Next.js
+web/.next/
+web/out/
+web/next-env.d.ts
+web/tsconfig.tsbuildinfo
