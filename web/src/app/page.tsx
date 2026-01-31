@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { Header } from "@/components/Header";
 import { KeypairSetup } from "@/components/KeypairSetup";
@@ -8,31 +7,30 @@ import { BalanceCard } from "@/components/BalanceCard";
 import { ShieldForm } from "@/components/ShieldForm";
 import { UnshieldForm } from "@/components/UnshieldForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
-import { DEMO_MODE } from "@/lib/constants";
+import { useShieldedBalance } from "@/hooks/useShieldedBalance";
 
 export default function Home() {
   const account = useCurrentAccount();
   const { keypair, isLoading, generateKeypair, clearKeypair } =
     useLocalKeypair();
 
-  // Demo state for shielded balance
-  const [demoBalance, setDemoBalance] = useState(0n);
-  const [demoNoteCount, setDemoNoteCount] = useState(0);
+  // Fetch shielded balance from blockchain
+  const {
+    balance: shieldedBalance,
+    noteCount,
+    notes,
+    isLoading: isLoadingBalance,
+    refresh: refreshBalance,
+  } = useShieldedBalance(keypair);
 
-  const handleShieldSuccess = (amount: bigint) => {
-    if (DEMO_MODE) {
-      // In demo mode, add the actual shielded amount to balance
-      setDemoBalance((prev) => prev + amount);
-      setDemoNoteCount((prev) => prev + 1);
-    }
+  const handleShieldSuccess = async () => {
+    // Refresh balance from blockchain after successful shield
+    await refreshBalance();
   };
 
-  const handleUnshieldSuccess = (amount: bigint) => {
-    if (DEMO_MODE) {
-      // In demo mode, subtract the actual unshielded amount from balance
-      setDemoBalance((prev) => prev - amount);
-      setDemoNoteCount((prev) => Math.max(0, prev - 1));
-    }
+  const handleUnshieldSuccess = async () => {
+    // Refresh balance from blockchain after successful unshield
+    await refreshBalance();
   };
 
   return (
@@ -48,11 +46,6 @@ export default function Home() {
           <p className="text-gray-600 dark:text-gray-400">
             Shield and unshield SUI tokens with zero-knowledge proofs
           </p>
-          {DEMO_MODE && (
-            <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
-              🔬 Running in demo mode - no real transactions
-            </p>
-          )}
         </div>
 
         {!account ? (
@@ -80,9 +73,9 @@ export default function Home() {
                 onClear={clearKeypair}
               />
               <BalanceCard
-                shieldedBalance={demoBalance}
-                noteCount={demoNoteCount}
-                isLoading={isLoading}
+                shieldedBalance={shieldedBalance}
+                noteCount={noteCount}
+                isLoading={isLoading || isLoadingBalance}
               />
             </div>
 
@@ -91,7 +84,8 @@ export default function Home() {
               <ShieldForm keypair={keypair} onSuccess={handleShieldSuccess} />
               <UnshieldForm
                 keypair={keypair}
-                maxAmount={demoBalance}
+                maxAmount={shieldedBalance}
+                notes={notes}
                 onSuccess={handleUnshieldSuccess}
               />
             </div>

@@ -2,7 +2,12 @@
 /// Notes represent shielded tokens that can only be spent by the owner.
 module railgun::note {
     use std::type_name::{Self, TypeName};
-    use sui::hash::keccak256;
+    use sui::poseidon;
+
+    // ============ Constants ============
+
+    /// BN254 field modulus for Poseidon hash
+    const BN254_MAX: u256 = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     // ============ Structs ============
 
@@ -36,8 +41,9 @@ module railgun::note {
 
     // ============ Public Functions ============
 
-    /// Compute a note commitment from its components.
-    /// This is called off-chain to generate the commitment before shielding.
+    /// Compute a note commitment from its components using Poseidon hash.
+    /// NOTE: This is a legacy test helper. In production, commitments are computed
+    /// off-chain using the circuit formula: Poseidon(NPK, token, value)
     public fun compute_commitment(
         owner_pk: vector<u8>,
         amount: u64,
@@ -45,7 +51,65 @@ module railgun::note {
         random: vector<u8>,
     ): NoteCommitment {
         let preimage = build_preimage(owner_pk, amount, token_type, random);
-        NoteCommitment { value: keccak256(&preimage) }
+        // Hash the entire preimage by splitting into 32-byte chunks
+        let hash_u256 = hash_preimage_with_poseidon(preimage);
+        NoteCommitment { value: u256_to_bytes(hash_u256) }
+    }
+
+    /// Hash a preimage (of any length) using Poseidon by splitting into chunks
+    fun hash_preimage_with_poseidon(preimage: vector<u8>): u256 {
+        let len = vector::length(&preimage);
+        let mut inputs = vector::empty<u256>();
+
+        // Split preimage into 32-byte chunks and hash each
+        let mut i = 0;
+        while (i < len) {
+            let mut chunk = vector::empty<u8>();
+            let mut j = 0;
+            while (j < 32 && i < len) {
+                vector::push_back(&mut chunk, *vector::borrow(&preimage, i));
+                i = i + 1;
+                j = j + 1;
+            };
+            // Pad last chunk with zeros if needed
+            while (j < 32) {
+                vector::push_back(&mut chunk, 0u8);
+                j = j + 1;
+            };
+            vector::push_back(&mut inputs, bytes_to_u256(chunk));
+        };
+
+        // Hash all chunks together
+        poseidon::poseidon_bn254(&inputs)
+    }
+
+    /// Convert 32-byte vector to u256 (big-endian) for Poseidon with BN254 field reduction
+    fun bytes_to_u256(bytes: vector<u8>): u256 {
+        let mut result = 0u256;
+        let len = vector::length(&bytes);
+        let mut i = 0;
+        // Use first 32 bytes if longer, pad with zeros if shorter
+        let max_bytes = if (len > 32) { 32 } else { len };
+        while (i < max_bytes) {
+            result = (result << 8) | (*vector::borrow(&bytes, i) as u256);
+            i = i + 1;
+        };
+        // Reduce modulo BN254 field to ensure validity
+        result % BN254_MAX
+    }
+
+    /// Convert u256 to 32-byte vector (big-endian)
+    fun u256_to_bytes(value: u256): vector<u8> {
+        let mut bytes = vector::empty<u8>();
+        let mut v = value;
+        let mut i = 0;
+        while (i < 32) {
+            vector::push_back(&mut bytes, ((v & 0xff) as u8));
+            v = v >> 8;
+            i = i + 1;
+        };
+        vector::reverse(&mut bytes);
+        bytes
     }
 
     /// Create an encrypted note (called off-chain).

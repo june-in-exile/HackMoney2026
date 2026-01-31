@@ -20,7 +20,7 @@ import {
 
 interface ShieldFormProps {
   keypair: RailgunKeypair | null;
-  onSuccess?: (amount: bigint) => void;
+  onSuccess?: () => void | Promise<void>;
 }
 
 export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
@@ -102,7 +102,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         setSuccess(`Demo: Shielded ${formatSui(amountMist)} SUI`);
         setAmount("");
-        onSuccess?.(amountMist);
+        await onSuccess?.();
         return;
       }
 
@@ -145,7 +145,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
 
       setSuccess(`Shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`);
       setAmount("");
-      onSuccess?.(amountMist);
+      await onSuccess?.();
     } catch (err) {
       console.error("Shield failed:", err);
       setError(err instanceof Error ? err.message : "Shield failed");

@@ -1,0 +1,183 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Octopus is a privacy protocol for Sui implementing Railgun-style shielded transactions using Groth16 ZK-SNARKs. Users shield tokens into a privacy pool and unshield with ZK proofs.
+
+## Build & Test Commands
+
+### Circuits (Circom)
+
+```bash
+cd circuits
+npm install
+./compile_unshield.sh  # Generates WASM, proving key, verification key in build/
+```
+
+### Move Contracts
+
+```bash
+cd railgun
+sui move build
+sui move test          # 23 tests expected
+sui move test -f <test_name>  # Run single test
+```
+
+### TypeScript SDK
+
+```bash
+cd sdk
+npm install
+npm run build          # Compile TypeScript
+npm run demo           # Interactive 8-step demo
+npm test               # Run Vitest tests
+```
+
+### Web Frontend
+
+```bash
+cd web
+npm install
+npm run dev            # Dev server at localhost:3000
+npm run build          # Production build (uses --webpack flag for Next.js 16)
+```
+
+## Architecture
+
+```
+octopus/
+├── circuits/          # Circom ZK circuits (BN254, Poseidon, Groth16)
+│   ├── unshield.circom    # Main circuit (10,477 constraints)
+│   └── lib/               # Merkle proof template
+├── railgun/           # Sui Move smart contracts
+│   └── sources/
+│       ├── pool.move          # Privacy pool (shield/unshield entry functions)
+│       ├── merkle_tree.move   # Incremental Merkle tree (depth 16)
+│       ├── nullifier.move     # Double-spend prevention
+│       └── note.move          # UTXO note structure
+├── sdk/               # TypeScript SDK
+│   └── src/
+│       ├── crypto.ts      # Poseidon hash, key derivation, note creation
+│       ├── prover.ts      # Groth16 proof generation via snarkjs
+│       └── sui.ts         # Transaction builders, RailgunClient
+└── web/               # Next.js 16 frontend with @mysten/dapp-kit
+```
+
+## Key Cryptographic Formulas
+
+```
+MPK = Poseidon(spending_key, nullifying_key)   // Master Public Key
+NPK = Poseidon(MPK, random)                    // Note Public Key
+commitment = Poseidon(NPK, token, value)       // Note Commitment
+nullifier = Poseidon(nullifying_key, leaf_index)
+```
+
+## Move Contract Entry Points
+
+**Shield** (deposit): `pool::shield<T>(pool, coin, commitment, encrypted_note, ctx)`
+
+- No ZK proof required, adds commitment to Merkle tree
+
+**Unshield** (withdraw): `pool::unshield<T>(pool, proof_bytes, public_inputs_bytes, amount, recipient, ctx)`
+
+- Requires 128-byte Groth16 proof + 96-byte public inputs (root, nullifier, commitment)
+- Verifies proof, marks nullifier spent, transfers tokens
+
+## SDK Critical Initialization
+
+Always call `initPoseidon()` before any cryptographic operations:
+
+```typescript
+import { initPoseidon, generateKeypair, createNote } from "@octopus/sdk";
+await initPoseidon();  // Required first!
+```
+
+## Version Constraints
+
+- `@mysten/dapp-kit@0.14.x` requires `@mysten/sui@1.24.0` (must match)
+- TypeScript target must be ES2020+ for BigInt literal support
+- Next.js 16 uses Turbopack by default; use `--webpack` flag for builds
+
+## Testnet Deployment
+
+**Railgun Privacy Pool (SUI) - Poseidon Hash (2026-01-31):**
+
+- Package ID: `0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080`
+- Pool ID (Shared Object): `0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3`
+- Modules: `pool`, `merkle_tree`, `nullifier`, `note`
+- Network: Sui Testnet
+- Verification Key: Embedded in pool (360 bytes, Arkworks compressed BN254)
+- Hash Function: **Poseidon BN254** (circuit-compatible)
+
+**Explorer Links:**
+
+- [Package](https://suiscan.xyz/testnet/object/0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080)
+- [Pool Object](https://suiscan.xyz/testnet/object/0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3)
+- [Pool Creation TX](https://suiscan.xyz/testnet/tx/D8EAjXrRBmQHfdrZwJUubvd5RuawPu8eQu1Q4w1qGxzm)
+
+**Previous Deployment (Deprecated - Keccak256):**
+
+- Old Package ID: `0x802ba1f07807fd1d73ee9391145265cefdae4e3b097f66bfbfde13c47406ff19`
+- ⚠️ Incompatible with ZK circuit - do not use
+
+## Implementation Status
+
+### ✅ Phase 1: Hash Function Migration - COMPLETE (2026-01-31)
+
+**Critical Hash Function Fix:**
+
+- ✅ Fixed Keccak256/Poseidon mismatch between on-chain tree and ZK circuit
+- ✅ Updated all Move contracts to use Poseidon BN254:
+  - [railgun/sources/merkle_tree.move](railgun/sources/merkle_tree.move) - Core Merkle tree hashing
+  - [railgun/sources/note.move](railgun/sources/note.move) - Note commitment computation
+  - [railgun/sources/nullifier.move](railgun/sources/nullifier.move) - Nullifier generation
+- ✅ Added BN254 field modulus reduction for input validation
+- ✅ All 23 Move tests passing
+- ✅ Deployed new package: `0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080`
+- ✅ Created new pool: `0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3`
+- ✅ Updated [web/src/lib/constants.ts](web/src/lib/constants.ts) with new IDs
+
+**Merkle Proof Infrastructure:**
+
+- ✅ Created [web/src/lib/merkleProof.ts](web/src/lib/merkleProof.ts)
+- ✅ `getMerkleProofForNote()` - Queries on-chain state and reconstructs Merkle paths
+- ✅ `MerkleProofData` interface for type safety
+
+**Frontend Features (Existing):**
+
+- ✅ Shield: Wallet balance validation, Poseidon commitments, on-chain transactions
+- ✅ Unshield UI: Note selection, amount input, recipient address
+- ✅ Balance: Reads shielded notes from blockchain, persists to localStorage
+
+### 🚧 Phase 2 & 3: ZK Proof Integration - PENDING
+
+**Next Steps:**
+
+1. **Integrate Merkle Proof Extraction** (Phase 2)
+   - Use `getMerkleProofForNote()` in unshield flow
+   - Extract proof path for selected note
+   - Verify reconstructed path matches on-chain root
+
+2. **Replace Placeholder Proofs** (Phase 3)
+   - Update [web/src/components/UnshieldForm.tsx](web/src/components/UnshieldForm.tsx) lines 147-155
+   - Integrate SDK's `generateUnshieldProof()` function
+   - Build `SpendInput` with note data and Merkle proof
+   - Add loading state for proof generation (~10-30 seconds)
+
+3. **Deploy Circuit Artifacts** (Phase 3)
+   - Copy `circuits/build/unshield_js/unshield.wasm` to `web/public/circuits/`
+   - Copy `circuits/build/unshield_final.zkey` to `web/public/circuits/` (~100 MB)
+   - Update SDK to load artifacts from `/circuits/` path
+
+4. **End-to-End Testing** (Phase 4)
+   - Shield 1 SUI → verify commitment in Merkle tree
+   - Unshield 0.5 SUI → generate real ZK proof → verify on-chain
+   - Confirm nullifier prevents double-spend
+   - Validate transaction on Sui explorer
+
+**Blockers:**
+
+- Circuit artifacts need to be deployed to `web/public/circuits/`
+- Proof generation code needs integration in UnshieldForm

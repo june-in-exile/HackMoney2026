@@ -49,6 +49,7 @@ export {
   computeMerkleRoot,
   buildSingleLeafProof,
   encryptNote,
+  decryptNote,
   bigIntToBytes,
   bytesToBigInt,
 } from "./crypto.js";

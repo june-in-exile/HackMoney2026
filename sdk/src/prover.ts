@@ -5,9 +5,6 @@
  */
 
 import * as snarkjs from "snarkjs";
-import * as fs from "fs";
-import * as path from "path";
-import { fileURLToPath } from "url";
 import {
   type SpendInput,
   type UnshieldCircuitInput,
@@ -20,21 +17,37 @@ import {
   computeMerkleRoot,
 } from "./crypto.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Lazy-loaded Node.js modules (only used in Node.js environment)
+let fs: any;
+let path: any;
+let url: any;
 
-/** Default paths to circuit artifacts */
-const DEFAULT_WASM_PATH = path.resolve(
-  __dirname,
-  "../../circuits/build/unshield_js/unshield.wasm"
-);
-const DEFAULT_ZKEY_PATH = path.resolve(
-  __dirname,
-  "../../circuits/build/unshield_final.zkey"
-);
-const DEFAULT_VK_PATH = path.resolve(
-  __dirname,
-  "../../circuits/build/unshield_vk.json"
-);
+/** Get default paths to circuit artifacts (Node.js only) */
+function getDefaultPaths() {
+  // Check if running in Node.js environment
+  const isNode = typeof process !== 'undefined' &&
+                 process.versions != null &&
+                 process.versions.node != null;
+
+  if (!isNode) {
+    throw new Error('Proof generation is only supported in Node.js environment');
+  }
+
+  // Dynamically import Node.js modules
+  if (!fs) {
+    fs = require('fs');
+    path = require('path');
+    url = require('url');
+  }
+
+  const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+
+  return {
+    wasmPath: path.resolve(__dirname, "../../circuits/build/unshield_js/unshield.wasm"),
+    zkeyPath: path.resolve(__dirname, "../../circuits/build/unshield_final.zkey"),
+    vkPath: path.resolve(__dirname, "../../circuits/build/unshield_vk.json"),
+  };
+}
 
 /**
  * Prover configuration
@@ -87,8 +100,9 @@ export async function generateUnshieldProof(
   spendInput: SpendInput,
   config: ProverConfig = {}
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
-  const wasmPath = config.wasmPath ?? DEFAULT_WASM_PATH;
-  const zkeyPath = config.zkeyPath ?? DEFAULT_ZKEY_PATH;
+  const defaults = getDefaultPaths();
+  const wasmPath = config.wasmPath ?? defaults.wasmPath;
+  const zkeyPath = config.zkeyPath ?? defaults.zkeyPath;
 
   // Check if circuit files exist
   if (!fs.existsSync(wasmPath)) {
@@ -119,7 +133,8 @@ export async function verifyProofLocal(
   publicSignals: string[],
   config: ProverConfig = {}
 ): Promise<boolean> {
-  const vkPath = config.vkPath ?? DEFAULT_VK_PATH;
+  const defaults = getDefaultPaths();
+  const vkPath = config.vkPath ?? defaults.vkPath;
 
   if (!fs.existsSync(vkPath)) {
     throw new Error(`Verification key not found: ${vkPath}`);
@@ -216,7 +231,8 @@ export function convertProofToSui(
  * Load and convert verification key to Sui format
  */
 export function loadVerificationKey(vkPath?: string): SuiVerificationKey {
-  const path_ = vkPath ?? DEFAULT_VK_PATH;
+  const defaults = getDefaultPaths();
+  const path_ = vkPath ?? defaults.vkPath;
 
   if (!fs.existsSync(path_)) {
     throw new Error(`Verification key not found: ${path_}`);

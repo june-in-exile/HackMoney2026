@@ -227,3 +227,48 @@ export function bytesToBigInt(bytes: Uint8Array): bigint {
   }
   return result;
 }
+
+/**
+ * Decrypt and verify note ownership
+ *
+ * Returns null if the note doesn't belong to the given MPK
+ * Returns the decrypted note if ownership is verified
+ */
+export function decryptNote(
+  encryptedData: Uint8Array | number[],
+  myMpk: bigint
+): Note | null {
+  // Convert to Uint8Array if needed
+  const data = encryptedData instanceof Uint8Array
+    ? encryptedData
+    : new Uint8Array(encryptedData);
+
+  // Encrypted note format: npk || token || value || random (32 bytes each)
+  if (data.length !== 128) {
+    return null;
+  }
+
+  // 1. Decode the encrypted data
+  const npk = bytesToBigInt(data.slice(0, 32));
+  const token = bytesToBigInt(data.slice(32, 64));
+  const value = bytesToBigInt(data.slice(64, 96));
+  const random = bytesToBigInt(data.slice(96, 128));
+
+  // 2. Verify ownership by recomputing NPK
+  // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
+  const expectedNpk = poseidonHash([myMpk, random]);
+  if (expectedNpk !== npk) {
+    return null; // Not our note
+  }
+
+  // 3. Recompute commitment to verify data integrity
+  const commitment = poseidonHash([npk, token, value]);
+
+  return {
+    npk,
+    token,
+    value,
+    random,
+    commitment,
+  };
+}

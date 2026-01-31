@@ -4,16 +4,25 @@ import { useState } from "react";
 import {
   useCurrentAccount,
   useSignAndExecuteTransaction,
+  useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import type { ShieldedNote } from "@/types/note";
+import {
+  generateUnshieldProof,
+  convertProofToSui,
+  type SpendInput,
+} from "@octopus/sdk";
+import { getMerkleProofForNote } from "@/lib/merkleProof";
 
 interface UnshieldFormProps {
   keypair: RailgunKeypair | null;
   maxAmount: bigint;
-  onSuccess?: (amount: bigint) => void;
+  notes: ShieldedNote[];
+  onSuccess?: () => void | Promise<void>;
 }
 
 type UnshieldState =
@@ -26,6 +35,7 @@ type UnshieldState =
 export function UnshieldForm({
   keypair,
   maxAmount,
+  notes,
   onSuccess,
 }: UnshieldFormProps) {
   const [amount, setAmount] = useState("");
@@ -36,6 +46,7 @@ export function UnshieldForm({
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const suiClient = useSuiClient();
 
   // Auto-fill recipient with connected wallet
   const handleUseMyAddress = () => {
@@ -90,17 +101,62 @@ export function UnshieldForm({
         setSuccess(`Demo: Unshielded ${formatSui(amountMist)} SUI to ${recipient.slice(0, 10)}...`);
         setAmount("");
         setRecipient("");
-        onSuccess?.(amountMist);
+        await onSuccess?.();
         return;
       }
 
-      // In production, generate actual ZK proof here
-      // const proof = await generateUnshieldProof(spendInput);
-      // const suiProof = convertProofToSui(proof);
+      // Get unspent notes
+      const unspentNotes = notes.filter((note) => !note.spent);
+      if (unspentNotes.length === 0) {
+        throw new Error("No unspent notes available");
+      }
 
-      // For now, use placeholder proof bytes
-      const proofBytes = new Uint8Array(128);
-      const publicInputsBytes = new Uint8Array(96);
+      // For now, spend the first note that has enough value
+      const noteToSpend = unspentNotes.find((note) => note.value >= amountMist);
+      if (!noteToSpend) {
+        throw new Error("No note with sufficient balance");
+      }
+
+      // Get Merkle proof from on-chain state
+      console.log("Fetching Merkle proof for note at position:", noteToSpend.position);
+      const merkleProofData = await getMerkleProofForNote(
+        suiClient,
+        noteToSpend.position
+      );
+
+      console.log("Merkle proof retrieved, generating ZK proof...");
+
+      // Build SpendInput for proof generation
+      const spendInput: SpendInput = {
+        note: {
+          npk: BigInt(noteToSpend.npk),
+          token: BigInt(noteToSpend.token),
+          value: noteToSpend.value,
+          random: BigInt(noteToSpend.random),
+          commitment: BigInt("0x" + noteToSpend.commitment),
+        },
+        leafIndex: noteToSpend.position,
+        pathElements: merkleProofData.pathElements,
+        keypair: keypair,
+      };
+
+      // Generate ZK proof (this takes 10-30 seconds)
+      console.log("Generating ZK proof with snarkjs...");
+      const { proof, publicSignals } = await generateUnshieldProof(spendInput);
+
+      console.log("ZK proof generated successfully!");
+      console.log("Public signals:", publicSignals);
+
+      // Convert to Sui format
+      const suiProof = convertProofToSui(proof, publicSignals);
+
+      console.log("Proof converted to Sui format");
+      console.log("Proof bytes:", suiProof.proofBytes.length, "bytes");
+      console.log("Public inputs:", suiProof.publicInputsBytes.length, "bytes");
+
+      // Use real proof bytes
+      const proofBytes = suiProof.proofBytes;          // 128 bytes
+      const publicInputsBytes = suiProof.publicInputsBytes; // 96 bytes
 
       // Step 2: Submit transaction
       setState("submitting");
@@ -126,7 +182,7 @@ export function UnshieldForm({
       setSuccess(`Unshielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`);
       setAmount("");
       setRecipient("");
-      onSuccess?.(amountMist);
+      await onSuccess?.();
     } catch (err) {
       console.error("Unshield failed:", err);
       setState("error");

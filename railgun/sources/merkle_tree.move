@@ -1,7 +1,7 @@
 /// Incremental Merkle Tree for tracking note commitments.
-/// Uses SHA3-256 as the hash function and supports 2^16 leaves.
+/// Uses Poseidon hash (BN254) and supports 2^16 leaves.
 module railgun::merkle_tree {
-    use sui::hash::keccak256;
+    use sui::poseidon;
 
     // ============ Constants ============
 
@@ -9,12 +9,17 @@ module railgun::merkle_tree {
     const TREE_DEPTH: u64 = 16;
     const TREE_DEPTH_U8: u8 = 16;
 
+    /// BN254 field modulus for Poseidon hash
+    const BN254_MAX: u256 = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
     // ============ Errors ============
 
     /// Tree is full (all 2^TREE_DEPTH leaves used)
     const ETreeFull: u64 = 0;
     /// Invalid proof length
     const EInvalidProofLength: u64 = 1;
+    /// Invalid bytes length (must be 32 bytes)
+    const EInvalidLength: u64 = 2;
 
     // ============ Structs ============
 
@@ -126,11 +131,47 @@ module railgun::merkle_tree {
 
     // ============ Internal Functions ============
 
-    /// Hash two nodes together (left || right)
+    /// Hash two nodes together using Poseidon
     fun hash_pair(left: vector<u8>, right: vector<u8>): vector<u8> {
-        let mut combined = left;
-        vector::append(&mut combined, right);
-        keccak256(&combined)
+        // Convert 32-byte vectors to u256
+        let left_u256 = bytes_to_u256(left);
+        let right_u256 = bytes_to_u256(right);
+
+        // Hash with Poseidon
+        let inputs = vector[left_u256, right_u256];
+        let hash_u256 = poseidon::poseidon_bn254(&inputs);
+
+        // Convert back to 32-byte vector
+        u256_to_bytes(hash_u256)
+    }
+
+    /// Convert 32-byte vector to u256 (big-endian) with BN254 field reduction
+    fun bytes_to_u256(bytes: vector<u8>): u256 {
+        assert!(vector::length(&bytes) == 32, EInvalidLength);
+
+        let mut result = 0u256;
+        let mut i = 0;
+        while (i < 32) {
+            result = (result << 8) | (*vector::borrow(&bytes, i) as u256);
+            i = i + 1;
+        };
+
+        // Reduce modulo BN254 field to ensure validity
+        result % BN254_MAX
+    }
+
+    /// Convert u256 to 32-byte vector (big-endian)
+    fun u256_to_bytes(value: u256): vector<u8> {
+        let mut bytes = vector::empty<u8>();
+        let mut v = value;
+        let mut i = 0;
+        while (i < 32) {
+            vector::push_back(&mut bytes, ((v & 0xff) as u8));
+            v = v >> 8;
+            i = i + 1;
+        };
+        vector::reverse(&mut bytes);
+        bytes
     }
 
     /// Compute zero hashes for each level
