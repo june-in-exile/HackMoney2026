@@ -122,76 +122,7 @@ await initPoseidon();  // Required first!
 - Old Package ID: `0x802ba1f07807fd1d73ee9391145265cefdae4e3b097f66bfbfde13c47406ff19`
 - ⚠️ Incompatible with ZK circuit - do not use
 
-## Implementation Status
-
-### ✅ Phase 1: Hash Function Migration - COMPLETE (2026-01-31)
-
-**Critical Hash Function Fix:**
-
-- ✅ Fixed Keccak256/Poseidon mismatch between on-chain tree and ZK circuit
-- ✅ Updated all Move contracts to use Poseidon BN254:
-  - [railgun/sources/merkle_tree.move](railgun/sources/merkle_tree.move) - Core Merkle tree hashing
-  - [railgun/sources/note.move](railgun/sources/note.move) - Note commitment computation
-  - [railgun/sources/nullifier.move](railgun/sources/nullifier.move) - Nullifier generation
-- ✅ Added BN254 field modulus reduction for input validation
-- ✅ All 23 Move tests passing
-- ✅ Deployed new package: `0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080`
-- ✅ Created new pool: `0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3`
-- ✅ Updated [web/src/lib/constants.ts](web/src/lib/constants.ts) with new IDs
-
-**Merkle Proof Infrastructure:**
-
-- ✅ Created [web/src/lib/merkleProof.ts](web/src/lib/merkleProof.ts)
-- ✅ `getMerkleProofForNote()` - Queries on-chain state and reconstructs Merkle paths
-- ✅ `MerkleProofData` interface for type safety
-
-**Frontend Features (Existing):**
-
-- ✅ Shield: Wallet balance validation, Poseidon commitments, on-chain transactions
-- ✅ Unshield UI: Note selection, amount input, recipient address
-- ✅ Balance: Reads shielded notes from blockchain, persists to localStorage
-
-### ✅ Phase 2 & 3: ZK Proof Integration - COMPLETE (2026-01-31)
-
-**Completed Tasks:**
-
-1. **✅ Merkle Proof Extraction** (Phase 2)
-   - Integrated `getMerkleProofForNote()` in unshield flow ([UnshieldForm.tsx:120-125](web/src/components/UnshieldForm.tsx#L120-L125))
-   - Extract proof path for selected note from on-chain state
-   - Reconstruct Merkle path with 16 sibling hashes
-
-2. **✅ Real ZK Proof Generation** (Phase 3)
-   - Updated [UnshieldForm.tsx:130-160](web/src/components/UnshieldForm.tsx#L130-L160) to use real proofs
-   - Integrated SDK's `generateUnshieldProof()` function
-   - Build `SpendInput` with note data and Merkle proof
-   - Added loading state for proof generation (lines 256-293)
-
-3. **✅ Circuit Artifacts Deployed** (Phase 3)
-   - Deployed `unshield.wasm` (2.1 MB) to [web/public/circuits/unshield_js/](web/public/circuits/unshield_js/)
-   - Deployed `unshield_final.zkey` (4.6 MB) to [web/public/circuits/](web/public/circuits/)
-   - Updated SDK to support browser environment via fetch
-
-4. **✅ Browser-Compatible Prover** (Phase 3)
-   - Enhanced [sdk/src/prover.ts](sdk/src/prover.ts) to detect Node.js vs browser
-   - Browser: Load artifacts via `fetch()` from `/circuits/` path
-   - Node.js: Load artifacts via `fs` from filesystem
-   - Both environments use same API (`generateUnshieldProof`)
-
-**Technical Implementation:**
-
-- [sdk/src/prover.ts](sdk/src/prover.ts):
-  - `isNodeEnvironment()` - Detects runtime environment
-  - `loadFileBrowser()` - Fetch-based artifact loading
-  - `generateUnshieldProof()` - Unified API for both environments
-- [web/src/components/UnshieldForm.tsx](web/src/components/UnshieldForm.tsx):
-  - Lines 120-125: Fetch Merkle proof from on-chain pool
-  - Lines 130-141: Build `SpendInput` with note + proof
-  - Lines 144-145: Generate real ZK proof (10-30 seconds)
-  - Lines 158-159: Use real proof bytes (128 bytes) and public inputs (96 bytes)
-
-### 🚧 Phase 4: End-to-End Testing - PENDING
-
-**Next Steps:**
+## End-to-End Testing - PENDING
 
 1. **Manual Testing**
    - Start dev server: `cd web && npm run dev`
@@ -210,3 +141,133 @@ await initPoseidon();  // Required first!
    - Test with invalid recipient address
    - Test double-spend attempt (should fail)
    - Test with disconnected wallet
+
+## Feature Comparison: Octopus vs Railgun
+
+### Overview
+
+Octopus implements the core privacy technology of Railgun (shield/unshield with ZK-SNARKs) but adapted for the Sui blockchain. The main difference beyond blockchain platform is the scope of features implemented.
+
+### ✅ Implemented Features (Core Privacy)
+
+**What Octopus Has:**
+
+- **Shield/Unshield**: Deposit tokens into privacy pool and withdraw with ZK proofs
+- **ZK-SNARK Proofs**: Groth16 proof system with BN254 curve
+- **Note System**: UTXO-based private notes with Poseidon commitments
+- **Merkle Tree**: Incremental Merkle tree (depth 16) with Poseidon hashing
+- **Nullifier System**: Prevents double-spending of notes
+- **TypeScript SDK**: Browser-compatible proof generation and transaction building
+- **Web Frontend**: Basic UI for shield/unshield operations with wallet integration
+
+### ❌ Missing Features (vs. Railgun)
+
+**1. Private Transfers (0zk-to-0zk)**
+
+- Railgun: Users can send private transactions between shielded addresses
+- Octopus: Only supports shield (public→private) and unshield (private→public)
+- Impact: Cannot transact privately without exiting the pool
+
+**2. Relayer/Broadcaster Network**
+
+- Railgun: Third-party relayers submit transactions and pay gas fees, hiding transaction origin
+- Octopus: Users submit transactions directly from their wallets
+- Impact: Transaction metadata can be linked to sender's public address
+
+**3. DeFi Integration**
+
+- Railgun: Private swaps, lending, borrowing, liquidity provision via cross-contract calls
+- Octopus: No DeFi integration - only basic shield/unshield
+- Impact: Limited utility beyond basic privacy transfers
+
+**4. Compliance Features**
+
+- Railgun:
+  - Private Proofs of Innocence (blocks sanctioned addresses automatically)
+  - View keys for selective disclosure to auditors
+  - Tax reporting tools
+  - Automatic screening against known malicious addresses
+- Octopus: No compliance features
+- Impact: Cannot prove funds are not from illicit sources
+
+**5. Multi-Chain Support**
+
+- Railgun: Live on Ethereum, Arbitrum, Polygon, BNB Chain
+- Octopus: Sui only
+- Impact: Isolated liquidity, no cross-chain privacy
+
+**6. Advanced Wallet Features**
+
+- Railgun: Multi-signature wallets (2026 roadmap), hardware wallet support (Ledger, Trezor)
+- Octopus: Standard single-signature wallets only
+- Impact: Not suitable for institutional or high-security use cases
+
+**7. Economic Model**
+
+- Railgun:
+  - 0.25% protocol fee on shield/unshield
+  - Relayer fee system (10% premium default)
+  - RAIL governance token
+  - DAO treasury
+- Octopus: No fee system, no governance token
+- Impact: No economic sustainability or decentralized governance
+
+**8. Privacy Enhancements**
+
+- Railgun: Every transaction (transfer, swap, lend) adds noise to anonymity set
+- Octopus: Only shield/unshield operations affect anonymity set
+- Impact: Smaller anonymity set, weaker privacy guarantees
+
+### Technology Comparison
+
+| Feature | Railgun | Octopus |
+|---------|---------|---------|
+| **Blockchain** | EVM chains (Ethereum, Arbitrum, Polygon, BNB) | Sui |
+| **ZK Proof System** | Groth16 | Groth16 |
+| **Curve** | BN254 | BN254 |
+| **Hash Function** | Poseidon | Poseidon |
+| **Merkle Tree Depth** | Unknown | 16 |
+| **Commitment Model** | UTXO | UTXO |
+| **Transaction Types** | Shield, Unshield, Transfer, DeFi calls | Shield, Unshield only |
+| **Relayer Network** | ✅ Yes | ❌ No |
+| **Compliance Tools** | ✅ Yes | ❌ No |
+| **Multi-Chain** | ✅ Yes | ❌ No |
+
+### Summary
+
+**Octopus is a minimal viable privacy protocol** demonstrating the core ZK-SNARK technology for shielded transactions on Sui. It successfully implements the fundamental cryptographic primitives (Poseidon commitments, Merkle proofs, nullifiers) and the basic shield/unshield flow.
+
+**Railgun is a production-grade privacy infrastructure** with extensive features including private transfers, relayer networks, DeFi integration, compliance tools, and multi-chain support. It represents a complete privacy ecosystem rather than just a proof-of-concept.
+
+**Development Path Forward:**
+
+Detailed implementation plans are available in the [milestones/](milestones/) directory:
+
+1. 🔴 **[Private Transfers](milestones/01-private-transfers.md)** (Priority 1, 5-6 weeks)
+   - Extends utility beyond entry/exit
+   - Foundation for all other features
+   - 2-input, 2-output transfer circuit
+
+2. 🟡 **[DeFi Integration](milestones/02-defi-integration.md)** (Priority 2, 5-6 weeks)
+   - Private swaps through Cetus DEX
+   - Increases transaction volume and anonymity set
+   - Requires Private Transfers first
+
+3. 🟠 **[Relayer Network](milestones/03-relayer-network.md)** (Priority 3, 5-6 weeks)
+   - Improves privacy by hiding transaction origin
+   - Decentralized broadcaster network
+   - Fee payment in shielded tokens
+
+4. 🟢 **[Compliance Features](milestones/04-compliance-features.md)** (Priority 4, 6-7 weeks)
+   - Private Proofs of Innocence (PPOI)
+   - View keys for selective disclosure
+   - Tax reporting tools
+
+See [milestones/README.md](milestones/README.md) for complete roadmap and timeline
+
+**References:**
+
+- [Railgun Official Site](https://www.railgun.org/)
+- [Railgun Privacy System Documentation](https://docs.railgun.org/wiki/learn/privacy-system)
+- [Messari: RAILGUN Privacy Infrastructure for DeFi](https://messari.io/report/railgun-privacy-infrastructure-for-defi)
+- [BeInCrypto: What is Railgun? A Guide to the EVM Privacy Protocol](https://beincrypto.com/learn/railgun-defi-explainer/)
