@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"
@@ -11,6 +11,7 @@
   "dependencies": {
     "@mysten/dapp-kit": "^0.14.0",
     "@mysten/sui": "^1.24.0",
+    "@octopus/sdk": "file:../sdk",
     "@radix-ui/react-slot": "^1.0.2",
     "@tanstack/react-query": "^5.0.0",
     "circomlibjs": "^0.1.7",

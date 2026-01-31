@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@octopus/sdk"],
   turbopack: {},
   webpack: (config) => {
     config.resolve.fallback = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useCurrentAccount,
   useSignAndExecuteTransaction,
@@ -10,10 +10,17 @@ import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import {
+  initPoseidon,
+  createNote,
+  encryptNote,
+  bigIntToBytes,
+  poseidonHash
+} from "@octopus/sdk";
 
 interface ShieldFormProps {
   keypair: RailgunKeypair | null;
-  onSuccess?: () => void;
+  onSuccess?: (amount: bigint) => void;
 }
 
 export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
@@ -21,10 +28,38 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+
+  // Fetch wallet balance whenever account changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!account?.address) {
+        setBalance(null);
+        return;
+      }
+
+      setIsLoadingBalance(true);
+      try {
+        const balanceResult = await client.getBalance({
+          owner: account.address,
+          coinType: SUI_COIN_TYPE,
+        });
+        setBalance(BigInt(balanceResult.totalBalance));
+      } catch (err) {
+        console.error("Failed to fetch balance:", err);
+        setBalance(null);
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    fetchBalance();
+  }, [account?.address, client]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,19 +81,46 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       return;
     }
 
+    const amountMist = parseSui(amount);
+
+    // Validate against wallet balance
+    if (balance !== null && amountMist > balance) {
+      setError(
+        `Insufficient balance. You have ${formatSui(balance)} SUI available.`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const amountMist = parseSui(amount);
+      // Initialize Poseidon hash function
+      await initPoseidon();
 
       if (DEMO_MODE) {
         // Simulate shield in demo mode
         await new Promise((resolve) => setTimeout(resolve, 1500));
         setSuccess(`Demo: Shielded ${formatSui(amountMist)} SUI`);
         setAmount("");
-        onSuccess?.();
+        onSuccess?.(amountMist);
         return;
       }
+
+      // Create a token identifier for SUI by hashing the coin type
+      const tokenId = poseidonHash([BigInt(0x2)]); // Simplified: use 0x2 for SUI
+
+      // Create a note using SDK crypto functions
+      const note = createNote(
+        keypair.masterPublicKey,
+        tokenId,
+        amountMist
+      );
+
+      // Encrypt the note for the recipient (self in this case)
+      const encryptedNoteData = encryptNote(note, keypair.masterPublicKey);
+
+      // Convert commitment to bytes (32 bytes, big-endian)
+      const commitmentBytes = bigIntToBytes(note.commitment);
 
       // Build shield transaction
       const tx = new Transaction();
@@ -66,23 +128,14 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       // Split coin for the amount to shield
       const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(amountMist)]);
 
-      // Create note commitment (simplified for demo)
-      // In production, use proper Poseidon hash from SDK
-      const commitment = new Uint8Array(32);
-      crypto.getRandomValues(commitment);
-
-      // Encrypted note (simplified)
-      const encryptedNote = new Uint8Array(128);
-      crypto.getRandomValues(encryptedNote);
-
       tx.moveCall({
         target: `${PACKAGE_ID}::pool::shield`,
         typeArguments: [SUI_COIN_TYPE],
         arguments: [
           tx.object(POOL_ID),
           coin,
-          tx.pure.vector("u8", Array.from(commitment)),
-          tx.pure.vector("u8", Array.from(encryptedNote)),
+          tx.pure.vector("u8", Array.from(commitmentBytes)),
+          tx.pure.vector("u8", Array.from(encryptedNoteData)),
         ],
       });
 
@@ -92,7 +145,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
 
       setSuccess(`Shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`);
       setAmount("");
-      onSuccess?.();
+      onSuccess?.(amountMist);
     } catch (err) {
       console.error("Shield failed:", err);
       setError(err instanceof Error ? err.message : "Shield failed");
@@ -112,12 +165,25 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label
-            htmlFor="shield-amount"
-            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
-            Amount (SUI)
-          </label>
+          <div className="mb-1 flex items-center justify-between">
+            <label
+              htmlFor="shield-amount"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Amount (SUI)
+            </label>
+            {account && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {isLoadingBalance ? (
+                  "Loading balance..."
+                ) : balance !== null ? (
+                  <>Balance: {formatSui(balance)} SUI</>
+                ) : (
+                  "Balance unavailable"
+                )}
+              </span>
+            )}
+          </div>
           <input
             id="shield-amount"
             type="number"

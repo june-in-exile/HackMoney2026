@@ -19,18 +19,19 @@ export default function Home() {
   const [demoBalance, setDemoBalance] = useState(0n);
   const [demoNoteCount, setDemoNoteCount] = useState(0);
 
-  const handleShieldSuccess = () => {
+  const handleShieldSuccess = (amount: bigint) => {
     if (DEMO_MODE) {
-      // In demo mode, add a random amount to balance
-      setDemoBalance((prev) => prev + BigInt(Math.floor(Math.random() * 1e9)));
+      // In demo mode, add the actual shielded amount to balance
+      setDemoBalance((prev) => prev + amount);
       setDemoNoteCount((prev) => prev + 1);
     }
   };
 
-  const handleUnshieldSuccess = () => {
+  const handleUnshieldSuccess = (amount: bigint) => {
     if (DEMO_MODE) {
-      setDemoBalance(0n);
-      setDemoNoteCount(0);
+      // In demo mode, subtract the actual unshielded amount from balance
+      setDemoBalance((prev) => prev - amount);
+      setDemoNoteCount((prev) => Math.max(0, prev - 1));
     }
   };
 

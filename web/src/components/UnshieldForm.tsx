@@ -13,7 +13,7 @@ import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
 interface UnshieldFormProps {
   keypair: RailgunKeypair | null;
   maxAmount: bigint;
-  onSuccess?: () => void;
+  onSuccess?: (amount: bigint) => void;
 }
 
 type UnshieldState =
@@ -90,7 +90,7 @@ export function UnshieldForm({
         setSuccess(`Demo: Unshielded ${formatSui(amountMist)} SUI to ${recipient.slice(0, 10)}...`);
         setAmount("");
         setRecipient("");
-        onSuccess?.();
+        onSuccess?.(amountMist);
         return;
       }
 
@@ -126,7 +126,7 @@ export function UnshieldForm({
       setSuccess(`Unshielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`);
       setAmount("");
       setRecipient("");
-      onSuccess?.();
+      onSuccess?.(amountMist);
     } catch (err) {
       console.error("Unshield failed:", err);
       setState("error");

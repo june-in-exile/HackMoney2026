@@ -3,9 +3,8 @@
  */
 
 // Deployed contract addresses (testnet)
-// TODO: Update these after deploying the pool contract
-export const PACKAGE_ID = "0x0";
-export const POOL_ID = "0x0";
+export const PACKAGE_ID = "0x4f644f295c5120cff3d5393dcd8d9444bf0b28990b2eda950faee148b5370123";
+export const POOL_ID = "0x1f6c240a5a891098c2acfd0e4302228f88da5be205a7d5224a8c59eb7bfac367";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";
@@ -20,5 +19,5 @@ export const STORAGE_KEYS = {
   NOTES: "octopus_notes",
 } as const;
 
-// Demo mode - set to true to use mock data without real contracts
-export const DEMO_MODE = true;
+// Demo mode - set to false to use real on-chain contracts
+export const DEMO_MODE = false;
