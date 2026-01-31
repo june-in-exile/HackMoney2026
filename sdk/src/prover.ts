@@ -273,10 +273,10 @@ export function convertProofToSui(
   proofBytes.set(piB, 32);
   proofBytes.set(piC, 96);
 
-  // Public inputs: 3 × 32 bytes = 96 bytes (LE format)
+  // Public inputs: 3 × 32 bytes = 96 bytes (BE format for Move contract)
   const publicInputsBytes = new Uint8Array(96);
   for (let i = 0; i < 3; i++) {
-    const inputBytes = bigIntToLE32(BigInt(publicSignals[i]));
+    const inputBytes = bigIntToBE32(BigInt(publicSignals[i]));
     publicInputsBytes.set(inputBytes, i * 32);
   }
 
@@ -396,6 +396,16 @@ function bigIntToLE32(n: bigint): Uint8Array {
   const buf = new Uint8Array(32);
   let val = n;
   for (let i = 0; i < 32; i++) {
+    buf[i] = Number(val & 0xffn);
+    val >>= 8n;
+  }
+  return buf;
+}
+
+function bigIntToBE32(n: bigint): Uint8Array {
+  const buf = new Uint8Array(32);
+  let val = n;
+  for (let i = 31; i >= 0; i--) {
     buf[i] = Number(val & 0xffn);
     val >>= 8n;
   }
