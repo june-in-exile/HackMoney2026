@@ -1,6 +1,5 @@
 #!/bin/bash
-# Compile unshield.circom and generate proving/verification keys
-# Based on existing hash_preimage compilation workflow
+# Compile unshield.circom and generate proving/verification keys for Groth16 ZK-SNARKs
 
 set -e
 
@@ -54,7 +53,7 @@ echo "  - $BUILD_DIR/${CIRCUIT_NAME}_final.zkey"
 echo "  - $BUILD_DIR/${CIRCUIT_NAME}_vk.json"
 echo ""
 echo "Next steps:"
-echo "  1. Create input.json with test values"
-echo "  2. Generate witness: node ${BUILD_DIR}/${CIRCUIT_NAME}_js/generate_witness.js"
-echo "  3. Generate proof: snarkjs groth16 prove"
-echo "  4. Convert to Sui format: node convert_to_sui.js"
+echo "  1. Generate test input: node generateUnshieldTestInput.js"
+echo "  2. Generate witness: node ${BUILD_DIR}/${CIRCUIT_NAME}_js/generate_witness.js ${BUILD_DIR}/${CIRCUIT_NAME}_input.json ${BUILD_DIR}/${CIRCUIT_NAME}_witness.wtns"
+echo "  3. Generate proof: snarkjs groth16 prove ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ${BUILD_DIR}/${CIRCUIT_NAME}_witness.wtns ${BUILD_DIR}/${CIRCUIT_NAME}_proof.json ${BUILD_DIR}/${CIRCUIT_NAME}_public.json"
+echo "  4. Convert to Sui format: node arkworksConverter.js"

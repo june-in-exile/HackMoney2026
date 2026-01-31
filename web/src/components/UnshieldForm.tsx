@@ -118,13 +118,24 @@ export function UnshieldForm({
       }
 
       // Get Merkle proof from on-chain state
-      console.log("Fetching Merkle proof for note at position:", noteToSpend.position);
+      console.log("=== Unshield Debug Info ===");
+      console.log("Note to spend:", {
+        commitment: noteToSpend.commitment,
+        npk: noteToSpend.npk,
+        token: noteToSpend.token,
+        value: noteToSpend.value.toString(),
+        random: noteToSpend.random,
+        position: noteToSpend.position,
+      });
+
       const merkleProofData = await getMerkleProofForNote(
         suiClient,
         noteToSpend.position
       );
 
-      console.log("Merkle proof retrieved, generating ZK proof...");
+      console.log("Merkle proof retrieved:");
+      console.log("- On-chain root:", "0x" + merkleProofData.merkleRoot.toString(16).padStart(64, "0"));
+      console.log("- Path elements count:", merkleProofData.pathElements.length);
 
       // Build SpendInput for proof generation
       const spendInput: SpendInput = {
@@ -145,7 +156,18 @@ export function UnshieldForm({
       const { proof, publicSignals } = await generateUnshieldProof(spendInput);
 
       console.log("ZK proof generated successfully!");
-      console.log("Public signals:", publicSignals);
+      console.log("Public signals (circuit outputs):");
+      console.log("- merkle_root:", publicSignals[0]);
+      console.log("- nullifier:", publicSignals[1]);
+      console.log("- commitment:", publicSignals[2]);
+
+      // Compare circuit root with on-chain root
+      const circuitRoot = BigInt(publicSignals[0]);
+      const rootMatch = circuitRoot === merkleProofData.merkleRoot;
+      console.log("Root comparison:");
+      console.log("- Circuit root:", "0x" + circuitRoot.toString(16).padStart(64, "0"));
+      console.log("- On-chain root:", "0x" + merkleProofData.merkleRoot.toString(16).padStart(64, "0"));
+      console.log("- Match:", rootMatch ? "✅" : "❌ MISMATCH!");
 
       // Convert to Sui format
       const suiProof = convertProofToSui(proof, publicSignals);
