@@ -43,22 +43,115 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
     setIsSubmitting(true);
 
     try {
-      // TODO: Implement full transfer flow
-      // 1. Query owned notes from pool events
-      // 2. Select notes to cover amount (use selectNotesForTransfer from SDK)
-      // 3. Create output notes (recipient + change)
-      // 4. Generate Merkle proofs for input notes
-      // 5. Build transfer circuit input
-      // 6. Generate ZK proof (using generateTransferProof from SDK)
-      // 7. Build and submit transaction
+      // ============================================
+      // TRANSFER PROOF GENERATION FLOW
+      // ============================================
+      //
+      // Current Status: ✅ Core infrastructure complete
+      // - Transfer circuit compiled (21,649 constraints)
+      // - Move contract deployed with transfer() function
+      // - SDK functions ready (generateTransferProof, selectNotesForTransfer)
+      // - New pool deployed with both VKs (unshield + transfer)
+      //
+      // Missing Components (to enable full flow):
+      // 1. 🔴 Note encryption/decryption implementation
+      //    - Required for useNotes hook to decrypt owned notes
+      //    - ChaCha20-Poly1305 with ECDH shared secret
+      // 2. 🔴 Merkle proof generation
+      //    - Query on-chain Merkle tree to get proof paths
+      //    - Required for transfer circuit input
+      // 3. ⚠️  Circuit artifacts deployment
+      //    - transfer.wasm (2.2MB) and transfer_final.zkey (9.5MB)
+      //    - Already copied to web/public/circuits/
+      //
+      // Once above are ready, uncomment the code below:
 
-      setError("Transfer functionality coming soon! Core implementation complete.");
+      /*
+      // 1. Import SDK functions
+      import { selectNotesForTransfer, createTransferOutputs, generateTransferProof, convertTransferProofToSui } from "@octopus/sdk";
+      import { buildTransferTransaction } from "@octopus/sdk";
+      import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
+      import { useNotes } from "@/hooks/useNotes";
 
-      // Placeholder success message
-      // if (onSuccess) await onSuccess();
-      // setSuccess(`Transfer of ${amount} SUI initiated successfully!`);
-      // setRecipientMpk("");
-      // setAmount("");
+      // 2. Get available notes using useNotes hook
+      const { notes } = useNotes(keypair);
+      const unspentNotes = notes.filter(n => !n.spent);
+
+      if (unspentNotes.length === 0) {
+        setError("No unspent notes available. Shield some tokens first!");
+        return;
+      }
+
+      // 3. Select notes to cover amount
+      const amountNano = BigInt(Math.floor(parseFloat(amount) * 1_000_000_000)); // Convert SUI to nanoSUI
+      const selectedNotes = selectNotesForTransfer(
+        unspentNotes.map(n => ({
+          note: n.note,
+          leafIndex: n.leafIndex,
+          pathElements: n.pathElements || [], // Merkle proof
+        })),
+        amountNano
+      );
+
+      // 4. Create output notes (recipient + change)
+      const recipientMpkBigInt = BigInt(recipientMpk);
+      const inputTotal = selectedNotes.reduce((sum, n) => sum + n.note.value, 0n);
+      const [recipientNote, changeNote] = createTransferOutputs(
+        recipientMpkBigInt,
+        keypair.masterPublicKey,
+        amountNano,
+        inputTotal,
+        0n // token type (0 = SUI)
+      );
+
+      // 5. Generate ZK proof (30-60 seconds)
+      const proof = await generateTransferProof(
+        {
+          keypair,
+          inputNotes: selectedNotes.map(n => n.note),
+          inputLeafIndices: selectedNotes.map(n => n.leafIndex),
+          inputPathElements: selectedNotes.map(n => n.pathElements!),
+          outputNotes: [recipientNote, changeNote],
+          token: 0n,
+        },
+        {
+          wasmPath: CIRCUIT_URLS.TRANSFER.WASM,
+          zkeyPath: CIRCUIT_URLS.TRANSFER.ZKEY,
+        }
+      );
+
+      // 6. Convert proof to Sui format
+      const suiProof = convertTransferProofToSui(proof.proof, proof.publicSignals);
+
+      // 7. Encrypt output notes for recipients
+      const encryptedRecipientNote = encryptNote(recipientNote, recipientMpkBigInt);
+      const encryptedChangeNote = encryptNote(changeNote, keypair.masterPublicKey);
+
+      // 8. Build and submit transaction
+      const tx = buildTransferTransaction(
+        PACKAGE_ID,
+        POOL_ID,
+        SUI_COIN_TYPE,
+        suiProof,
+        [encryptedRecipientNote, encryptedChangeNote]
+      );
+
+      const result = await signAndExecute({ transaction: tx });
+
+      // 9. Success!
+      if (onSuccess) await onSuccess();
+      setSuccess(`✅ Transfer of ${amount} SUI initiated! TX: ${result.digest.slice(0, 8)}...`);
+      setRecipientMpk("");
+      setAmount("");
+      */
+
+      // Temporary placeholder until note encryption is implemented
+      setError(
+        "⚠️ Transfer requires note encryption/decryption. " +
+        "Core SDK, circuit (21,649 constraints), and Move contract are ready. " +
+        "Implement note encryption to enable full transfer flow."
+      );
+
     } catch (err) {
       console.error("Transfer failed:", err);
       setError(err instanceof Error ? err.message : "Transfer failed");

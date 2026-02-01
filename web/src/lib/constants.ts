@@ -3,9 +3,9 @@
  */
 
 // Deployed contract addresses (testnet)
-// Updated 2026-01-31: Redeployed with Poseidon hash ✅
-export const PACKAGE_ID = "0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080";
-export const POOL_ID = "0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3";
+// Updated 2026-02-01: Redeployed with transfer support ✅
+export const PACKAGE_ID = "0xbdfa6e285a327879c9ec3006a4992885ff21809c4d5f22a3b3f65a5228aafe61";
+export const POOL_ID = "0xe4b8527f84a141c508250c7f7eba512def477e8c6d60a36e896c6b80c3762a31";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";
