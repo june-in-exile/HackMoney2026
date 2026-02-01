@@ -207,15 +207,19 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - [ ] Write unit tests - PENDING
 - [ ] Test end-to-end with testnet - PENDING
 
-### Phase 4: Frontend (Week 4-5)
+### Phase 4: Frontend (Week 4-5) 🟡 Partially Complete
 
-- [ ] Create `TransferForm.tsx` component
-- [ ] Add recipient MPK input and validation
-- [ ] Implement note selection UI
-- [ ] Add proof generation progress
-- [ ] Deploy transfer circuit artifacts to `/public/circuits/`
-- [ ] Test in browser
-- [ ] Add transaction history view
+- [x] Create `TransferForm.tsx` component (placeholder UI)
+- [x] Add recipient MPK input and validation
+- [x] Add tabbed navigation (Shield/Transfer/Unshield)
+- [x] Deploy transfer circuit artifacts to `/public/circuits/`
+- [x] Update constants with transfer circuit URLs
+- [x] Update How It Works section with transfer flow
+- [ ] Implement full proof generation flow - PENDING (requires SDK integration)
+- [ ] Implement note selection UI - PENDING
+- [ ] Add proof generation progress indicator - PENDING
+- [ ] Test in browser - PENDING
+- [ ] Add transaction history view - PENDING
 
 ### Phase 5: Testing & Optimization (Week 5-6)
 
@@ -237,9 +241,9 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - ✅ `railgun/sources/transfer_tests.move` - Move tests (7 test cases, 280 lines)
 - ✅ `circuits/build/transfer_final.zkey` - Proving key (9.5 MB)
 - ✅ `circuits/build/transfer_vk.json` - Verification key (3.6 KB)
-- [ ] `web/src/components/TransferForm.tsx` - Transfer UI - NEXT
-- [ ] `web/public/circuits/transfer_js/transfer.wasm` - Circuit WASM - PENDING
-- [ ] `web/public/circuits/transfer_final.zkey` - Proving key - PENDING
+- ✅ `web/src/components/TransferForm.tsx` - Transfer UI (placeholder, 180 lines)
+- ✅ `web/public/circuits/transfer_js/transfer.wasm` - Circuit WASM (2.2 MB)
+- ✅ `web/public/circuits/transfer_final.zkey` - Proving key (9.5 MB)
 - [ ] `sdk/src/__tests__/transfer.test.ts` - SDK tests - PENDING
 
 ### Modified Files
