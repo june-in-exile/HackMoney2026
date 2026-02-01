@@ -36,7 +36,7 @@ module railgun::transfer_tests {
         ts::next_tx(scenario, ADMIN);
         {
             let ctx = ts::ctx(scenario);
-            let pool = pool::create_pool<SUI>(TEST_VK, TEST_VK, ctx);
+            let pool = pool::create_pool<SUI>(TEST_VK, TEST_VK, TEST_VK, ctx);
             transfer::public_share_object(pool);
         };
     }

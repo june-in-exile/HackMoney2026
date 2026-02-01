@@ -11,6 +11,7 @@ import {
 import { Transaction } from "@mysten/sui/transactions";
 import { type Keypair } from "@mysten/sui/cryptography";
 import { type SuiProof, type SuiVerificationKey, type SuiTransferProof, type Note } from "./types.js";
+import { type SuiSwapProof } from "./defi.js";
 import { bigIntToBytes, encryptNote, deriveViewingPublicKey } from "./crypto.js";
 
 /**
@@ -416,6 +417,52 @@ export function buildTransferTransaction<T extends string>(
         "vector<vector<u8>>",
         encryptedNotes.map((n) => Array.from(n))
       ),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build a swap transaction (for manual signing)
+ *
+ * @param packageId - Railgun package ID
+ * @param poolInId - Input token pool ID
+ * @param poolOutId - Output token pool ID
+ * @param coinTypeIn - Input token type (e.g., "0x2::sui::SUI")
+ * @param coinTypeOut - Output token type (e.g., "0x...::usdc::USDC")
+ * @param proof - Swap ZK proof
+ * @param amountIn - Amount to swap in
+ * @param minAmountOut - Minimum amount out (slippage protection)
+ * @param encryptedOutputNote - Encrypted note for output token
+ * @param encryptedChangeNote - Encrypted note for change token
+ */
+export function buildSwapTransaction<TokenIn extends string, TokenOut extends string>(
+  packageId: string,
+  poolInId: string,
+  poolOutId: string,
+  coinTypeIn: TokenIn,
+  coinTypeOut: TokenOut,
+  proof: SuiSwapProof,
+  amountIn: bigint,
+  minAmountOut: bigint,
+  encryptedOutputNote: Uint8Array,
+  encryptedChangeNote: Uint8Array
+): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${packageId}::pool::swap`,
+    typeArguments: [coinTypeIn, coinTypeOut],
+    arguments: [
+      tx.object(poolInId),
+      tx.object(poolOutId),
+      tx.pure("vector<u8>", Array.from(proof.proofBytes)),
+      tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
+      tx.pure("u64", amountIn.toString()),
+      tx.pure("u64", minAmountOut.toString()),
+      tx.pure("vector<u8>", Array.from(encryptedOutputNote)),
+      tx.pure("vector<u8>", Array.from(encryptedChangeNote)),
     ],
   });
 

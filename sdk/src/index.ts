@@ -71,6 +71,8 @@ export {
   RailgunClient,
   buildShieldTransaction,
   buildUnshieldTransaction,
+  buildTransferTransaction,
+  buildSwapTransaction,
   hexToBytes,
   bytesToHex,
   TESTNET_CONFIG,
@@ -84,3 +86,15 @@ export {
   getMerkleProofForNote,
   type CommitmentLeaf,
 } from "./merkle.js";
+
+// DeFi operations (Private Swaps)
+export {
+  buildSwapInput,
+  generateSwapProof,
+  calculateMinAmountOut,
+  estimateSwapOutput,
+  type SwapParams,
+  type SwapInput,
+  type SwapCircuitInput,
+  type SuiSwapProof,
+} from "./defi.js";

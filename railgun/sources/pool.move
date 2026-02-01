@@ -43,6 +43,8 @@ module railgun::pool {
         vk_bytes: vector<u8>,
         /// Groth16 verification key for transfer (Arkworks compressed format)
         transfer_vk_bytes: vector<u8>,
+        /// Groth16 verification key for swap (Arkworks compressed format)
+        swap_vk_bytes: vector<u8>,
         /// Historical merkle roots for proof validity window
         historical_roots: vector<vector<u8>>,
     }
@@ -79,13 +81,35 @@ module railgun::pool {
         encrypted_notes: vector<vector<u8>>,
     }
 
+    /// Event emitted when tokens are swapped privately through DEX
+    public struct SwapEvent has copy, drop {
+        /// Nullifiers that were spent (2 inputs)
+        input_nullifiers: vector<vector<u8>>,
+        /// Output commitment (swapped token)
+        output_commitment: vector<u8>,
+        /// Change commitment (remaining input token)
+        change_commitment: vector<u8>,
+        /// Position of output commitment in output pool tree
+        output_position: u64,
+        /// Position of change commitment in input pool tree
+        change_position: u64,
+        /// Amount swapped in
+        amount_in: u64,
+        /// Amount received out
+        amount_out: u64,
+        /// Encrypted notes for recipient to scan
+        encrypted_output_note: vector<u8>,
+        encrypted_change_note: vector<u8>,
+    }
+
     // ============ Public Functions ============
 
     /// Create a new privacy pool for token type T with the given verification keys.
-    /// The verification keys are generated from circuit compilation (unshield and transfer).
+    /// The verification keys are generated from circuit compilation (unshield, transfer, swap).
     public fun create_pool<T>(
         vk_bytes: vector<u8>,
         transfer_vk_bytes: vector<u8>,
+        swap_vk_bytes: vector<u8>,
         ctx: &mut TxContext,
     ): PrivacyPool<T> {
         PrivacyPool {
@@ -95,6 +119,7 @@ module railgun::pool {
             nullifiers: nullifier::new(ctx),
             vk_bytes,
             transfer_vk_bytes,
+            swap_vk_bytes,
             historical_roots: vector::empty(),
         }
     }
@@ -104,9 +129,10 @@ module railgun::pool {
     public entry fun create_shared_pool<T>(
         vk_bytes: vector<u8>,
         transfer_vk_bytes: vector<u8>,
+        swap_vk_bytes: vector<u8>,
         ctx: &mut TxContext,
     ) {
-        let pool = create_pool<T>(vk_bytes, transfer_vk_bytes, ctx);
+        let pool = create_pool<T>(vk_bytes, transfer_vk_bytes, swap_vk_bytes, ctx);
         transfer::share_object(pool);
     }
 
@@ -206,6 +232,105 @@ module railgun::pool {
             output_commitments: vector[commitment1, commitment2],
             output_positions: vector[position1, position2],
             encrypted_notes,
+        });
+    }
+
+    /// Swap tokens privately through external DEX (e.g., Cetus).
+    ///
+    /// The ZK proof proves:
+    /// 1. Knowledge of spending_key and nullifying_key (ownership of input notes)
+    /// 2. Both input notes exist in Merkle tree (2 Merkle proofs)
+    /// 3. Correct nullifier computation for both inputs
+    /// 4. Sufficient balance: sum(input_values) >= amount_in + change_value
+    /// 5. Swap parameters hash correctly
+    /// 6. Output and change commitments correctly computed
+    ///
+    /// Public inputs format (192 bytes total):
+    /// - merkle_root (32 bytes): Merkle tree root
+    /// - input_nullifiers[2] (64 bytes): Nullifiers for both input notes
+    /// - output_commitment (32 bytes): Commitment for output note (token_out)
+    /// - change_commitment (32 bytes): Commitment for change note (token_in)
+    /// - swap_data_hash (32 bytes): Hash of swap parameters
+    ///
+    /// NOTE: This is a TEST-ONLY version using 1:1 swap ratio.
+    /// For production use, implement execute_cetus_swap() with real Cetus DEX integration.
+    #[test_only]
+    public entry fun swap<TokenIn, TokenOut>(
+        pool_in: &mut PrivacyPool<TokenIn>,
+        pool_out: &mut PrivacyPool<TokenOut>,
+        proof_bytes: vector<u8>,
+        public_inputs_bytes: vector<u8>,
+        amount_in: u64,
+        min_amount_out: u64,
+        encrypted_output_note: vector<u8>,
+        encrypted_change_note: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 192, E_INVALID_PUBLIC_INPUTS);
+
+        // 1. Parse public inputs
+        let (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, _swap_data_hash) =
+            parse_swap_public_inputs(&public_inputs_bytes);
+
+        // 2. Verify merkle root is valid (current or in history)
+        assert!(is_valid_root(pool_in, &merkle_root), E_INVALID_ROOT);
+
+        // 3. Check both nullifiers have not been spent (prevent double-spend)
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier1), E_DOUBLE_SPEND);
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier2), E_DOUBLE_SPEND);
+
+        // 4. Verify Groth16 ZK proof using swap verification key
+        let pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool_in.swap_vk_bytes);
+        let public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
+        let proof_points = groth16::proof_points_from_bytes(proof_bytes);
+
+        assert!(
+            groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
+            E_INVALID_PROOF
+        );
+
+        // 5. Extract tokens from pool_in
+        assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
+        let coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
+
+        // 6. Execute swap through DEX
+        // TODO: Replace with real Cetus DEX integration
+        // For now, using simplified 1:1 swap ratio for testing
+        let amount_out = execute_mock_swap<TokenIn, TokenOut>(
+            coin_in,
+            min_amount_out,
+            pool_out,
+            ctx
+        );
+
+        // 7. Mark both nullifiers as spent
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
+
+        // 8. Insert output commitment into pool_out's Merkle tree
+        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
+        merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
+
+        // 9. Insert change commitment into pool_in's Merkle tree
+        let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
+        merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
+
+        // 10. Save historical roots for both pools
+        save_historical_root(pool_in);
+        save_historical_root(pool_out);
+
+        // 11. Emit event for wallet scanning
+        event::emit(SwapEvent {
+            input_nullifiers: vector[nullifier1, nullifier2],
+            output_commitment,
+            change_commitment,
+            output_position,
+            change_position,
+            amount_in,
+            amount_out,
+            encrypted_output_note,
+            encrypted_change_note,
         });
     }
 
@@ -396,6 +521,97 @@ module railgun::pool {
         (merkle_root, nullifier1, nullifier2, commitment1, commitment2)
     }
 
+    /// Parse swap public inputs from concatenated bytes (for swap).
+    /// Returns (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash)
+    /// each as 32-byte vectors.
+    fun parse_swap_public_inputs(bytes: &vector<u8>):
+        (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
+
+        let mut merkle_root = vector::empty<u8>();
+        let mut nullifier1 = vector::empty<u8>();
+        let mut nullifier2 = vector::empty<u8>();
+        let mut output_commitment = vector::empty<u8>();
+        let mut change_commitment = vector::empty<u8>();
+        let mut swap_data_hash = vector::empty<u8>();
+
+        // Extract merkle_root (bytes 0-31)
+        let mut i = 0;
+        while (i < 32) {
+            vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract nullifier1 (bytes 32-63)
+        while (i < 64) {
+            vector::push_back(&mut nullifier1, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract nullifier2 (bytes 64-95)
+        while (i < 96) {
+            vector::push_back(&mut nullifier2, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract output_commitment (bytes 96-127)
+        while (i < 128) {
+            vector::push_back(&mut output_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract change_commitment (bytes 128-159)
+        while (i < 160) {
+            vector::push_back(&mut change_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract swap_data_hash (bytes 160-191)
+        while (i < 192) {
+            vector::push_back(&mut swap_data_hash, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash)
+    }
+
+    /// Execute a mock swap (1:1 ratio) for testing.
+    /// TODO: Replace with real Cetus DEX integration.
+    ///
+    /// In production, this should:
+    /// 1. Call Cetus pool's swap function
+    /// 2. Get real market price
+    /// 3. Apply slippage protection
+    /// 4. Return actual output amount
+    #[test_only]
+    fun execute_mock_swap<TokenIn, TokenOut>(
+        coin_in: Coin<TokenIn>,
+        min_amount_out: u64,
+        pool_out: &mut PrivacyPool<TokenOut>,
+        ctx: &mut TxContext,
+    ): u64 {
+        // Get input amount
+        let amount_in = coin::value(&coin_in);
+
+        // Destroy input coin (in real DEX integration, this would go to the DEX)
+        coin::burn_for_testing(coin_in);
+
+        // Mock 1:1 swap (simplified for testing)
+        // In production, this would call:
+        // let coin_out = cetus::swap<TokenIn, TokenOut>(dex_pool, coin_in, min_amount_out, ctx);
+        let amount_out = amount_in; // 1:1 ratio for testing
+
+        // Check slippage protection
+        assert!(amount_out >= min_amount_out, E_INSUFFICIENT_BALANCE);
+
+        // Mint output tokens (in real DEX integration, we'd receive from DEX)
+        let coin_out = coin::mint_for_testing<TokenOut>(amount_out, ctx);
+
+        // Add to output pool balance
+        balance::join(&mut pool_out.balance, coin::into_balance(coin_out));
+
+        amount_out
+    }
+
     // ============ Test Helpers ============
 
     #[test_only]
@@ -407,6 +623,7 @@ module railgun::pool {
             nullifiers,
             vk_bytes: _,
             transfer_vk_bytes: _,
+            swap_vk_bytes: _,
             historical_roots: _
         } = pool;
 

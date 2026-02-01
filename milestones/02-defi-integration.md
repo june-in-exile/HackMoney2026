@@ -1,9 +1,11 @@
 # Milestone 2: DeFi Integration (Private Swaps)
 
 **Priority:** 🟡 High
-**Status:** Not Started
+**Status:** 🟡 In Progress (Phase 1: 70% Complete)
 **Estimated Complexity:** Very High
-**Dependencies:** Private Transfers (Milestone 1)
+**Dependencies:** Private Transfers (Milestone 1) ✅ Complete
+
+**Last Updated:** 2026-02-01
 
 ## Overview
 
@@ -280,15 +282,20 @@ export function useDexPrice(
 
 ## Implementation Phases
 
-### Phase 1: Circuit & Contract (Week 1-2)
+### Phase 1: Circuit & Contract (Week 1-2) - 🟡 70% Complete
 
-- [ ] Design `swap.circom` circuit
-- [ ] Add swap constraints and verification
-- [ ] Compile circuit and generate keys
-- [ ] Add `swap()` function to pool.move
-- [ ] Integrate with Cetus DEX module
+- [x] Design `swap.circom` circuit ✅ 2026-02-01
+- [x] Add swap constraints and verification ✅ 2026-02-01
+- [x] Compile circuit and generate keys ✅ 2026-02-01 (22,553 constraints)
+- [x] Add `swap()` function to pool.move ✅ 2026-02-01 (test-only version)
+- [ ] Integrate with Cetus DEX module ⚠️ Mock implementation only
 - [ ] Write Move unit tests (15+ cases)
 - [ ] Deploy multi-token pools to testnet
+
+**Notes:**
+- Swap circuit successfully compiled with 22,553 constraints (well under 80K target)
+- Mock swap implementation using 1:1 ratio for testing
+- Real Cetus integration documented in [/docs/CETUS_INTEGRATION.md](/Users/june/Projects/HackMoney2026/docs/CETUS_INTEGRATION.md)
 
 ### Phase 2: SDK Integration (Week 2-3)
 
@@ -331,28 +338,33 @@ export function useDexPrice(
 
 ### New Files
 
-- `circuits/swap.circom` - Swap circuit
-- `circuits/compile_swap.sh` - Compilation script
-- `sdk/src/defi.ts` - DeFi operations SDK
-- `sdk/src/__tests__/defi.test.ts` - DeFi tests
-- `web/src/components/SwapForm.tsx` - Swap UI
-- `web/src/hooks/useDexPrice.ts` - Price fetching hook
-- `web/public/circuits/swap_js/swap.wasm` - Circuit WASM
-- `web/public/circuits/swap_final.zkey` - Proving key
-- `railgun/tests/swap_tests.move` - Swap tests
+- [x] `circuits/swap.circom` - Swap circuit ✅
+- [x] `circuits/compile_swap.sh` - Compilation script ✅
+- [x] `circuits/build/swap_js/swap.wasm` - Circuit WASM ✅
+- [x] `circuits/build/swap_final.zkey` - Proving key ✅
+- [x] `docs/CETUS_INTEGRATION.md` - Cetus integration guide ✅
+- [ ] `sdk/src/defi.ts` - DeFi operations SDK
+- [ ] `sdk/src/__tests__/defi.test.ts` - DeFi tests
+- [ ] `web/src/components/SwapForm.tsx` - Swap UI
+- [ ] `web/src/hooks/useDexPrice.ts` - Price fetching hook
+- [ ] `web/public/circuits/swap_js/swap.wasm` - Circuit WASM (deployment)
+- [ ] `web/public/circuits/swap_final.zkey` - Proving key (deployment)
+- [ ] `railgun/tests/swap_tests.move` - Swap tests
 
 ### Modified Files
 
-- `railgun/sources/pool.move` - Add swap() function
-- `railgun/Move.toml` - Add Cetus dependency
-- `sdk/src/prover.ts` - Add generateSwapProof()
-- `sdk/src/sui.ts` - Add buildSwapTransaction()
-- `web/src/app/page.tsx` - Add Swap tab
-- `web/src/lib/constants.ts` - Add supported tokens
+- [x] `railgun/sources/pool.move` - Add swap() function ✅ (test-only)
+- [x] `railgun/sources/pool_tests.move` - Update test setup ✅
+- [x] `railgun/sources/transfer_tests.move` - Update test setup ✅
+- [ ] `railgun/Move.toml` - Add Cetus dependency
+- [ ] `sdk/src/prover.ts` - Add generateSwapProof()
+- [ ] `sdk/src/sui.ts` - Add buildSwapTransaction()
+- [ ] `web/src/app/page.tsx` - Add Swap tab
+- [ ] `web/src/lib/constants.ts` - Add supported tokens
 
 ## Success Criteria
 
-- [ ] Circuit compiles with <80K constraints
+- [x] Circuit compiles with <80K constraints ✅ (22,553 constraints)
 - [ ] All Move tests pass (swap succeeds, failures handled)
 - [ ] SDK generates swap proofs in <90 seconds
 - [ ] Real-time price quotes display accurately
@@ -360,6 +372,47 @@ export function useDexPrice(
 - [ ] Successful swap: SUI → USDC (privacy preserved)
 - [ ] Output note received and spendable
 - [ ] No information leaked about swap details
+
+## Current Implementation Status
+
+### ✅ Completed (2026-02-01)
+
+1. **Swap Circuit Design & Implementation**
+   - File: `circuits/swap.circom`
+   - Constraint count: 22,553 (well under 80K target)
+   - Supports 2-input, 2-output (output + change)
+   - Verifies ownership, Merkle proofs, balance conservation, swap parameters
+
+2. **Circuit Compilation**
+   - Generated proving key: `circuits/build/swap_final.zkey`
+   - Generated verification key: `circuits/build/swap_vk.json`
+   - WASM prover: `circuits/build/swap_js/swap.wasm`
+
+3. **Move Contract Updates**
+   - Added `swap_vk_bytes` field to `PrivacyPool`
+   - Implemented `swap()` function (test-only with mock DEX)
+   - Added `SwapEvent` for transaction scanning
+   - Added `parse_swap_public_inputs()` helper
+   - Updated `create_pool()` signature to accept swap VK
+
+4. **Documentation**
+   - Created comprehensive Cetus integration guide
+   - Documented implementation steps, code examples, testing checklist
+
+### ⚠️ In Progress
+
+5. **Cetus DEX Integration** (Next Priority)
+   - Current: Mock 1:1 swap for testing
+   - Required: Real Cetus CLMM integration
+   - See: `docs/CETUS_INTEGRATION.md`
+
+### 🔴 Not Started
+
+6. **SDK Implementation** (`sdk/src/defi.ts`)
+7. **Move Unit Tests** (15+ test cases)
+8. **Frontend Components** (SwapForm.tsx)
+9. **Multi-token Pool Deployment**
+10. **End-to-end Testing**
 
 ## Testing Checklist
 
