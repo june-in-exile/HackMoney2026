@@ -30,7 +30,9 @@ User receives private USDC note
 
 ## Implementation Steps
 
-### 1. Add Cetus Dependency to Move.toml
+### 1. Add Cetus Dependency to Move.toml ✅
+
+**Status:** Completed - Cetus address added to Move.toml
 
 Update `/Users/june/Projects/HackMoney2026/railgun/Move.toml`:
 
@@ -41,14 +43,13 @@ edition = "2024.beta"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
-Cetus = { git = "https://github.com/CetusProtocol/cetus-clmm-sui.git", subdir = "sui/clmm", rev = "main" }
 
 [addresses]
 railgun = "0x0"
-cetus_clmm = "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb"
+cetus_clmm = "0x5372d555ac734e272659136c2a0cd3227f9b92de67c80dc11250307268af2db8"
 ```
 
-**Note:** Verify the Cetus package address and git revision for testnet.
+**Note:** We use the published testnet package address instead of git dependency to avoid Sui framework version conflicts. For production swap calls, reference Cetus modules via the address: `cetus_clmm::pool`, `cetus_clmm::config`, etc.
 
 ### 2. Import Cetus Modules in pool.move
 

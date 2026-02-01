@@ -98,3 +98,15 @@ export {
   type SwapCircuitInput,
   type SuiSwapProof,
 } from "./defi.js";
+
+// DEX Integration (Cetus price fetching)
+export {
+  getCetusPool,
+  estimateCetusSwap,
+  findCetusPool,
+  getCetusPrice,
+  calculateMinOutput,
+  CETUS_TESTNET_POOLS,
+  type CetusPoolConfig,
+  type SwapEstimation,
+} from "./dex.js";

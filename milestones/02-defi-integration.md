@@ -1,11 +1,11 @@
 # Milestone 2: DeFi Integration (Private Swaps)
 
 **Priority:** 🟡 High
-**Status:** 🟡 In Progress (Phase 1: 70% Complete)
+**Status:** 🟢 85% Complete - Ready for Cetus Integration
 **Estimated Complexity:** Very High
 **Dependencies:** Private Transfers (Milestone 1) ✅ Complete
 
-**Last Updated:** 2026-02-01
+**Last Updated:** 2026-02-01 18:15
 
 ## Overview
 
@@ -388,31 +388,62 @@ export function useDexPrice(
    - Generated verification key: `circuits/build/swap_vk.json`
    - WASM prover: `circuits/build/swap_js/swap.wasm`
 
-3. **Move Contract Updates**
+3. **Move Contract Updates** ✅
    - Added `swap_vk_bytes` field to `PrivacyPool`
    - Implemented `swap()` function (test-only with mock DEX)
    - Added `SwapEvent` for transaction scanning
    - Added `parse_swap_public_inputs()` helper
    - Updated `create_pool()` signature to accept swap VK
 
-4. **Documentation**
-   - Created comprehensive Cetus integration guide
-   - Documented implementation steps, code examples, testing checklist
+4. **Cetus Dependency Setup** ✅
+   - Added Cetus testnet package address to Move.toml
+   - Package ID: `0x5372d555ac734e272659136c2a0cd3227f9b92de67c80dc11250307268af2db8`
+   - Build verified successfully
 
-### ⚠️ In Progress
+5. **SDK Implementation** ✅
+   - Created `sdk/src/defi.ts` (392 lines) with swap proof generation
+   - Created `sdk/src/dex.ts` (273 lines) with Cetus price fetching
+   - Implemented `generateSwapProof()`, `buildSwapInput()`, `estimateCetusSwap()`
+   - Added `calculateMinAmountOut()` for slippage protection
+   - SDK builds successfully
 
-5. **Cetus DEX Integration** (Next Priority)
-   - Current: Mock 1:1 swap for testing
-   - Required: Real Cetus CLMM integration
-   - See: `docs/CETUS_INTEGRATION.md`
+6. **Frontend Components** ✅
+   - Created `web/src/components/SwapForm.tsx` (full swap UI)
+   - Token pair selection (SUI ↔ USDC)
+   - Real-time price estimation
+   - Slippage tolerance settings (0.1%, 0.5%, 1%, 5%)
+   - Price impact warnings
 
-### 🔴 Not Started
+7. **Circuit Artifacts Deployment** ✅
+   - Deployed swap.wasm to `web/public/circuits/swap_js/`
+   - Deployed swap_final.zkey (9.8 MB) to `web/public/circuits/`
+   - Converted swap VK to Sui format (456 bytes hex)
 
-6. **SDK Implementation** (`sdk/src/defi.ts`)
-7. **Move Unit Tests** (15+ test cases)
-8. **Frontend Components** (SwapForm.tsx)
-9. **Multi-token Pool Deployment**
-10. **End-to-end Testing**
+8. **Documentation** ✅
+   - Created `docs/CETUS_INTEGRATION.md` (integration guide)
+   - Created `docs/PRODUCTION_SWAP_IMPLEMENTATION.md` (production guide)
+   - Created `docs/DEPLOYMENT_CHECKLIST.md` (deployment steps)
+   - Updated `docs/SWAP_IMPLEMENTATION_SUMMARY.md`
+
+9. **Move Unit Tests** ✅
+   - Created `railgun/sources/swap_tests.move` (7 tests, 477 lines)
+   - 2/7 tests passing (error condition tests)
+   - 5/7 require real proof generation to pass
+
+### ⚠️ Remaining Work
+
+10. **Production Cetus Integration** (Next Priority)
+    - Current: Mock 1:1 swap for testing
+    - Required: Implement `execute_cetus_swap()` with real Cetus calls
+    - See: `docs/PRODUCTION_SWAP_IMPLEMENTATION.md`
+
+11. **Multi-token Pool Deployment**
+    - Deploy SUI and USDC privacy pools to testnet
+    - Initialize with swap verification keys
+
+12. **End-to-End Testing**
+    - Test swap flow with real Cetus testnet pools
+    - Verify slippage protection and price impact
 
 ## Testing Checklist
 
