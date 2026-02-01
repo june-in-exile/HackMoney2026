@@ -34,7 +34,9 @@ module railgun::pool_tests {
         ts::next_tx(scenario, ADMIN);
         {
             let ctx = ts::ctx(scenario);
-            let pool = pool::create_pool<SUI>(TEST_VK, ctx);
+            // Note: Using same TEST_VK for both unshield and transfer VKs for now
+            // In production, transfer_vk would be generated from transfer.circom
+            let pool = pool::create_pool<SUI>(TEST_VK, TEST_VK, ctx);
             transfer::public_share_object(pool);
         };
     }

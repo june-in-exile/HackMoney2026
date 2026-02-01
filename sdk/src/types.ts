@@ -133,3 +133,53 @@ export interface PoolState {
   /** Historical roots for proof validity */
   historicalRoots: bigint[];
 }
+
+/**
+ * Input for generating a transfer proof (2-input, 2-output)
+ */
+export interface TransferInput {
+  /** Sender's keypair */
+  keypair: RailgunKeypair;
+  /** Input notes to spend (1 or 2, will be padded to 2 with dummy if needed) */
+  inputNotes: Note[];
+  /** Leaf indices for input notes */
+  inputLeafIndices: number[];
+  /** Merkle proof paths for input notes */
+  inputPathElements: bigint[][];
+  /** Output notes (exactly 2: recipient + change) */
+  outputNotes: Note[];
+  /** Token type */
+  token: bigint;
+}
+
+/**
+ * Circuit input for transfer proof generation
+ */
+export interface TransferCircuitInput {
+  // Private inputs
+  spending_key: string;
+  nullifying_key: string;
+  input_npks: string[];
+  input_values: string[];
+  input_randoms: string[];
+  input_leaf_indices: string[];
+  input_path_elements: string[][];
+  output_npks: string[];
+  output_values: string[];
+  output_randoms: string[];
+  token: string;
+  // Public inputs
+  merkle_root: string;
+  input_nullifiers: string[];
+  output_commitments: string[];
+}
+
+/**
+ * Transfer proof in Sui-compatible format
+ */
+export interface SuiTransferProof {
+  /** Proof points (128 bytes: A || B || C) */
+  proofBytes: Uint8Array;
+  /** Public inputs (160 bytes: root || null1 || null2 || comm1 || comm2) */
+  publicInputsBytes: Uint8Array;
+}

@@ -39,8 +39,10 @@ module railgun::pool {
         merkle_tree: MerkleTree,
         /// Registry of spent nullifiers
         nullifiers: NullifierRegistry,
-        /// Groth16 verification key (Arkworks compressed format)
+        /// Groth16 verification key for unshield (Arkworks compressed format)
         vk_bytes: vector<u8>,
+        /// Groth16 verification key for transfer (Arkworks compressed format)
+        transfer_vk_bytes: vector<u8>,
         /// Historical merkle roots for proof validity window
         historical_roots: vector<vector<u8>>,
     }
@@ -65,12 +67,25 @@ module railgun::pool {
         amount: u64,
     }
 
+    /// Event emitted when tokens are transferred privately within the pool
+    public struct TransferEvent has copy, drop {
+        /// Nullifiers that were spent (2 inputs)
+        input_nullifiers: vector<vector<u8>>,
+        /// New commitments created (2 outputs)
+        output_commitments: vector<vector<u8>>,
+        /// Positions of output commitments in tree
+        output_positions: vector<u64>,
+        /// Encrypted note data for recipients to scan
+        encrypted_notes: vector<vector<u8>>,
+    }
+
     // ============ Public Functions ============
 
-    /// Create a new privacy pool for token type T with the given verification key.
-    /// The verification key is generated from the unshield circuit compilation.
+    /// Create a new privacy pool for token type T with the given verification keys.
+    /// The verification keys are generated from circuit compilation (unshield and transfer).
     public fun create_pool<T>(
         vk_bytes: vector<u8>,
+        transfer_vk_bytes: vector<u8>,
         ctx: &mut TxContext,
     ): PrivacyPool<T> {
         PrivacyPool {
@@ -79,6 +94,7 @@ module railgun::pool {
             merkle_tree: merkle_tree::new(ctx),
             nullifiers: nullifier::new(ctx),
             vk_bytes,
+            transfer_vk_bytes,
             historical_roots: vector::empty(),
         }
     }
@@ -87,9 +103,10 @@ module railgun::pool {
     /// This is the typical way to deploy a pool for public use.
     public entry fun create_shared_pool<T>(
         vk_bytes: vector<u8>,
+        transfer_vk_bytes: vector<u8>,
         ctx: &mut TxContext,
     ) {
-        let pool = create_pool<T>(vk_bytes, ctx);
+        let pool = create_pool<T>(vk_bytes, transfer_vk_bytes, ctx);
         transfer::share_object(pool);
     }
 
@@ -122,6 +139,74 @@ module railgun::pool {
 
         // 5. Emit event for wallet scanning
         event::emit(ShieldEvent { position, commitment, encrypted_note });
+    }
+
+    /// Transfer tokens privately within the pool (0zk-to-0zk transfer).
+    ///
+    /// The ZK proof proves:
+    /// 1. Knowledge of spending_key and nullifying_key (ownership of both inputs)
+    /// 2. Both input notes exist in Merkle tree (2 Merkle proofs)
+    /// 3. Correct nullifier computation for both inputs
+    /// 4. Correct commitment computation for both outputs
+    /// 5. Balance conservation: sum(input_values) = sum(output_values)
+    ///
+    /// Public inputs format (160 bytes total):
+    /// - merkle_root (32 bytes): Merkle tree root
+    /// - input_nullifiers[2] (64 bytes): Nullifiers for both input notes
+    /// - output_commitments[2] (64 bytes): Commitments for both output notes
+    public entry fun transfer<T>(
+        pool: &mut PrivacyPool<T>,
+        proof_bytes: vector<u8>,
+        public_inputs_bytes: vector<u8>,
+        encrypted_notes: vector<vector<u8>>,
+        _ctx: &mut TxContext,
+    ) {
+        // Validate public inputs length (5 field elements × 32 bytes = 160 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 160, E_INVALID_PUBLIC_INPUTS);
+        assert!(vector::length(&encrypted_notes) == 2, E_INVALID_PUBLIC_INPUTS);
+
+        // 1. Parse public inputs [merkle_root, nullifier1, nullifier2, commitment1, commitment2]
+        let (merkle_root, nullifier1, nullifier2, commitment1, commitment2) =
+            parse_transfer_public_inputs(&public_inputs_bytes);
+
+        // 2. Verify merkle root is valid (current or in history)
+        assert!(is_valid_root(pool, &merkle_root), E_INVALID_ROOT);
+
+        // 3. Check both nullifiers have not been spent (prevent double-spend)
+        assert!(!nullifier::is_spent(&pool.nullifiers, nullifier1), E_DOUBLE_SPEND);
+        assert!(!nullifier::is_spent(&pool.nullifiers, nullifier2), E_DOUBLE_SPEND);
+
+        // 4. Verify Groth16 ZK proof
+        let pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool.transfer_vk_bytes);
+        let public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
+        let proof_points = groth16::proof_points_from_bytes(proof_bytes);
+
+        assert!(
+            groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
+            E_INVALID_PROOF
+        );
+
+        // 5. Mark both nullifiers as spent
+        nullifier::mark_spent(&mut pool.nullifiers, nullifier1);
+        nullifier::mark_spent(&mut pool.nullifiers, nullifier2);
+
+        // 6. Insert both output commitments into Merkle tree
+        let position1 = merkle_tree::get_next_index(&pool.merkle_tree);
+        merkle_tree::insert(&mut pool.merkle_tree, commitment1);
+
+        let position2 = merkle_tree::get_next_index(&pool.merkle_tree);
+        merkle_tree::insert(&mut pool.merkle_tree, commitment2);
+
+        // 7. Save historical root for proof validity window
+        save_historical_root(pool);
+
+        // 8. Emit event for wallet scanning
+        event::emit(TransferEvent {
+            input_nullifiers: vector[nullifier1, nullifier2],
+            output_commitments: vector[commitment1, commitment2],
+            output_positions: vector[position1, position2],
+            encrypted_notes,
+        });
     }
 
     /// Unshield tokens from the privacy pool with ZK proof verification.
@@ -237,7 +322,7 @@ module railgun::pool {
         false
     }
 
-    /// Parse public inputs from concatenated bytes.
+    /// Parse public inputs from concatenated bytes (for unshield).
     /// Returns (merkle_root, nullifier, commitment) each as 32-byte vectors.
     fun parse_public_inputs(bytes: &vector<u8>): (vector<u8>, vector<u8>, vector<u8>) {
         let mut merkle_root = vector::empty<u8>();
@@ -266,6 +351,51 @@ module railgun::pool {
         (merkle_root, nullifier, commitment)
     }
 
+    /// Parse transfer public inputs from concatenated bytes (for transfer).
+    /// Returns (merkle_root, nullifier1, nullifier2, commitment1, commitment2) each as 32-byte vectors.
+    fun parse_transfer_public_inputs(bytes: &vector<u8>):
+        (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
+
+        let mut merkle_root = vector::empty<u8>();
+        let mut nullifier1 = vector::empty<u8>();
+        let mut nullifier2 = vector::empty<u8>();
+        let mut commitment1 = vector::empty<u8>();
+        let mut commitment2 = vector::empty<u8>();
+
+        // Extract merkle_root (bytes 0-31)
+        let mut i = 0;
+        while (i < 32) {
+            vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract nullifier1 (bytes 32-63)
+        while (i < 64) {
+            vector::push_back(&mut nullifier1, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract nullifier2 (bytes 64-95)
+        while (i < 96) {
+            vector::push_back(&mut nullifier2, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract commitment1 (bytes 96-127)
+        while (i < 128) {
+            vector::push_back(&mut commitment1, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract commitment2 (bytes 128-159)
+        while (i < 160) {
+            vector::push_back(&mut commitment2, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        (merkle_root, nullifier1, nullifier2, commitment1, commitment2)
+    }
+
     // ============ Test Helpers ============
 
     #[test_only]
@@ -276,6 +406,7 @@ module railgun::pool {
             merkle_tree,
             nullifiers,
             vk_bytes: _,
+            transfer_vk_bytes: _,
             historical_roots: _
         } = pool;
 

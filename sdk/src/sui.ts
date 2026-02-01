@@ -10,7 +10,7 @@ import {
 } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { type Keypair } from "@mysten/sui/cryptography";
-import { type SuiProof, type SuiVerificationKey, type Note } from "./types.js";
+import { type SuiProof, type SuiVerificationKey, type SuiTransferProof, type Note } from "./types.js";
 import { bigIntToBytes, encryptNote } from "./crypto.js";
 
 /**
@@ -142,6 +142,42 @@ export class RailgunClient {
   }
 
   /**
+   * Transfer tokens privately within the pool (0zk-to-0zk transfer)
+   */
+  async transfer<T extends string>(
+    coinType: T,
+    proof: SuiTransferProof,
+    encryptedNotes: Uint8Array[],
+    signer: Keypair
+  ): Promise<SuiTransactionBlockResponse> {
+    if (encryptedNotes.length !== 2) {
+      throw new Error(`Expected 2 encrypted notes, got ${encryptedNotes.length}`);
+    }
+
+    const tx = new Transaction();
+
+    tx.moveCall({
+      target: `${this.config.packageId}::pool::transfer`,
+      typeArguments: [coinType],
+      arguments: [
+        tx.object(this.config.poolId),
+        tx.pure("vector<u8>", Array.from(proof.proofBytes)),
+        tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
+        tx.pure(
+          "vector<vector<u8>>",
+          encryptedNotes.map((n) => Array.from(n))
+        ),
+      ],
+    });
+
+    return await this.client.signAndExecuteTransaction({
+      signer,
+      transaction: tx,
+      options: { showEffects: true, showEvents: true },
+    });
+  }
+
+  /**
    * Get current pool state
    */
   async getPoolState<T extends string>(
@@ -253,6 +289,46 @@ export class RailgunClient {
       };
     });
   }
+
+  /**
+   * Query recent TransferEvents from the pool
+   */
+  async queryTransferEvents(
+    limit: number = 50
+  ): Promise<
+    Array<{
+      inputNullifiers: Uint8Array[];
+      outputCommitments: Uint8Array[];
+      outputPositions: number[];
+      encryptedNotes: Uint8Array[];
+      txDigest: string;
+    }>
+  > {
+    const events = await this.client.queryEvents({
+      query: {
+        MoveEventType: `${this.config.packageId}::pool::TransferEvent`,
+      },
+      limit,
+      order: "descending",
+    });
+
+    return events.data.map((event) => {
+      const fields = event.parsedJson as Record<string, unknown>;
+      return {
+        inputNullifiers: (fields.input_nullifiers as number[][]).map(
+          (n) => new Uint8Array(n)
+        ),
+        outputCommitments: (fields.output_commitments as number[][]).map(
+          (c) => new Uint8Array(c)
+        ),
+        outputPositions: (fields.output_positions as string[]).map((p) => Number(p)),
+        encryptedNotes: (fields.encrypted_notes as number[][]).map(
+          (n) => new Uint8Array(n)
+        ),
+        txDigest: event.id.txDigest,
+      };
+    });
+  }
 }
 
 /**
@@ -304,6 +380,39 @@ export function buildUnshieldTransaction<T extends string>(
       tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
       tx.pure("u64", amount.toString()),
       tx.pure("address", recipient),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build a transfer transaction (for manual signing)
+ */
+export function buildTransferTransaction<T extends string>(
+  packageId: string,
+  poolId: string,
+  coinType: T,
+  proof: SuiTransferProof,
+  encryptedNotes: Uint8Array[]
+): Transaction {
+  if (encryptedNotes.length !== 2) {
+    throw new Error(`Expected 2 encrypted notes, got ${encryptedNotes.length}`);
+  }
+
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${packageId}::pool::transfer`,
+    typeArguments: [coinType],
+    arguments: [
+      tx.object(poolId),
+      tx.pure("vector<u8>", Array.from(proof.proofBytes)),
+      tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
+      tx.pure(
+        "vector<vector<u8>>",
+        encryptedNotes.map((n) => Array.from(n))
+      ),
     ],
   });
 

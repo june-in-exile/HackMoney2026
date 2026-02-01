@@ -10,11 +10,15 @@ import {
   type UnshieldCircuitInput,
   type SuiProof,
   type SuiVerificationKey,
+  type TransferInput,
+  type TransferCircuitInput,
+  type SuiTransferProof,
   MERKLE_TREE_DEPTH,
 } from "./types.js";
 import {
   computeNullifier,
   computeMerkleRoot,
+  createNote,
 } from "./crypto.js";
 
 // Lazy-loaded Node.js modules (only used in Node.js environment)
@@ -410,4 +414,213 @@ function bigIntToBE32(n: bigint): Uint8Array {
     val >>= 8n;
   }
   return buf;
+}
+
+// ============ Transfer Proof Functions ============
+
+/**
+ * Build circuit input for transfer proof (2-input, 2-output)
+ */
+export function buildTransferInput(transferInput: TransferInput): TransferCircuitInput {
+  const { keypair, inputNotes, inputLeafIndices, inputPathElements, outputNotes, token } = transferInput;
+
+  // Validate inputs
+  if (inputNotes.length < 1 || inputNotes.length > 2) {
+    throw new Error("Transfer requires 1 or 2 input notes");
+  }
+  if (outputNotes.length !== 2) {
+    throw new Error("Transfer requires exactly 2 output notes");
+  }
+  if (inputPathElements.length !== inputNotes.length) {
+    throw new Error("Path elements must match input notes count");
+  }
+
+  // Verify all path elements have correct length
+  for (const paths of inputPathElements) {
+    if (paths.length !== MERKLE_TREE_DEPTH) {
+      throw new Error(
+        `Invalid path elements length: ${paths.length}, expected ${MERKLE_TREE_DEPTH}`
+      );
+    }
+  }
+
+  // Pad to 2 inputs if only 1 provided (use dummy note with value=0)
+  const paddedInputs = [...inputNotes];
+  const paddedIndices = [...inputLeafIndices];
+  const paddedPaths = [...inputPathElements];
+
+  if (paddedInputs.length === 1) {
+    // Create dummy note with value=0
+    const dummyNote = createNote(keypair.masterPublicKey, token, 0n, 0n);
+    paddedInputs.push(dummyNote);
+    paddedIndices.push(0); // Dummy leaf index
+    paddedPaths.push(new Array(MERKLE_TREE_DEPTH).fill(0n)); // Dummy path
+  }
+
+  // Compute nullifiers for both inputs
+  const inputNullifiers = paddedIndices.map((index) =>
+    computeNullifier(keypair.nullifyingKey, index)
+  );
+
+  // Compute merkle root from first input
+  const merkleRoot = computeMerkleRoot(
+    paddedInputs[0].commitment,
+    paddedPaths[0],
+    paddedIndices[0]
+  );
+
+  return {
+    // Private inputs
+    spending_key: keypair.spendingKey.toString(),
+    nullifying_key: keypair.nullifyingKey.toString(),
+    input_npks: paddedInputs.map((n) => n.npk.toString()),
+    input_values: paddedInputs.map((n) => n.value.toString()),
+    input_randoms: paddedInputs.map((n) => n.random.toString()),
+    input_leaf_indices: paddedIndices.map((idx) => idx.toString()),
+    input_path_elements: paddedPaths.map((path) => path.map((e) => e.toString())),
+    output_npks: outputNotes.map((n) => n.npk.toString()),
+    output_values: outputNotes.map((n) => n.value.toString()),
+    output_randoms: outputNotes.map((n) => n.random.toString()),
+    token: token.toString(),
+    // Public inputs
+    merkle_root: merkleRoot.toString(),
+    input_nullifiers: inputNullifiers.map((n) => n.toString()),
+    output_commitments: outputNotes.map((n) => n.commitment.toString()),
+  };
+}
+
+/**
+ * Generate transfer proof using snarkjs
+ */
+export async function generateTransferProof(
+  transferInput: TransferInput,
+  config: ProverConfig = {}
+): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
+  const wasmPath = config.wasmPath ?? (isNodeEnvironment()
+    ? path?.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../../circuits/build/transfer_js/transfer.wasm")
+    : "/circuits/transfer_js/transfer.wasm");
+
+  const zkeyPath = config.zkeyPath ?? (isNodeEnvironment()
+    ? path?.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../../circuits/build/transfer_final.zkey")
+    : "/circuits/transfer_final.zkey");
+
+  // Build circuit input
+  const input = buildTransferInput(transferInput);
+
+  // Generate proof (snarkjs supports both Node.js and browser)
+  if (isNodeEnvironment()) {
+    // Node.js: Check if files exist, then use file paths directly
+    if (!fs.existsSync(wasmPath)) {
+      throw new Error(`Transfer circuit WASM not found: ${wasmPath}`);
+    }
+    if (!fs.existsSync(zkeyPath)) {
+      throw new Error(`Transfer zkey not found: ${zkeyPath}`);
+    }
+
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input as unknown as snarkjs.CircuitSignals,
+      wasmPath,
+      zkeyPath
+    );
+
+    return { proof, publicSignals };
+  } else {
+    // Browser: Load files via fetch, then use snarkjs with buffers
+    console.log(`Loading transfer circuit artifacts from ${wasmPath} and ${zkeyPath}...`);
+
+    const [wasmBuffer, zkeyBuffer] = await Promise.all([
+      loadFileBrowser(wasmPath),
+      loadFileBrowser(zkeyPath),
+    ]);
+
+    console.log(
+      `Loaded transfer WASM: ${wasmBuffer.byteLength} bytes, zkey: ${zkeyBuffer.byteLength} bytes`
+    );
+
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input as unknown as snarkjs.CircuitSignals,
+      new Uint8Array(wasmBuffer),
+      new Uint8Array(zkeyBuffer)
+    );
+
+    return { proof, publicSignals };
+  }
+}
+
+/**
+ * Convert transfer proof to Sui-compatible format (Arkworks compressed)
+ */
+export function convertTransferProofToSui(
+  proof: snarkjs.Groth16Proof,
+  publicSignals: string[]
+): SuiTransferProof {
+  // Reuse compression functions from convertProofToSui
+  const compressG1 = (point: string[]): Uint8Array => {
+    const x = BigInt(point[0]);
+    const y = BigInt(point[1]);
+    const buf = bigIntToLE32(x);
+    const FIELD_MODULUS = BigInt(
+      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
+    );
+    if (y > FIELD_MODULUS / 2n) {
+      buf[31] |= 0x80;
+    }
+    return buf;
+  };
+
+  const compressG2 = (point: string[][]): Uint8Array => {
+    const x0 = BigInt(point[0][0]);
+    const x1 = BigInt(point[0][1]);
+    const y0 = BigInt(point[1][0]);
+    const y1 = BigInt(point[1][1]);
+
+    const buf = new Uint8Array(64);
+    const x0Bytes = bigIntToLE32(x0);
+    buf.set(x0Bytes, 0);
+    const x1Bytes = bigIntToLE32(x1);
+    buf.set(x1Bytes, 32);
+
+    const FIELD_MODULUS = BigInt(
+      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
+    );
+    const negY0 = y0 === 0n ? 0n : FIELD_MODULUS - y0;
+    const negY1 = y1 === 0n ? 0n : FIELD_MODULUS - y1;
+
+    let yIsLarger = false;
+    if (y1 > negY1) {
+      yIsLarger = true;
+    } else if (y1 === negY1 && y0 > negY0) {
+      yIsLarger = true;
+    }
+
+    if (yIsLarger) {
+      buf[63] |= 0x80;
+    }
+
+    return buf;
+  };
+
+  // Proof: A (G1) || B (G2) || C (G1) = 32 + 64 + 32 = 128 bytes
+  const piA = compressG1(proof.pi_a as string[]);
+  const piB = compressG2(proof.pi_b as string[][]);
+  const piC = compressG1(proof.pi_c as string[]);
+
+  const proofBytes = new Uint8Array(128);
+  proofBytes.set(piA, 0);
+  proofBytes.set(piB, 32);
+  proofBytes.set(piC, 96);
+
+  // Public inputs: 5 × 32 bytes = 160 bytes (BE format for Move contract)
+  // Order: merkle_root, nullifier1, nullifier2, commitment1, commitment2
+  if (publicSignals.length !== 5) {
+    throw new Error(`Expected 5 public signals, got ${publicSignals.length}`);
+  }
+
+  const publicInputsBytes = new Uint8Array(160);
+  for (let i = 0; i < 5; i++) {
+    const inputBytes = bigIntToBE32(BigInt(publicSignals[i]));
+    publicInputsBytes.set(inputBytes, i * 32);
+  }
+
+  return { proofBytes, publicInputsBytes };
 }
