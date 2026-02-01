@@ -5,7 +5,12 @@ import { useSuiClient } from "@mysten/dapp-kit";
 import type { RailgunKeypair } from "./useLocalKeypair";
 import type { Note } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
-import { initPoseidon, deriveNullifier } from "@octopus/sdk";
+import {
+  initPoseidon,
+  computeNullifier,
+  decryptNote as sdkDecryptNote,
+  buildMerkleTreeFromEvents,
+} from "@octopus/sdk";
 
 /**
  * Owned note with metadata for selection and spending
@@ -76,16 +81,17 @@ export function useNotes(keypair: RailgunKeypair | null) {
           };
 
           // Attempt to decrypt note
-          const decryptedNote = await tryDecryptNote(
+          const decryptedNote = tryDecryptNote(
             encrypted_note,
+            keypair.spendingKey,
             keypair.masterPublicKey
           );
 
           if (decryptedNote) {
             // Compute nullifier
-            const nullifier = deriveNullifier(
+            const nullifier = computeNullifier(
               keypair.nullifyingKey,
-              BigInt(position)
+              Number(position)
             );
 
             // Check if spent
@@ -118,16 +124,17 @@ export function useNotes(keypair: RailgunKeypair | null) {
 
           // Try to decrypt both output notes
           for (let i = 0; i < encrypted_notes.length; i++) {
-            const decryptedNote = await tryDecryptNote(
+            const decryptedNote = tryDecryptNote(
               encrypted_notes[i],
+              keypair.spendingKey,
               keypair.masterPublicKey
             );
 
             if (decryptedNote) {
               const position = Number(output_positions[i]);
-              const nullifier = deriveNullifier(
+              const nullifier = computeNullifier(
                 keypair.nullifyingKey,
-                BigInt(position)
+                position
               );
 
               const spent = await isNullifierSpent(nullifier);
@@ -139,6 +146,23 @@ export function useNotes(keypair: RailgunKeypair | null) {
                 spent,
                 txDigest: event.id.txDigest,
               });
+            }
+          }
+        }
+
+        // 3. Fetch Merkle proofs for all owned notes
+        if (ownedNotes.length > 0) {
+          const merkleTree = await buildMerkleTreeFromEvents(client, PACKAGE_ID);
+
+          for (const ownedNote of ownedNotes) {
+            try {
+              const pathElements = merkleTree.getMerkleProof(ownedNote.leafIndex);
+              ownedNote.pathElements = pathElements;
+            } catch (err) {
+              console.error(
+                `Failed to generate Merkle proof for note at index ${ownedNote.leafIndex}:`,
+                err
+              );
             }
           }
         }
@@ -199,29 +223,21 @@ export function useNotes(keypair: RailgunKeypair | null) {
 }
 
 /**
- * Attempt to decrypt an encrypted note using the user's MPK.
- * Returns the note if decryption succeeds, null otherwise.
+ * Attempt to decrypt an encrypted note using the user's keys.
+ * Returns the note if decryption succeeds and we own it, null otherwise.
  *
- * Note: This is a simplified placeholder. In a real implementation,
- * you would need to implement the actual decryption algorithm
- * (e.g., ChaCha20-Poly1305 with shared secret from ECDH).
+ * Uses ChaCha20-Poly1305 with ECDH key agreement.
  */
-async function tryDecryptNote(
+function tryDecryptNote(
   encryptedNote: number[],
+  spendingKey: bigint,
   mpk: bigint
-): Promise<Note | null> {
+): Note | null {
   try {
-    // TODO: Implement actual note decryption
-    // For now, this is a placeholder that always returns null
-    //
-    // Real implementation would:
-    // 1. Derive shared secret from MPK and ephemeral public key
-    // 2. Decrypt using ChaCha20-Poly1305
-    // 3. Parse decrypted bytes into Note struct
-    // 4. Verify commitment matches
-
-    return null;
+    // Use SDK's decryptNote function with ECDH + ChaCha20-Poly1305
+    return sdkDecryptNote(encryptedNote, spendingKey, mpk);
   } catch (err) {
+    // Decryption failed - not our note or corrupted data
     return null;
   }
 }

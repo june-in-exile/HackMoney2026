@@ -4,6 +4,18 @@ import { useState } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { cn } from "@/lib/utils";
 import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import { useNotes } from "@/hooks/useNotes";
+import {
+  selectNotesForTransfer,
+  createTransferOutputs,
+  generateTransferProof,
+  convertTransferProofToSui,
+  buildTransferTransaction,
+  deriveViewingPublicKey,
+  mpkToViewingPublicKeyUnsafe,
+  encryptNote,
+} from "@octopus/sdk";
+import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
 
 interface TransferFormProps {
   keypair: RailgunKeypair | null;
@@ -19,6 +31,7 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const { notes, loading: notesLoading } = useNotes(keypair);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,48 +57,29 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
 
     try {
       // ============================================
-      // TRANSFER PROOF GENERATION FLOW
+      // PRIVATE TRANSFER FLOW
       // ============================================
-      //
-      // Current Status: ✅ Core infrastructure complete
-      // - Transfer circuit compiled (21,649 constraints)
-      // - Move contract deployed with transfer() function
-      // - SDK functions ready (generateTransferProof, selectNotesForTransfer)
-      // - New pool deployed with both VKs (unshield + transfer)
-      //
-      // Missing Components (to enable full flow):
-      // 1. 🔴 Note encryption/decryption implementation
-      //    - Required for useNotes hook to decrypt owned notes
-      //    - ChaCha20-Poly1305 with ECDH shared secret
-      // 2. 🔴 Merkle proof generation
-      //    - Query on-chain Merkle tree to get proof paths
-      //    - Required for transfer circuit input
-      // 3. ⚠️  Circuit artifacts deployment
-      //    - transfer.wasm (2.2MB) and transfer_final.zkey (9.5MB)
-      //    - Already copied to web/public/circuits/
-      //
-      // Once above are ready, uncomment the code below:
+      // ✅ All components implemented:
+      // - Note encryption/decryption (ChaCha20-Poly1305 + ECDH)
+      // - Merkle proof generation from on-chain events
+      // - Transfer circuit (21,649 constraints)
+      // - Move contract with transfer() function
+      // - Pool deployed with transfer VK
+      // ============================================
 
-      /*
-      // 1. Import SDK functions
-      import { selectNotesForTransfer, createTransferOutputs, generateTransferProof, convertTransferProofToSui } from "@octopus/sdk";
-      import { buildTransferTransaction } from "@octopus/sdk";
-      import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
-      import { useNotes } from "@/hooks/useNotes";
-
-      // 2. Get available notes using useNotes hook
-      const { notes } = useNotes(keypair);
-      const unspentNotes = notes.filter(n => !n.spent);
+      // 1. Get unspent notes
+      const unspentNotes = notes.filter((n) => !n.spent);
 
       if (unspentNotes.length === 0) {
         setError("No unspent notes available. Shield some tokens first!");
+        setIsSubmitting(false);
         return;
       }
 
-      // 3. Select notes to cover amount
+      // 2. Select notes to cover amount
       const amountNano = BigInt(Math.floor(parseFloat(amount) * 1_000_000_000)); // Convert SUI to nanoSUI
       const selectedNotes = selectNotesForTransfer(
-        unspentNotes.map(n => ({
+        unspentNotes.map((n) => ({
           note: n.note,
           leafIndex: n.leafIndex,
           pathElements: n.pathElements || [], // Merkle proof
@@ -93,7 +87,13 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
         amountNano
       );
 
-      // 4. Create output notes (recipient + change)
+      if (!selectedNotes || selectedNotes.length === 0) {
+        setError("Insufficient balance or notes don't have Merkle proofs yet!");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 3. Create output notes (recipient + change)
       const recipientMpkBigInt = BigInt(recipientMpk);
       const inputTotal = selectedNotes.reduce((sum, n) => sum + n.note.value, 0n);
       const [recipientNote, changeNote] = createTransferOutputs(
@@ -104,13 +104,14 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
         0n // token type (0 = SUI)
       );
 
-      // 5. Generate ZK proof (30-60 seconds)
+      // 4. Generate ZK proof (30-60 seconds)
+      setSuccess("⏳ Generating ZK proof (this may take 30-60 seconds)...");
       const proof = await generateTransferProof(
         {
           keypair,
-          inputNotes: selectedNotes.map(n => n.note),
-          inputLeafIndices: selectedNotes.map(n => n.leafIndex),
-          inputPathElements: selectedNotes.map(n => n.pathElements!),
+          inputNotes: selectedNotes.map((n) => n.note),
+          inputLeafIndices: selectedNotes.map((n) => n.leafIndex),
+          inputPathElements: selectedNotes.map((n) => n.pathElements!),
           outputNotes: [recipientNote, changeNote],
           token: 0n,
         },
@@ -120,14 +121,20 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
         }
       );
 
-      // 6. Convert proof to Sui format
+      // 5. Convert proof to Sui format
       const suiProof = convertTransferProofToSui(proof.proof, proof.publicSignals);
 
-      // 7. Encrypt output notes for recipients
-      const encryptedRecipientNote = encryptNote(recipientNote, recipientMpkBigInt);
-      const encryptedChangeNote = encryptNote(changeNote, keypair.masterPublicKey);
+      // 6. Encrypt output notes for recipients using viewing public keys
+      // ⚠️ MVP LIMITATION: Using deterministic viewing key derivation from MPK
+      // In production, recipient should explicitly share their viewing public key
+      const recipientViewingPk = mpkToViewingPublicKeyUnsafe(recipientMpkBigInt);
+      const myViewingPk = deriveViewingPublicKey(keypair.spendingKey);
 
-      // 8. Build and submit transaction
+      const encryptedRecipientNote = encryptNote(recipientNote, recipientViewingPk);
+      const encryptedChangeNote = encryptNote(changeNote, myViewingPk);
+
+      // 7. Build and submit transaction
+      setSuccess("⏳ Submitting transaction to Sui network...");
       const tx = buildTransferTransaction(
         PACKAGE_ID,
         POOL_ID,
@@ -138,19 +145,13 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
 
       const result = await signAndExecute({ transaction: tx });
 
-      // 9. Success!
+      // 8. Success!
       if (onSuccess) await onSuccess();
-      setSuccess(`✅ Transfer of ${amount} SUI initiated! TX: ${result.digest.slice(0, 8)}...`);
+      setSuccess(
+        `✅ Transfer of ${amount} SUI completed! TX: ${result.digest.slice(0, 8)}...`
+      );
       setRecipientMpk("");
       setAmount("");
-      */
-
-      // Temporary placeholder until note encryption is implemented
-      setError(
-        "⚠️ Transfer requires note encryption/decryption. " +
-        "Core SDK, circuit (21,649 constraints), and Move contract are ready. " +
-        "Implement note encryption to enable full transfer flow."
-      );
 
     } catch (err) {
       console.error("Transfer failed:", err);

@@ -48,6 +48,8 @@ export {
   computeZeroHashes,
   computeMerkleRoot,
   buildSingleLeafProof,
+  deriveViewingPublicKey,
+  mpkToViewingPublicKeyUnsafe,
   encryptNote,
   decryptNote,
   bigIntToBytes,
@@ -74,3 +76,11 @@ export {
   TESTNET_CONFIG,
   type SuiConfig,
 } from "./sui.js";
+
+// Merkle tree utilities
+export {
+  ClientMerkleTree,
+  buildMerkleTreeFromEvents,
+  getMerkleProofForNote,
+  type CommitmentLeaf,
+} from "./merkle.js";

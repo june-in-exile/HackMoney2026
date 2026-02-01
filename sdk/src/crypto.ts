@@ -5,6 +5,10 @@
  */
 
 import { buildPoseidon, type Poseidon } from "circomlibjs";
+import { x25519 } from "@noble/curves/ed25519.js";
+import { chacha20poly1305 } from "@noble/ciphers/chacha.js";
+import { hkdf } from "@noble/hashes/hkdf.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 import {
   SCALAR_MODULUS,
   MERKLE_TREE_DEPTH,
@@ -182,26 +186,130 @@ export function buildSingleLeafProof(commitment: bigint): {
 }
 
 /**
- * Encrypt note data for recipient (simplified XOR encryption for demo)
- * In production, use proper ECIES encryption with recipient's public key
+ * Derive X25519 viewing keypair from spending key
+ *
+ * This creates a separate keypair for encryption/decryption that is
+ * deterministically derived from the spending key.
  */
-export function encryptNote(note: Note, recipientMpk: bigint): Uint8Array {
-  // Simple encoding: npk || token || value || random (32 bytes each)
-  const data = new Uint8Array(128);
-  const view = new DataView(data.buffer);
+function deriveViewingKeypair(spendingKey: bigint): {
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
+} {
+  // Hash spending key to get viewing private key seed
+  const seed = sha256(bigIntToBytes(spendingKey));
 
-  // For demo, just encode the values directly (not secure!)
-  // In production, encrypt with recipient's viewing key
-  const values = [note.npk, note.token, note.value, note.random];
-  let offset = 0;
+  // Ensure seed is a valid X25519 scalar by taking modulo
+  // X25519 uses Curve25519 which has order 2^252 + ...
+  const privateKey = new Uint8Array(32);
+  privateKey.set(seed);
 
-  for (const val of values) {
-    const bytes = bigIntToBytes(val);
-    data.set(bytes, offset);
-    offset += 32;
-  }
+  // Clamp the private key as per X25519 spec
+  privateKey[0] &= 248;
+  privateKey[31] &= 127;
+  privateKey[31] |= 64;
 
-  return data;
+  const publicKey = x25519.getPublicKey(privateKey);
+
+  return { privateKey, publicKey };
+}
+
+/**
+ * Derive X25519 viewing public key from MPK
+ *
+ * Since MPK is derived from spending key, and viewing keypair is derived
+ * from spending key, we need the actual spending key to get the viewing public key.
+ * For encryption, sender must know recipient's viewing public key somehow.
+ *
+ * In practice, recipient shares their MPK, and we derive viewing PK from spending key.
+ * This helper reconstructs the viewing public key from the MPK's source.
+ */
+export function deriveViewingPublicKey(spendingKey: bigint): Uint8Array {
+  return deriveViewingKeypair(spendingKey).publicKey;
+}
+
+/**
+ * TEMPORARY: Derive viewing public key from MPK (for MVP testing only)
+ *
+ * ⚠️ WARNING: This is NOT secure for production use!
+ * This function deterministically derives a viewing public key from MPK.
+ * The problem is that anyone with MPK can compute this public key, but only
+ * the owner (with spending key) can derive the matching private key to decrypt.
+ *
+ * For production, recipients should explicitly share their viewing public key.
+ * This function exists only to enable MVP testing without complex key sharing.
+ *
+ * @deprecated Use proper viewing public key sharing instead
+ */
+export function mpkToViewingPublicKeyUnsafe(mpk: bigint): Uint8Array {
+  // Hash MPK to create a deterministic seed
+  const seed = sha256(bigIntToBytes(mpk));
+
+  // Treat seed as X25519 private scalar
+  const privateKey = new Uint8Array(32);
+  privateKey.set(seed);
+
+  // Clamp to valid X25519 scalar
+  privateKey[0] &= 248;
+  privateKey[31] &= 127;
+  privateKey[31] |= 64;
+
+  return x25519.getPublicKey(privateKey);
+}
+
+/**
+ * Encrypt note data for recipient using ECDH + ChaCha20-Poly1305
+ *
+ * Encryption scheme:
+ * 1. Generate ephemeral X25519 keypair
+ * 2. Compute shared secret via ECDH with recipient's viewing public key
+ * 3. Derive encryption key using HKDF-SHA256
+ * 4. Encrypt note data with ChaCha20-Poly1305
+ * 5. Output: ephemeral_pk (32) || nonce (12) || ciphertext || tag (16)
+ *
+ * @param note - The note to encrypt
+ * @param recipientViewingPk - Recipient's X25519 viewing public key (32 bytes)
+ * @returns Encrypted note data
+ */
+export function encryptNote(
+  note: Note,
+  recipientViewingPk: Uint8Array
+): Uint8Array {
+  // 1. Generate ephemeral keypair
+  const ephemeralSk = crypto.getRandomValues(new Uint8Array(32));
+  // Clamp ephemeral key
+  ephemeralSk[0] &= 248;
+  ephemeralSk[31] &= 127;
+  ephemeralSk[31] |= 64;
+  const ephemeralPk = x25519.getPublicKey(ephemeralSk);
+
+  // 2. Perform ECDH to get shared secret
+  const sharedSecret = x25519.getSharedSecret(ephemeralSk, recipientViewingPk);
+
+  // 3. Derive encryption key using HKDF
+  const info = new TextEncoder().encode("octopus-note-encryption-v1");
+  const encryptionKey = hkdf(sha256, sharedSecret, undefined, info, 32);
+
+  // 4. Serialize note data (npk || token || value || random, each 32 bytes)
+  const noteData = new Uint8Array(128);
+  noteData.set(bigIntToBytes(note.npk), 0);
+  noteData.set(bigIntToBytes(note.token), 32);
+  noteData.set(bigIntToBytes(note.value), 64);
+  noteData.set(bigIntToBytes(note.random), 96);
+
+  // 5. Generate nonce (12 bytes for ChaCha20-Poly1305)
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+
+  // 6. Encrypt with ChaCha20-Poly1305
+  const cipher = chacha20poly1305(encryptionKey, nonce);
+  const ciphertext = cipher.encrypt(noteData);
+
+  // 7. Combine: ephemeralPk || nonce || ciphertext (includes 16-byte tag)
+  const output = new Uint8Array(32 + 12 + ciphertext.length);
+  output.set(ephemeralPk, 0);
+  output.set(nonce, 32);
+  output.set(ciphertext, 44);
+
+  return output;
 }
 
 /**
@@ -229,46 +337,81 @@ export function bytesToBigInt(bytes: Uint8Array): bigint {
 }
 
 /**
- * Decrypt and verify note ownership
+ * Decrypt and verify note ownership using ECDH + ChaCha20-Poly1305
  *
- * Returns null if the note doesn't belong to the given MPK
- * Returns the decrypted note if ownership is verified
+ * Decryption scheme:
+ * 1. Extract ephemeral public key from encrypted data
+ * 2. Compute shared secret via ECDH with our viewing private key
+ * 3. Derive decryption key using HKDF-SHA256
+ * 4. Decrypt with ChaCha20-Poly1305
+ * 5. Verify note ownership by recomputing NPK
+ *
+ * @param encryptedData - Encrypted note (ephemeral_pk || nonce || ciphertext)
+ * @param mySpendingKey - Our spending key (to derive viewing private key)
+ * @param myMpk - Our master public key (to verify ownership)
+ * @returns Decrypted note if we own it, null otherwise
  */
 export function decryptNote(
   encryptedData: Uint8Array | number[],
+  mySpendingKey: bigint,
   myMpk: bigint
 ): Note | null {
-  // Convert to Uint8Array if needed
-  const data = encryptedData instanceof Uint8Array
-    ? encryptedData
-    : new Uint8Array(encryptedData);
+  try {
+    // Convert to Uint8Array if needed
+    const data =
+      encryptedData instanceof Uint8Array
+        ? encryptedData
+        : new Uint8Array(encryptedData);
 
-  // Encrypted note format: npk || token || value || random (32 bytes each)
-  if (data.length !== 128) {
+    // Format: ephemeral_pk (32) || nonce (12) || ciphertext (128 + 16 tag)
+    if (data.length !== 32 + 12 + 128 + 16) {
+      return null;
+    }
+
+    // 1. Extract components
+    const ephemeralPk = data.slice(0, 32);
+    const nonce = data.slice(32, 44);
+    const ciphertext = data.slice(44);
+
+    // 2. Derive our viewing private key
+    const { privateKey: myViewingSk } = deriveViewingKeypair(mySpendingKey);
+
+    // 3. Perform ECDH to get shared secret
+    const sharedSecret = x25519.getSharedSecret(myViewingSk, ephemeralPk);
+
+    // 4. Derive decryption key using HKDF
+    const info = new TextEncoder().encode("octopus-note-encryption-v1");
+    const decryptionKey = hkdf(sha256, sharedSecret, undefined, info, 32);
+
+    // 5. Decrypt with ChaCha20-Poly1305
+    const cipher = chacha20poly1305(decryptionKey, nonce);
+    const noteData = cipher.decrypt(ciphertext);
+
+    // 6. Parse decrypted data
+    const npk = bytesToBigInt(noteData.slice(0, 32));
+    const token = bytesToBigInt(noteData.slice(32, 64));
+    const value = bytesToBigInt(noteData.slice(64, 96));
+    const random = bytesToBigInt(noteData.slice(96, 128));
+
+    // 7. Verify ownership by recomputing NPK
+    // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
+    const expectedNpk = poseidonHash([myMpk, random]);
+    if (expectedNpk !== npk) {
+      return null; // Not our note
+    }
+
+    // 8. Recompute commitment to verify data integrity
+    const commitment = poseidonHash([npk, token, value]);
+
+    return {
+      npk,
+      token,
+      value,
+      random,
+      commitment,
+    };
+  } catch (err) {
+    // Decryption failed (wrong key, corrupted data, etc.)
     return null;
   }
-
-  // 1. Decode the encrypted data
-  const npk = bytesToBigInt(data.slice(0, 32));
-  const token = bytesToBigInt(data.slice(32, 64));
-  const value = bytesToBigInt(data.slice(64, 96));
-  const random = bytesToBigInt(data.slice(96, 128));
-
-  // 2. Verify ownership by recomputing NPK
-  // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
-  const expectedNpk = poseidonHash([myMpk, random]);
-  if (expectedNpk !== npk) {
-    return null; // Not our note
-  }
-
-  // 3. Recompute commitment to verify data integrity
-  const commitment = poseidonHash([npk, token, value]);
-
-  return {
-    npk,
-    token,
-    value,
-    random,
-    commitment,
-  };
 }

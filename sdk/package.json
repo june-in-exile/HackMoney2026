@@ -19,6 +19,9 @@
   },
   "dependencies": {
     "@mysten/sui": "^1.24.0",
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "circomlibjs": "^0.1.7",
     "snarkjs": "^0.7.5"
   },

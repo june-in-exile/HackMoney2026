@@ -11,7 +11,7 @@ import {
 import { Transaction } from "@mysten/sui/transactions";
 import { type Keypair } from "@mysten/sui/cryptography";
 import { type SuiProof, type SuiVerificationKey, type SuiTransferProof, type Note } from "./types.js";
-import { bigIntToBytes, encryptNote } from "./crypto.js";
+import { bigIntToBytes, encryptNote, deriveViewingPublicKey } from "./crypto.js";
 
 /**
  * Sui client configuration
@@ -76,12 +76,15 @@ export class RailgunClient {
 
   /**
    * Shield tokens into the privacy pool
+   *
+   * @param recipientViewingPk - Recipient's viewing public key (32 bytes)
+   *   Derive from spending key using: deriveViewingPublicKey(spendingKey)
    */
   async shield<T extends string>(
     coinType: T,
     coinObjectId: string,
     note: Note,
-    recipientMpk: bigint,
+    recipientViewingPk: Uint8Array,
     signer: Keypair
   ): Promise<SuiTransactionBlockResponse> {
     const tx = new Transaction();
@@ -89,8 +92,8 @@ export class RailgunClient {
     // Get commitment as bytes
     const commitmentBytes = Array.from(bigIntToBytes(note.commitment));
 
-    // Encrypt note for recipient
-    const encryptedNote = Array.from(encryptNote(note, recipientMpk));
+    // Encrypt note for recipient using their viewing public key
+    const encryptedNote = Array.from(encryptNote(note, recipientViewingPk));
 
     tx.moveCall({
       target: `${this.config.packageId}::pool::shield`,
