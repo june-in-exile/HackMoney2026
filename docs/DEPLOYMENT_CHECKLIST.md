@@ -8,6 +8,7 @@
 ## ✅ Pre-Deployment Completed
 
 ### Circuit Layer
+
 - [x] swap.circom implemented (22,553 constraints)
 - [x] Circuit compiled successfully
 - [x] Proving key generated (9.9 MB)
@@ -15,6 +16,7 @@
 - [x] Circuit artifacts in `circuits/build/`
 
 ### Smart Contract Layer
+
 - [x] swap() function implemented
 - [x] SwapEvent defined
 - [x] parse_swap_public_inputs() helper
@@ -22,12 +24,14 @@
 - [x] Move tests created (7 tests)
 
 ### SDK Layer
+
 - [x] defi.ts module complete
 - [x] generateSwapProof() implemented
 - [x] buildSwapTransaction() complete
 - [x] SDK builds successfully
 
 ### Documentation
+
 - [x] Cetus integration guide
 - [x] Implementation summary
 - [x] Milestone progress updated
@@ -51,6 +55,7 @@ ls -lh web/public/circuits/swap*
 ```
 
 **Expected Output:**
+
 - `swap_js/swap.wasm` (~1-2 MB)
 - `swap_final.zkey` (~9.9 MB)
 - `swap_vk.json` (~3-4 KB)
@@ -58,6 +63,7 @@ ls -lh web/public/circuits/swap*
 ### Step 2: Convert Swap VK to Sui Format (30 min)
 
 **Option A: Use Existing Converter**
+
 ```bash
 cd circuits
 node convert_swap_vk_to_sui.js
@@ -82,10 +88,12 @@ console.log('Swap VK converted to Sui format');
 ### Step 3: Deploy Updated Pool Contract (45 min)
 
 **Current Deployment:**
+
 - Package: `0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080`
 - SUI Pool: `0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3`
 
 **New Deployment Required:**
+
 ```bash
 cd railgun
 
@@ -100,6 +108,7 @@ sui client publish --gas-budget 500000000
 ```
 
 **Create SUI Pool with Swap VK:**
+
 ```bash
 sui client call \
   --package 0x[NEW_PACKAGE_ID] \
@@ -114,6 +123,7 @@ sui client call \
 ```
 
 **Create USDC Pool:**
+
 ```bash
 # First, get USDC token type on Sui testnet
 # Example: 0x[USDC_PACKAGE]::usdc::USDC
@@ -131,6 +141,7 @@ sui client call \
 ```
 
 **Save Pool IDs:**
+
 - SUI Pool: `0x[NEW_SUI_POOL_ID]`
 - USDC Pool: `0x[NEW_USDC_POOL_ID]`
 
@@ -189,6 +200,7 @@ testSwap().catch(console.error);
 **1. Add Cetus Dependency**
 
 Update `railgun/Move.toml`:
+
 ```toml
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
@@ -200,6 +212,7 @@ Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-fram
 **2. Create Production swap() Function**
 
 Create `railgun/sources/pool_swap_production.move`:
+
 ```move
 // Production swap function with Cetus integration
 // See docs/CETUS_INTEGRATION.md for full implementation
@@ -208,6 +221,7 @@ Create `railgun/sources/pool_swap_production.move`:
 **3. Update Frontend**
 
 Create `web/src/components/SwapForm.tsx`:
+
 ```typescript
 export function SwapForm() {
   // Token selection
@@ -224,6 +238,7 @@ export function SwapForm() {
 ## 📊 Current Capabilities
 
 ### ✅ Working Now (Test Mode)
+
 - ZK proof generation for swaps
 - Swap transaction building
 - Mock 1:1 swap execution
@@ -232,6 +247,7 @@ export function SwapForm() {
 - Slippage protection (circuit level)
 
 ### ⚠️ Requires Cetus Integration
+
 - Real market prices
 - Actual token swapping
 - Price impact calculation
@@ -243,6 +259,7 @@ export function SwapForm() {
 ## 🎯 Success Criteria
 
 ### Testnet Deployment
+
 - [ ] Circuit artifacts deployed to web/public/
 - [ ] Swap VK converted to Sui format
 - [ ] Updated pool contract deployed
@@ -251,6 +268,7 @@ export function SwapForm() {
 - [ ] End-to-end swap test passing
 
 ### Production Ready
+
 - [ ] Cetus dependency added
 - [ ] Real DEX swap implemented
 - [ ] Price oracle integrated
