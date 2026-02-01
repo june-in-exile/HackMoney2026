@@ -22,3 +22,17 @@ export const STORAGE_KEYS = {
 
 // Demo mode - set to false to use real on-chain contracts
 export const DEMO_MODE = false;
+
+// Circuit artifact URLs
+export const CIRCUIT_URLS = {
+  UNSHIELD: {
+    WASM: "/circuits/unshield_js/unshield.wasm",
+    ZKEY: "/circuits/unshield_final.zkey",
+    VK: "/circuits/unshield_vk.json",
+  },
+  TRANSFER: {
+    WASM: "/circuits/transfer_js/transfer.wasm",
+    ZKEY: "/circuits/transfer_final.zkey",
+    VK: "/circuits/transfer_vk.json",
+  },
+} as const;
