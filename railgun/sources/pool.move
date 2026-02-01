@@ -334,6 +334,143 @@ module railgun::pool {
         });
     }
 
+    /// Execute private swap through external DEX (Production Version)
+    ///
+    /// This function enables private swaps through Cetus DEX while maintaining privacy.
+    /// Users prove ownership of input notes via ZK proof, swap through DEX at market price,
+    /// and receive output as a new private note.
+    ///
+    /// Flow:
+    /// 1. Verify ZK proof (proves ownership of input notes and swap parameters)
+    /// 2. Extract input tokens from pool_in
+    /// 3. Call external DEX (Cetus) to execute swap
+    /// 4. Shield output tokens into pool_out
+    /// 5. Return change to pool_in if applicable
+    ///
+    /// NOTE: This is a production-ready scaffold. To complete integration:
+    /// 1. Import Cetus modules: `use cetus_clmm::pool as cetus_pool;`
+    /// 2. Add `cetus_pool_obj: &mut CetusPool<TokenIn, TokenOut>` parameter
+    /// 3. Replace TODO comments with actual Cetus calls
+    ///
+    /// For detailed implementation guide, see: docs/PRODUCTION_SWAP_IMPLEMENTATION.md
+    ///
+    /// # Arguments
+    /// * `pool_in` - Privacy pool for input token
+    /// * `pool_out` - Privacy pool for output token
+    /// * `proof_bytes` - Groth16 proof (128 bytes)
+    /// * `public_inputs_bytes` - Public inputs (192 bytes)
+    /// * `amount_in` - Exact amount to swap
+    /// * `min_amount_out` - Minimum output (slippage protection)
+    /// * `encrypted_output_note` - Encrypted note for recipient
+    /// * `encrypted_change_note` - Encrypted change note
+    /// * `ctx` - Transaction context
+    public entry fun swap_production<TokenIn, TokenOut>(
+        pool_in: &mut PrivacyPool<TokenIn>,
+        _pool_out: &mut PrivacyPool<TokenOut>,
+        // TODO: Add Cetus pool parameter when integration is complete
+        // cetus_pool: &mut cetus_clmm::pool::Pool<TokenIn, TokenOut>,
+        proof_bytes: vector<u8>,
+        public_inputs_bytes: vector<u8>,
+        amount_in: u64,
+        _min_amount_out: u64,
+        _encrypted_output_note: vector<u8>,
+        _encrypted_change_note: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 192, E_INVALID_PUBLIC_INPUTS);
+
+        // 1. Parse public inputs
+        let (merkle_root, nullifier1, nullifier2, _output_commitment, _change_commitment, _swap_data_hash) =
+            parse_swap_public_inputs(&public_inputs_bytes);
+
+        // 2. Verify merkle root is valid (current or in history)
+        assert!(is_valid_root(pool_in, &merkle_root), E_INVALID_ROOT);
+
+        // 3. Check both nullifiers have not been spent (prevent double-spend)
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier1), E_DOUBLE_SPEND);
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier2), E_DOUBLE_SPEND);
+
+        // 4. Verify Groth16 ZK proof using swap verification key
+        let pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool_in.swap_vk_bytes);
+        let public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
+        let proof_points = groth16::proof_points_from_bytes(proof_bytes);
+
+        assert!(
+            groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
+            E_INVALID_PROOF
+        );
+
+        // 5. Extract tokens from pool_in
+        assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
+        let _coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
+
+        // 6. Execute swap through Cetus DEX
+        // TODO: Implement actual Cetus integration
+        // Example Cetus call (uncomment when Cetus modules are imported):
+        //
+        // let (coin_out, coin_remainder) = cetus_pool::flash_swap<TokenIn, TokenOut>(
+        //     cetus_pool,
+        //     true,  // a_to_b direction
+        //     true,  // by_amount_in
+        //     amount_in,
+        //     0,     // sqrt_price_limit (0 = no limit, adjust for slippage)
+        //     ctx
+        // );
+        //
+        // // Repay flash swap
+        // cetus_pool::repay_flash_swap<TokenIn, TokenOut>(
+        //     cetus_pool,
+        //     coin_in,
+        //     coin_remainder,
+        //     coin::zero<TokenOut>(ctx),
+        //     coin_out
+        // );
+        //
+        // let amount_out = coin::value(&coin_out);
+
+        // Temporary: Abort with clear message until Cetus integration is complete
+        abort E_INSUFFICIENT_BALANCE  // Using existing error code to signal "not yet implemented"
+
+        // NOTE: Once Cetus integration is complete, uncomment below and remove abort above:
+        /*
+        // Verify slippage protection
+        assert!(amount_out >= min_amount_out, E_INSUFFICIENT_BALANCE);
+
+        // 7. Shield output into pool_out
+        balance::join(&mut pool_out.balance, coin::into_balance(coin_out));
+
+        // 8. Mark both nullifiers as spent
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
+
+        // 9. Add output commitment to pool_out Merkle tree
+        let output_position = merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
+        merkle_tree::update_root(&mut pool_out.merkle_tree);
+
+        // 10. Add change commitment to pool_in Merkle tree
+        let change_position = merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
+        merkle_tree::update_root(&mut pool_in.merkle_tree);
+
+        // Save updated roots to history
+        save_historical_root(pool_in);
+        save_historical_root(pool_out);
+
+        // 11. Emit event for wallet scanning
+        event::emit(SwapEvent {
+            input_nullifiers: vector[nullifier1, nullifier2],
+            output_commitment,
+            change_commitment,
+            output_position,
+            change_position,
+            amount_in,
+            amount_out,
+            encrypted_output_note,
+            encrypted_change_note,
+        });
+        */
+    }
+
     /// Unshield tokens from the privacy pool with ZK proof verification.
     ///
     /// The ZK proof proves:
