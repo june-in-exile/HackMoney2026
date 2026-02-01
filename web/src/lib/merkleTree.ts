@@ -127,6 +127,69 @@ export function buildMerkleProof(
 }
 
 /**
+ * Build Merkle proof from on-chain incremental tree state
+ * This matches the Move contract's incremental Merkle tree logic
+ */
+export function buildProofFromOnChainState(
+  leafIndex: number,
+  filledSubtreesRaw: any[],
+  zerosRaw: any[]
+): bigint[] {
+  const pathElements: bigint[] = [];
+
+  // Convert filled_subtrees from raw format to bigint[]
+  const filledSubtrees: bigint[] = filledSubtreesRaw.map(subtree => {
+    if (Array.isArray(subtree)) {
+      return bytesToBigInt(subtree);
+    } else if (typeof subtree === 'object') {
+      const bytes = Object.values(subtree as object).map(v => Number(v));
+      return bytesToBigInt(bytes);
+    }
+    return 0n;
+  });
+
+  // Convert zeros from raw format to bigint[]
+  const zeros: bigint[] = zerosRaw.map(zero => {
+    if (Array.isArray(zero)) {
+      return bytesToBigInt(zero);
+    } else if (typeof zero === 'object') {
+      const bytes = Object.values(zero as object).map(v => Number(v));
+      return bytesToBigInt(bytes);
+    }
+    return 0n;
+  });
+
+  // Build proof using incremental tree logic (matching Move contract)
+  let currentIndex = leafIndex;
+  for (let level = 0; level < TREE_DEPTH; level++) {
+    const isLeft = currentIndex % 2 === 0;
+
+    if (isLeft) {
+      // Left child: sibling is zero hash
+      pathElements.push(zeros[level] || 0n);
+    } else {
+      // Right child: sibling is filled subtree at this level
+      pathElements.push(filledSubtrees[level] || 0n);
+    }
+
+    currentIndex = Math.floor(currentIndex / 2);
+  }
+
+  return pathElements;
+}
+
+/**
+ * Convert byte array to BigInt (big-endian)
+ */
+function bytesToBigInt(bytes: number[]): bigint {
+  let result = 0n;
+  for (const byte of bytes) {
+    result = (result << 8n) | BigInt(byte);
+  }
+  return result;
+}
+
+/**
  * Compute Merkle root from commitments
  */
 export function computeRootFromCommitments(commitments: bigint[]): bigint {

@@ -10,6 +10,26 @@ import { poseidonHash, computeZeroHashes } from "./crypto.js";
 import { MERKLE_TREE_DEPTH } from "./types.js";
 
 /**
+ * Convert byte array to BigInt using little-endian format
+ * (matches on-chain bytes_to_u256 function)
+ */
+function bytesToBigInt(bytes: number[]): bigint {
+  if (bytes.length !== 32) {
+    throw new Error(`Invalid bytes length: ${bytes.length}, expected 32`);
+  }
+
+  // Read from high byte to low byte (LE format)
+  let result = 0n;
+  for (let i = 31; i >= 0; i--) {
+    result = (result << 8n) | BigInt(bytes[i]);
+  }
+
+  // Reduce modulo BN254 field (same as on-chain)
+  const BN254_MAX = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+  return result % BN254_MAX;
+}
+
+/**
  * Commitment with its tree position
  */
 export interface CommitmentLeaf {
@@ -173,11 +193,11 @@ export async function buildMerkleTreeFromEvents(
   for (const event of shieldEvents.data) {
     const { position, commitment } = event.parsedJson as {
       position: string;
-      commitment: string;
+      commitment: number[];  // Fixed: commitment is a byte array, not string
     };
 
     commitments.push({
-      commitment: BigInt(commitment),
+      commitment: bytesToBigInt(commitment),  // Convert LE bytes to BigInt
       leafIndex: Number(position),
       txDigest: event.id.txDigest,
     });
@@ -193,12 +213,12 @@ export async function buildMerkleTreeFromEvents(
   for (const event of transferEvents.data) {
     const { output_positions, output_commitments } = event.parsedJson as {
       output_positions: string[];
-      output_commitments: string[];
+      output_commitments: number[][];  // Fixed: array of byte arrays
     };
 
     for (let i = 0; i < output_commitments.length; i++) {
       commitments.push({
-        commitment: BigInt(output_commitments[i]),
+        commitment: bytesToBigInt(output_commitments[i]),  // Convert LE bytes to BigInt
         leafIndex: Number(output_positions[i]),
         txDigest: event.id.txDigest,
       });

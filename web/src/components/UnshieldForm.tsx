@@ -137,7 +137,8 @@ export function UnshieldForm({
 
       const merkleProofData = await getMerkleProofForNote(
         suiClient,
-        noteToSpend.position
+        noteToSpend.position,
+        POOL_ID // FIX: Pass pool ID to get on-chain root (same as swap tests)
       );
 
       console.log("Merkle proof retrieved:");
