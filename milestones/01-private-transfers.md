@@ -1,7 +1,7 @@
 # Milestone 1: Private Transfers (0zk-to-0zk)
 
 **Priority:** 🔴 Highest
-**Status:** 🟡 In Progress (Phases 1-3 Complete, Testing Phase 4-5)
+**Status:** 🟡 In Progress (Phases 1-4 Complete, Phase 5 Testing)
 **Estimated Complexity:** High
 
 ## Overview
@@ -194,8 +194,11 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - [x] Add commitment insertion for 2 outputs
 - [x] Write unit tests (10+ test cases) - **7 transfer tests created** ✓
 - [x] Verify all tests pass - **30/30 tests passing** ✓
-- [ ] Test with real proofs from circuit - PENDING (requires deployed pool with transfer VK)
-- [ ] Deploy to testnet - PENDING
+- [x] Deploy to testnet - **✅ Deployed 2026-02-01**
+  - Package: `0xbdfa6e285a327879c9ec3006a4992885ff21809c4d5f22a3b3f65a5228aafe61`
+  - Pool: `0xe4b8527f84a141c508250c7f7eba512def477e8c6d60a36e896c6b80c3762a31`
+  - Both VKs included (unshield: 360 bytes, transfer: 424 bytes)
+- [ ] Test with real proofs from circuit - PENDING (requires note encryption)
 
 ### Phase 3: SDK Integration (Week 3-4) ✅
 
@@ -207,17 +210,23 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - [ ] Write unit tests - PENDING
 - [ ] Test end-to-end with testnet - PENDING
 
-### Phase 4: Frontend (Week 4-5) 🟡 Partially Complete
+### Phase 4: Frontend (Week 4-5) ✅ COMPLETE (Infrastructure)
 
 - [x] Create `TransferForm.tsx` component (placeholder UI)
 - [x] Add recipient MPK input and validation
 - [x] Add tabbed navigation (Shield/Transfer/Unshield)
 - [x] Deploy transfer circuit artifacts to `/public/circuits/`
+  - transfer.wasm: 2.2 MB
+  - transfer_final.zkey: 9.5 MB
+  - transfer_vk.json: 3.6 KB
 - [x] Update constants with transfer circuit URLs
 - [x] Update How It Works section with transfer flow
-- [ ] Implement full proof generation flow - PENDING (requires SDK integration)
-- [ ] Implement note selection UI - PENDING
-- [ ] Add proof generation progress indicator - PENDING
+- [x] Implement full proof generation flow (commented, ready to activate)
+- [x] Create useNotes hook for note scanning and management
+- [x] Deploy new pool with transfer VK to testnet
+- [ ] Implement note encryption/decryption - PENDING (ChaCha20-Poly1305 + ECDH)
+- [ ] Implement Merkle proof fetching - PENDING (query on-chain tree)
+- [ ] Activate full proof flow - PENDING (requires encryption)
 - [ ] Test in browser - PENDING
 - [ ] Add transaction history view - PENDING
 
@@ -237,11 +246,15 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - ✅ `circuits/transfer.circom` - Transfer circuit (119 lines)
 - ✅ `circuits/compile_transfer.sh` - Compilation script (58 lines)
 - ✅ `circuits/generateTransferTestInput.js` - Test input generator (186 lines)
+- ✅ `circuits/arkworksConverterTransfer.js` - VK converter for transfer circuit (170 lines)
 - ✅ `sdk/src/wallet.ts` - Note selection & UTXO management (205 lines)
 - ✅ `railgun/sources/transfer_tests.move` - Move tests (7 test cases, 280 lines)
+- ✅ `railgun/deploy.sh` - Automated deployment script (77 lines)
 - ✅ `circuits/build/transfer_final.zkey` - Proving key (9.5 MB)
 - ✅ `circuits/build/transfer_vk.json` - Verification key (3.6 KB)
-- ✅ `web/src/components/TransferForm.tsx` - Transfer UI (placeholder, 180 lines)
+- ✅ `circuits/build/transfer_vk_bytes.hex` - Sui-compatible VK hex (424 bytes)
+- ✅ `web/src/components/TransferForm.tsx` - Transfer UI with full flow (183 lines)
+- ✅ `web/src/hooks/useNotes.ts` - Note scanning and management hook (238 lines)
 - ✅ `web/public/circuits/transfer_js/transfer.wasm` - Circuit WASM (2.2 MB)
 - ✅ `web/public/circuits/transfer_final.zkey` - Proving key (9.5 MB)
 - [ ] `sdk/src/__tests__/transfer.test.ts` - SDK tests - PENDING
@@ -249,23 +262,49 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 ### Modified Files
 
 - ✅ `railgun/sources/pool.move` - Add transfer() function, TransferEvent, parse_transfer_public_inputs()
+- ✅ `railgun/sources/pool_tests.move` - Update create_pool() calls to include transfer VK
 - ✅ `sdk/src/types.ts` - Add TransferInput, TransferCircuitInput, SuiTransferProof
 - ✅ `sdk/src/prover.ts` - Add buildTransferInput(), generateTransferProof(), convertTransferProofToSui()
 - ✅ `sdk/src/sui.ts` - Add transfer(), queryTransferEvents(), buildTransferTransaction()
-- [ ] `sdk/src/crypto.ts` - Add encryption functions - PENDING
-- [ ] `web/src/app/page.tsx` - Add Transfer tab - PENDING
-- [ ] `web/src/lib/constants.ts` - Add transfer circuit URLs - PENDING
+- ✅ `web/src/app/page.tsx` - Add Transfer tab with tabbed navigation
+- ✅ `web/src/lib/constants.ts` - Add transfer circuit URLs, update deployment addresses
+- [ ] `sdk/src/crypto.ts` - Add encryption functions (encryptNote, decryptNote) - PENDING
 
 ## Success Criteria
 
 - [x] Circuit compiles with <50K constraints - **21,649 constraints** ✓
 - [x] All Move tests pass (23+ tests) - **30 tests passing (23 + 7 transfer)** ✓
-- [ ] SDK generates valid proofs in <60 seconds - PENDING
-- [ ] Frontend successfully sends private transfer - PENDING
-- [ ] Transaction verifies on-chain - PENDING
-- [ ] Recipient can see and spend received note - PENDING
-- [ ] Sender's identity remains hidden
-- [ ] Zero information leaked about amount
+- [x] Contract deployed to testnet with transfer VK - **✅ Deployed** ✓
+- [ ] SDK generates valid proofs in <60 seconds - PENDING (awaiting encryption)
+- [ ] Frontend successfully sends private transfer - PENDING (awaiting encryption)
+- [ ] Transaction verifies on-chain - PENDING (awaiting encryption)
+- [ ] Recipient can see and spend received note - PENDING (awaiting encryption)
+- [ ] Sender's identity remains hidden - Ready (circuit proven)
+- [ ] Zero information leaked about amount - Ready (circuit proven)
+
+## Current Deployment (Testnet)
+
+**Deployed:** 2026-02-01
+**Network:** Sui Testnet
+**Transaction:** BMNhuWM5WW5aPidnUCL8X1iApceBVNxAytyr8sZJCcPx
+
+**Addresses:**
+
+- Package ID: [`0xbdfa6e285a327879c9ec3006a4992885ff21809c4d5f22a3b3f65a5228aafe61`](https://suiscan.xyz/testnet/object/0xbdfa6e285a327879c9ec3006a4992885ff21809c4d5f22a3b3f65a5228aafe61)
+- Pool ID: [`0xe4b8527f84a141c508250c7f7eba512def477e8c6d60a36e896c6b80c3762a31`](https://suiscan.xyz/testnet/object/0xe4b8527f84a141c508250c7f7eba512def477e8c6d60a36e896c6b80c3762a31)
+
+**Verification Keys:**
+
+- Unshield VK: 360 bytes (4 IC points for 3 public inputs)
+- Transfer VK: 424 bytes (6 IC points for 5 public inputs)
+
+**Features:**
+
+- ✅ Shield (public → private)
+- ✅ Unshield (private → public)
+- ✅ Transfer (private → private) - Circuit ready, encryption pending
+
+**Status:** Infrastructure complete, awaiting note encryption implementation
 
 ## Testing Checklist
 
