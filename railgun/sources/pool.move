@@ -9,6 +9,11 @@ module railgun::pool {
     use railgun::merkle_tree::{Self, MerkleTree};
     use railgun::nullifier::{Self, NullifierRegistry};
 
+    // Cetus DEX integration (uncomment when Cetus package is available)
+    // Note: Cetus package address is configured in Move.toml
+    // use cetus_clmm::pool::{Self as cetus_pool, Pool as CetusPool};
+    // use cetus_clmm::config::GlobalConfig as CetusGlobalConfig;
+
     // ============ Errors ============
 
     /// Nullifier has already been spent (double-spend attempt)
@@ -366,15 +371,16 @@ module railgun::pool {
     /// * `ctx` - Transaction context
     public entry fun swap_production<TokenIn, TokenOut>(
         pool_in: &mut PrivacyPool<TokenIn>,
-        _pool_out: &mut PrivacyPool<TokenOut>,
-        // TODO: Add Cetus pool parameter when integration is complete
-        // cetus_pool: &mut cetus_clmm::pool::Pool<TokenIn, TokenOut>,
+        pool_out: &mut PrivacyPool<TokenOut>,
+        // TODO: Uncomment when Cetus modules are imported:
+        // cetus_pool: &mut CetusPool<TokenIn, TokenOut>,
+        // cetus_config: &CetusGlobalConfig,
         proof_bytes: vector<u8>,
         public_inputs_bytes: vector<u8>,
         amount_in: u64,
-        _min_amount_out: u64,
-        _encrypted_output_note: vector<u8>,
-        _encrypted_change_note: vector<u8>,
+        min_amount_out: u64,
+        encrypted_output_note: vector<u8>,
+        encrypted_change_note: vector<u8>,
         ctx: &mut TxContext,
     ) {
         // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
@@ -403,18 +409,18 @@ module railgun::pool {
 
         // 5. Extract tokens from pool_in
         assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
-        let _coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
+        let coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
 
         // 6. Execute swap through Cetus DEX
-        // TODO: Implement actual Cetus integration
-        // Example Cetus call (uncomment when Cetus modules are imported):
+        // TODO: Replace with real Cetus integration when modules are imported
         //
+        // Production Cetus call (uncomment when cetus_clmm modules are available):
         // let (coin_out, coin_remainder) = cetus_pool::flash_swap<TokenIn, TokenOut>(
         //     cetus_pool,
-        //     true,  // a_to_b direction
+        //     true,  // a_to_b direction (adjust based on token pair order)
         //     true,  // by_amount_in
         //     amount_in,
-        //     0,     // sqrt_price_limit (0 = no limit, adjust for slippage)
+        //     0,     // sqrt_price_limit (0 = no limit, adjust for slippage control)
         //     ctx
         // );
         //
@@ -429,38 +435,52 @@ module railgun::pool {
         //
         // let amount_out = coin::value(&coin_out);
 
-        // Temporary: Abort with clear message until Cetus integration is complete
-        abort E_INSUFFICIENT_BALANCE  // Using existing error code to signal "not yet implemented"
+        // ============================================================
+        // CETUS INTEGRATION REQUIRED
+        // ============================================================
+        // This function is ready for Cetus integration. To complete:
+        // 1. Uncomment Cetus imports at top of file
+        // 2. Add cetus_pool and cetus_config parameters
+        // 3. Uncomment Cetus flash swap code above
+        // 4. Comment out or remove this abort block
+        // 5. Uncomment the implementation below
+        // ============================================================
 
-        // NOTE: Once Cetus integration is complete, uncomment below and remove abort above:
+        // Return borrowed coins and abort until Cetus is integrated
+        balance::join(&mut pool_in.balance, coin::into_balance(coin_in));
+        abort E_INSUFFICIENT_BALANCE
+
+        // ============================================================
+        // IMPLEMENTATION (Uncomment when Cetus is integrated)
+        // ============================================================
         /*
-        // Verify slippage protection
+        // 7. Verify slippage protection
         assert!(amount_out >= min_amount_out, E_INSUFFICIENT_BALANCE);
 
-        // 7. Shield output into pool_out
+        // 8. Shield output into pool_out
         balance::join(&mut pool_out.balance, coin::into_balance(coin_out));
 
-        // 8. Mark both nullifiers as spent
+        // 9. Mark both nullifiers as spent
         nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
         nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
 
-        // 9. Add output commitment to pool_out Merkle tree
-        let output_position = merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
-        merkle_tree::update_root(&mut pool_out.merkle_tree);
+        // 10. Add output commitment to pool_out Merkle tree
+        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
+        merkle_tree::insert(&mut pool_out.merkle_tree, _output_commitment);
 
-        // 10. Add change commitment to pool_in Merkle tree
-        let change_position = merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
-        merkle_tree::update_root(&mut pool_in.merkle_tree);
+        // 11. Add change commitment to pool_in Merkle tree
+        let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
+        merkle_tree::insert(&mut pool_in.merkle_tree, _change_commitment);
 
-        // Save updated roots to history
+        // 12. Save updated roots to history
         save_historical_root(pool_in);
         save_historical_root(pool_out);
 
-        // 11. Emit event for wallet scanning
+        // 13. Emit event for wallet scanning
         event::emit(SwapEvent {
             input_nullifiers: vector[nullifier1, nullifier2],
-            output_commitment,
-            change_commitment,
+            output_commitment: _output_commitment,
+            change_commitment: _change_commitment,
             output_position,
             change_position,
             amount_in,
