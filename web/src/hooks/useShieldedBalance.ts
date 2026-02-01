@@ -73,7 +73,7 @@ export function useShieldedBalance(
    * Scan blockchain for ShieldEvent emissions and decrypt notes
    */
   const scanShieldEvents = useCallback(
-    async (mpk: bigint): Promise<ShieldedNote[]> => {
+    async (spendingKey: bigint, mpk: bigint): Promise<ShieldedNote[]> => {
       try {
         // Initialize Poseidon if not already done
         await initPoseidon();
@@ -95,8 +95,12 @@ export function useShieldedBalance(
               encrypted_note: number[];
             };
 
-            // Try to decrypt the note
-            const decrypted = decryptNote(eventData.encrypted_note, mpk);
+            // Try to decrypt the note (requires spending key + MPK)
+            const decrypted = decryptNote(
+              eventData.encrypted_note,
+              spendingKey,
+              mpk
+            );
 
             if (decrypted) {
               // This note belongs to us!
@@ -140,7 +144,10 @@ export function useShieldedBalance(
 
     try {
       // Scan blockchain for our notes
-      const scannedNotes = await scanShieldEvents(keypair.masterPublicKey);
+      const scannedNotes = await scanShieldEvents(
+        keypair.spendingKey,
+        keypair.masterPublicKey
+      );
 
       // Merge with existing notes from storage to preserve spent status
       const mpkHex = keypair.masterPublicKey.toString();

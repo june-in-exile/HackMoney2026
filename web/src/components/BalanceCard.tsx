@@ -8,12 +8,14 @@ interface BalanceCardProps {
   shieldedBalance: bigint;
   noteCount: number;
   isLoading?: boolean;
+  onRefresh?: () => void;
 }
 
 export function BalanceCard({
   shieldedBalance,
   noteCount,
   isLoading,
+  onRefresh,
 }: BalanceCardProps) {
   const account = useCurrentAccount();
 
@@ -33,11 +35,35 @@ export function BalanceCard({
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Shielded Balance
         </h2>
-        {DEMO_MODE && (
-          <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-            Demo
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+              title="Refresh balance"
+            >
+              <svg
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </button>
+          )}
+          {DEMO_MODE && (
+            <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+              Demo
+            </span>
+          )}
+        </div>
       </div>
 
       {isLoading ? (

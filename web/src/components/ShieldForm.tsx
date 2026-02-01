@@ -15,7 +15,8 @@ import {
   createNote,
   encryptNote,
   bigIntToBytes,
-  poseidonHash
+  poseidonHash,
+  deriveViewingPublicKey
 } from "@octopus/sdk";
 
 interface ShieldFormProps {
@@ -117,7 +118,9 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       );
 
       // Encrypt the note for the recipient (self in this case)
-      const encryptedNoteData = encryptNote(note, keypair.masterPublicKey);
+      // Derive viewing public key from spending key
+      const viewingPk = deriveViewingPublicKey(keypair.spendingKey);
+      const encryptedNoteData = encryptNote(note, viewingPk);
 
       // Convert commitment to bytes (32 bytes, big-endian)
       const commitmentBytes = bigIntToBytes(note.commitment);
@@ -143,9 +146,19 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         transaction: tx,
       });
 
-      setSuccess(`Shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`);
+      setSuccess(
+        `Shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}\n` +
+        `Refreshing balance...`
+      );
       setAmount("");
+
+      // Call onSuccess callback to refresh balance
       await onSuccess?.();
+
+      // Update success message after refresh completes
+      setSuccess(
+        `Successfully shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`
+      );
     } catch (err) {
       console.error("Shield failed:", err);
       setError(err instanceof Error ? err.message : "Shield failed");

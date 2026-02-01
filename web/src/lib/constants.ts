@@ -3,9 +3,9 @@
  */
 
 // Deployed contract addresses (testnet)
-// Updated 2026-02-01: Redeployed with transfer support ✅
-export const PACKAGE_ID = "0xbdfa6e285a327879c9ec3006a4992885ff21809c4d5f22a3b3f65a5228aafe61";
-export const POOL_ID = "0xe4b8527f84a141c508250c7f7eba512def477e8c6d60a36e896c6b80c3762a31";
+// Updated 2026-02-02: Redeployed with LE endianness fix for Sui groth16 ✅
+export const PACKAGE_ID = "0x10b0c07057021ca7d3e1922e4ce66df2519d539614ed4bba90b716e2eb996ade";
+export const POOL_ID = "0x0fa823eca462230bfda4afbd531eaae5521324df30343dec124c99b481b94517";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";

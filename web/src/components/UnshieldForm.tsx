@@ -111,10 +111,17 @@ export function UnshieldForm({
         throw new Error("No unspent notes available");
       }
 
-      // For now, spend the first note that has enough value
-      const noteToSpend = unspentNotes.find((note) => note.value >= amountMist);
+      // Sort notes by value (largest first) for better UX
+      const sortedNotes = unspentNotes.sort((a, b) => Number(b.value - a.value));
+
+      // Use the largest note (current implementation supports 1-input only)
+      const noteToSpend = sortedNotes.find((note) => note.value >= amountMist);
       if (!noteToSpend) {
-        throw new Error("No note with sufficient balance");
+        const maxSingleNote = sortedNotes[0]?.value ?? 0n;
+        throw new Error(
+          `No single note with sufficient balance. Largest note: ${formatSui(maxSingleNote)} SUI. ` +
+          `To unshield larger amounts, use private transfer to merge notes first.`
+        );
       }
 
       // Get Merkle proof from on-chain state
@@ -243,7 +250,18 @@ export function UnshieldForm({
             disabled={isProcessing}
           />
           <p className="mt-1 text-xs text-gray-500">
-            Max: {formatSui(maxAmount)} SUI
+            {notes.length > 0 ? (
+              <>
+                Max per note: {formatSui(notes.filter(n => !n.spent).sort((a, b) => Number(b.value - a.value))[0]?.value ?? 0n)} SUI
+                {notes.filter(n => !n.spent).length > 1 && (
+                  <span className="text-gray-400">
+                    {" "}(Total: {formatSui(maxAmount)} SUI across {notes.filter(n => !n.spent).length} notes)
+                  </span>
+                )}
+              </>
+            ) : (
+              <>Max: {formatSui(maxAmount)} SUI</>
+            )}
           </p>
         </div>
 
@@ -274,6 +292,35 @@ export function UnshieldForm({
             </button>
           </div>
         </div>
+
+        {/* Available Notes Display */}
+        {notes.filter(n => !n.spent).length > 1 && (
+          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+              Available Notes (UTXO Model)
+            </p>
+            <div className="space-y-1 text-xs text-blue-700 dark:text-blue-300">
+              {notes
+                .filter(n => !n.spent)
+                .sort((a, b) => Number(b.value - a.value))
+                .slice(0, 5)
+                .map((note, i) => (
+                  <div key={i} className="flex justify-between font-mono">
+                    <span>Note #{i + 1}:</span>
+                    <span>{formatSui(note.value)} SUI</span>
+                  </div>
+                ))}
+              {notes.filter(n => !n.spent).length > 5 && (
+                <p className="text-blue-600 dark:text-blue-400">
+                  ... and {notes.filter(n => !n.spent).length - 5} more note(s)
+                </p>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+              ℹ️ Currently supports spending 1 note at a time. Use private transfer to merge notes.
+            </p>
+          </div>
+        )}
 
         {/* Progress indicator */}
         {isProcessing && (

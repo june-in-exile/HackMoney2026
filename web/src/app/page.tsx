@@ -31,17 +31,38 @@ export default function Home() {
 
   const handleShieldSuccess = async () => {
     // Refresh balance from blockchain after successful shield
+    // Add delay to allow blockchain events to be indexed
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     await refreshBalance();
+
+    // Retry after another delay to ensure we catch the event
+    setTimeout(async () => {
+      await refreshBalance();
+    }, 3000);
   };
 
   const handleUnshieldSuccess = async () => {
     // Refresh balance from blockchain after successful unshield
+    // Add delay to allow blockchain events to be indexed
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     await refreshBalance();
+
+    // Retry after another delay to ensure we catch the event
+    setTimeout(async () => {
+      await refreshBalance();
+    }, 3000);
   };
 
   const handleTransferSuccess = async () => {
     // Refresh balance from blockchain after successful transfer
+    // Add delay to allow blockchain events to be indexed
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     await refreshBalance();
+
+    // Retry after another delay to ensure we catch the event
+    setTimeout(async () => {
+      await refreshBalance();
+    }, 3000);
   };
 
   return (
@@ -87,6 +108,7 @@ export default function Home() {
                 shieldedBalance={shieldedBalance}
                 noteCount={noteCount}
                 isLoading={isLoading || isLoadingBalance}
+                onRefresh={refreshBalance}
               />
             </div>
 

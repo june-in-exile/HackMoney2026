@@ -145,22 +145,23 @@ module railgun::merkle_tree {
         u256_to_bytes(hash_u256)
     }
 
-    /// Convert 32-byte vector to u256 (big-endian) with BN254 field reduction
+    /// Convert 32-byte vector to u256 (little-endian for Sui groth16 compatibility)
     fun bytes_to_u256(bytes: vector<u8>): u256 {
         assert!(vector::length(&bytes) == 32, EInvalidLength);
 
         let mut result = 0u256;
-        let mut i = 0;
-        while (i < 32) {
+        let mut i = 32;
+        // Read from high byte to low byte (LE format)
+        while (i > 0) {
+            i = i - 1;
             result = (result << 8) | (*vector::borrow(&bytes, i) as u256);
-            i = i + 1;
         };
 
         // Reduce modulo BN254 field to ensure validity
         result % BN254_MAX
     }
 
-    /// Convert u256 to 32-byte vector (big-endian)
+    /// Convert u256 to 32-byte vector (little-endian for Sui groth16 compatibility)
     fun u256_to_bytes(value: u256): vector<u8> {
         let mut bytes = vector::empty<u8>();
         let mut v = value;
@@ -170,7 +171,7 @@ module railgun::merkle_tree {
             v = v >> 8;
             i = i + 1;
         };
-        vector::reverse(&mut bytes);
+        // REMOVED vector::reverse() - now returns little-endian
         bytes
     }
 

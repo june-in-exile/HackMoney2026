@@ -277,10 +277,11 @@ export function convertProofToSui(
   proofBytes.set(piB, 32);
   proofBytes.set(piC, 96);
 
-  // Public inputs: 3 × 32 bytes = 96 bytes (BE format for Move contract)
+  // Public inputs: 3 × 32 bytes = 96 bytes (LE format per Sui docs)
+  // Sui requires little-endian format for scalar field elements
   const publicInputsBytes = new Uint8Array(96);
   for (let i = 0; i < 3; i++) {
-    const inputBytes = bigIntToBE32(BigInt(publicSignals[i]));
+    const inputBytes = bigIntToLE32(BigInt(publicSignals[i]));  // Changed to LE!
     publicInputsBytes.set(inputBytes, i * 32);
   }
 
@@ -616,9 +617,10 @@ export function convertTransferProofToSui(
     throw new Error(`Expected 5 public signals, got ${publicSignals.length}`);
   }
 
+  // Sui requires little-endian format for public inputs per official docs
   const publicInputsBytes = new Uint8Array(160);
   for (let i = 0; i < 5; i++) {
-    const inputBytes = bigIntToBE32(BigInt(publicSignals[i]));
+    const inputBytes = bigIntToLE32(BigInt(publicSignals[i]));  // Changed to LE!
     publicInputsBytes.set(inputBytes, i * 32);
   }
 
