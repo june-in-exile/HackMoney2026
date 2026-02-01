@@ -94,7 +94,7 @@ interface SwapParams {
 }
 
 interface SwapInput {
-  keypair: RailgunKeypair;
+  keypair: OctopusKeypair;
   inputNotes: Note[];
   inputLeafIndices: number[];
   inputPathElements: bigint[][];

@@ -4,7 +4,7 @@ include "node_modules/circomlib/circuits/poseidon.circom";
 include "node_modules/circomlib/circuits/bitify.circom";
 include "./lib/merkle_proof.circom";
 
-/// Transfer circuit for Railgun on Sui
+/// Transfer circuit for Octopus on Sui
 /// Implements 2-input, 2-output private transfers within the privacy pool
 ///
 /// Proves:
@@ -14,7 +14,7 @@ include "./lib/merkle_proof.circom";
 /// 4. Correct commitment computation for both outputs
 /// 5. Balance conservation: sum(input_values) = sum(output_values)
 ///
-/// Based on Railgun cryptographic formulas:
+/// Based on cryptographic formulas:
 /// - MPK = Poseidon(spending_key, nullifying_key)
 /// - NPK = Poseidon(MPK, random)
 /// - Commitment = Poseidon(NPK, token, value)

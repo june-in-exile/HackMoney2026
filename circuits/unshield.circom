@@ -4,8 +4,8 @@ include "node_modules/circomlib/circuits/poseidon.circom";
 include "node_modules/circomlib/circuits/bitify.circom";
 include "./lib/merkle_proof.circom";
 
-/// Unshield circuit for Railgun on Sui
-/// Simplified version of Railgun's JoinSplit circuit (1 input, no EdDSA)
+/// Unshield circuit for Octopus on Sui
+/// Simplified version of a privacy circuit (1 input, no EdDSA)
 ///
 /// Proves:
 /// 1. Knowledge of spending_key and nullifying_key (ownership)
@@ -13,7 +13,7 @@ include "./lib/merkle_proof.circom";
 /// 3. Correct nullifier computation
 /// 4. Commitment exists in Merkle tree
 ///
-/// Based on Railgun cryptographic formulas:
+/// Based on cryptographic formulas:
 /// - MPK = Poseidon(spending_key, nullifying_key)
 /// - NPK = Poseidon(MPK, random)
 /// - Commitment = Poseidon(NPK, token, value)
@@ -23,7 +23,7 @@ template Unshield(levels) {
     signal input spending_key;           // User's secret spending key (256-bit)
     signal input nullifying_key;         // Secret key for nullifier generation (256-bit)
     signal input random;                 // Random blinding factor (256-bit)
-    signal input value;                  // Note amount (120-bit max in Railgun)
+    signal input value;                  // Note amount (120-bit max)
     signal input token;                  // Token identifier (address hash)
     signal input path_elements[levels];  // Merkle proof siblings
     signal input path_indices;           // Leaf position in tree (as integer)
@@ -35,7 +35,7 @@ template Unshield(levels) {
 
     // ============ Step 1: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)
-    // Simplified from Railgun: MPK = Poseidon(pubkey_x, pubkey_y, nullifying_key)
+    // Simplified: MPK = Poseidon(spending_key, nullifying_key)
     component mpkHasher = Poseidon(2);
     mpkHasher.inputs[0] <== spending_key;
     mpkHasher.inputs[1] <== nullifying_key;

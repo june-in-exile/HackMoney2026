@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Railgun on Sui - Demo Script
+ * Octopus SDK - Demo Script
  *
  * Demonstrates the complete shield/unshield flow:
  * 1. Generate keypair
@@ -51,7 +51,7 @@ function logSection(title: string) {
 }
 
 async function main() {
-  log("\nRailgun on Sui - SDK Demo\n", "bright");
+  log("\nOctopus SDK Demo\n", "bright");
 
   // Check if circuit files exist
   const circuitDir = path.resolve(__dirname, "../../circuits/build");
@@ -77,7 +77,7 @@ async function main() {
   log("✓ Poseidon initialized", "green");
 
   // ============ Step 2: Generate Keypair ============
-  logSection("Step 2: Generate Railgun Keypair");
+  logSection("Step 2: Generate Keypair");
 
   const keypair = generateKeypair();
   log(`Spending Key:     ${keypair.spendingKey.toString().slice(0, 40)}...`);
@@ -195,7 +195,7 @@ async function main() {
 
   // ============ Final ============
   logSection("Demo Complete!");
-  log("Railgun on Sui SDK is ready for use.\n", "bright");
+  log("Octopus SDK is ready for use.\n", "bright");
 }
 
 main().catch((error) => {

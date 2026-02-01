@@ -1,7 +1,7 @@
 /**
- * Railgun on Sui SDK
+ * Octopus SDK
  *
- * A TypeScript SDK for interacting with the Railgun privacy protocol on Sui.
+ * A TypeScript SDK for interacting with the Octopus privacy protocol on Sui.
  *
  * @example
  * ```typescript
@@ -11,7 +11,7 @@
  *   createNote,
  *   generateUnshieldProof,
  *   convertProofToSui,
- *   RailgunClient,
+ *   OctopusClient,
  * } from "@octopus/sdk";
  *
  * // Initialize
@@ -28,7 +28,7 @@
  * const suiProof = convertProofToSui(proof, publicSignals);
  *
  * // Execute on Sui
- * const client = new RailgunClient(config);
+ * const client = new OctopusClient(config);
  * await client.unshield(coinType, suiProof, amount, recipient, signer);
  * ```
  */
@@ -68,7 +68,7 @@ export {
 
 // Sui interactions
 export {
-  RailgunClient,
+  OctopusClient,
   buildShieldTransaction,
   buildUnshieldTransaction,
   buildTransferTransaction,

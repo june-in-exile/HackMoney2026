@@ -1,5 +1,5 @@
 /**
- * Railgun on Sui - Sui Transaction Builders
+ * Octopus SDK - Sui Transaction Builders
  *
  * Builds and executes shield/unshield transactions on Sui.
  */
@@ -20,7 +20,7 @@ import { bigIntToBytes, encryptNote, deriveViewingPublicKey } from "./crypto.js"
 export interface SuiConfig {
   /** Sui RPC endpoint */
   rpcUrl: string;
-  /** Package ID of deployed railgun contract */
+  /** Package ID of deployed Octopus contract */
   packageId: string;
   /** Pool object ID (shared object) */
   poolId: string;
@@ -34,9 +34,9 @@ export const TESTNET_CONFIG: Partial<SuiConfig> = {
 };
 
 /**
- * RailgunClient for interacting with the privacy pool
+ * OctopusClient for interacting with the privacy pool
  */
-export class RailgunClient {
+export class OctopusClient {
   private client: SuiClient;
   private config: SuiConfig;
 
@@ -426,7 +426,7 @@ export function buildTransferTransaction<T extends string>(
 /**
  * Build a swap transaction (for manual signing)
  *
- * @param packageId - Railgun package ID
+ * @param packageId - Octopus package ID
  * @param poolInId - Input token pool ID
  * @param poolOutId - Output token pool ID
  * @param coinTypeIn - Input token type (e.g., "0x2::sui::SUI")

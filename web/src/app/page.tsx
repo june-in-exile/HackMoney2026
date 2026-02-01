@@ -70,21 +70,56 @@ export default function Home() {
       <Header />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        {/* Hero Section */}
-        <div className="mb-12 text-center relative">
-          <div className="inline-block relative mb-4">
-            <h1 className="text-5xl font-black tracking-tighter text-cyber-blue uppercase relative z-10 text-cyber">
-              PRIVACY PROTOCOL
-            </h1>
-            <div className="absolute -inset-1 bg-cyber-blue/20 blur-xl -z-10 animate-pulse-slow" />
+        <div className="mb-12 relative overflow-hidden">
+          {/* Scanning line effect */}
+          <div className="absolute inset-0 pointer-events-none z-20">
+            <div className="absolute w-full h-0.5 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-50 animate-scan"
+                 style={{ filter: 'blur(1px)' }} />
           </div>
-          <p className="text-gray-400 text-sm tracking-wider uppercase font-mono">
-            [ SHIELD // TRANSFER // UNSHIELD ] — ZK-PROOF ENABLED
-          </p>
-          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-600 font-mono">
-            <span className="w-2 h-2 bg-cyber-blue rounded-full animate-pulse" />
-            <span>SYSTEM ONLINE</span>
+
+          {/* Top corner accent */}
+          <div className="absolute top-0 right-0 w-32 h-32 border-t-2 border-r-2 border-cyber-blue/30 clip-corner opacity-50" />
+
+          {/* Main title section */}
+          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8">
+            {/* Animated line */}
+            <div className="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-cyber-blue via-cyber-purple to-transparent animate-pulse-slow" />
+
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative">
+                <h1 className="text-6xl md:text-7xl font-black tracking-tighter text-cyber-blue uppercase relative z-10 text-cyber">
+                  O.C.T.O.P.U.S.
+                </h1>
+                <div className="absolute -inset-2 bg-cyber-blue/10 blur-2xl -z-10" />
+              </div>
+
+              {/* Status indicator */}
+              <div className="flex flex-col gap-1 text-xs text-gray-600 font-mono ml-auto">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-pulse" />
+                  <span>ACTIVE</span>
+                </div>
+                <div className="flex items-center gap-2 opacity-70">
+                  <span className="w-1 h-1 bg-cyber-purple rounded-full" />
+                  <span className="text-[10px]">v1.0</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Subtitle with grid accent */}
+            <div className="relative">
+              <div className="absolute -left-6 top-0 w-1 h-full bg-gradient-to-b from-transparent via-cyber-purple/30 to-transparent" />
+              <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono mb-2 max-w-2xl">
+                On-chain Transaction Obfuscated Protocol Underlying Sui
+              </p>
+              <p className="text-gray-600 text-xs font-mono tracking-widest uppercase">
+                Privacy-Preserving Layer • Zero-Knowledge Proofs • Sui Network
+              </p>
+            </div>
           </div>
+
+          {/* Bottom corner accent */}
+          <div className="absolute bottom-0 left-0 w-24 h-24 border-b-2 border-l-2 border-cyber-purple/20 clip-corner opacity-30" />
         </div>
 
         {!account ? (
@@ -260,7 +295,7 @@ export default function Home() {
             <div className="h-px w-16 bg-gradient-to-l from-transparent to-cyber-blue/50" />
           </div>
           <p className="text-xs text-gray-500 font-mono">
-            Built with Railgun protocol on Sui •{" "}
+            Built with Octopus privacy protocol on Sui •{" "}
             <a
               href="https://github.com/june-in-exile/Octopus"
               className="text-cyber-blue hover:text-cyber-blue/80 transition-colors"

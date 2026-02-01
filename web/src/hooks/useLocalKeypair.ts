@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { STORAGE_KEYS } from "@/lib/constants";
 import { bigIntToHex, hexToBigInt } from "@/lib/utils";
 
-export interface RailgunKeypair {
+export interface OctopusKeypair {
   spendingKey: bigint;
   nullifyingKey: bigint;
   masterPublicKey: bigint;
@@ -17,11 +17,11 @@ interface StoredKeypair {
 }
 
 /**
- * Hook to manage Railgun keypair in localStorage
+ * Hook to manage Octopus keypair in localStorage
  * For demo purposes only - not secure for production!
  */
 export function useLocalKeypair() {
-  const [keypair, setKeypair] = useState<RailgunKeypair | null>(null);
+  const [keypair, setKeypair] = useState<OctopusKeypair | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [poseidonReady, setPoseidonReady] = useState(false);
 
@@ -92,7 +92,7 @@ export function useLocalKeypair() {
       const mpkHash = poseidon([spendingKey, nullifyingKey]);
       const masterPublicKey = BigInt(poseidon.F.toString(mpkHash));
 
-      const newKeypair: RailgunKeypair = {
+      const newKeypair: OctopusKeypair = {
         spendingKey,
         nullifyingKey,
         masterPublicKey,

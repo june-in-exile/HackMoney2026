@@ -173,7 +173,7 @@ export class ClientMerkleTree {
  * Fetch all commitments from on-chain events and build a Merkle tree
  *
  * @param client - Sui client instance
- * @param packageId - Railgun package ID
+ * @param packageId - Octopus package ID
  * @returns Client-side Merkle tree with all commitments
  */
 export async function buildMerkleTreeFromEvents(
@@ -239,7 +239,7 @@ export async function buildMerkleTreeFromEvents(
  * Get Merkle proof for a specific note
  *
  * @param client - Sui client instance
- * @param packageId - Railgun package ID
+ * @param packageId - Octopus package ID
  * @param leafIndex - Position of the note in the tree
  * @returns Merkle proof (16 sibling hashes)
  */

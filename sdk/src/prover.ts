@@ -1,5 +1,5 @@
 /**
- * Railgun on Sui - ZK Proof Generation
+ * Octopus SDK - ZK Proof Generation
  *
  * Generates Groth16 proofs for unshield operations using snarkjs.
  */

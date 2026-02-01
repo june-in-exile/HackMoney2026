@@ -1,7 +1,7 @@
 /**
- * Railgun on Sui - Cryptographic Utilities
+ * Octopus SDK - Cryptographic Utilities
  *
- * Implements Poseidon hashing and key derivation following Railgun protocol.
+ * Implements Poseidon hashing and key derivation for privacy transactions.
  */
 
 import { buildPoseidon, type Poseidon } from "circomlibjs";
@@ -12,7 +12,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import {
   SCALAR_MODULUS,
   MERKLE_TREE_DEPTH,
-  type RailgunKeypair,
+  type OctopusKeypair,
   type Note,
 } from "./types.js";
 
@@ -60,13 +60,13 @@ export function randomFieldElement(): bigint {
 }
 
 /**
- * Derive a Railgun keypair from a master spending key
+ * Derive a keypair from a master spending key
  *
- * Following Railgun formula:
+ * Formula:
  * - nullifyingKey = spending_key (simplified for MVP)
  * - MPK = Poseidon(spendingKey, nullifyingKey)
  */
-export function deriveKeypair(spendingKey: bigint): RailgunKeypair {
+export function deriveKeypair(spendingKey: bigint): OctopusKeypair {
   // In production, nullifyingKey would be derived differently
   // For MVP, we use a hash of spending key
   const nullifyingKey = poseidonHash([spendingKey, 1n]);
@@ -82,14 +82,14 @@ export function deriveKeypair(spendingKey: bigint): RailgunKeypair {
 /**
  * Generate a new random keypair
  */
-export function generateKeypair(): RailgunKeypair {
+export function generateKeypair(): OctopusKeypair {
   return deriveKeypair(randomFieldElement());
 }
 
 /**
  * Create a new note (UTXO)
  *
- * Following Railgun formula:
+ * Formula:
  * - NPK = Poseidon(MPK, random)
  * - commitment = Poseidon(NPK, token, value)
  */
@@ -115,7 +115,7 @@ export function createNote(
 /**
  * Compute nullifier for a note
  *
- * Railgun formula: nullifier = Poseidon(nullifyingKey, leafIndex)
+ * Formula: nullifier = Poseidon(nullifyingKey, leafIndex)
  */
 export function computeNullifier(
   nullifyingKey: bigint,

@@ -1,5 +1,5 @@
 /**
- * Railgun on Sui - DeFi Operations (Private Swaps)
+ * Octopus SDK - DeFi Operations (Private Swaps)
  *
  * Provides functionality for private token swaps through external DEXs.
  */
@@ -8,7 +8,7 @@ import * as snarkjs from "snarkjs";
 import { poseidonHash } from "./crypto.js";
 import {
   type Note,
-  type RailgunKeypair,
+  type OctopusKeypair,
   MERKLE_TREE_DEPTH,
 } from "./types.js";
 
@@ -47,7 +47,7 @@ export interface SwapParams {
  */
 export interface SwapInput {
   /** Sender's keypair */
-  keypair: RailgunKeypair;
+  keypair: OctopusKeypair;
   /** Input notes to spend (same token type as tokenIn) */
   inputNotes: Note[];
   /** Leaf indices for input notes */

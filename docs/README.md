@@ -1,10 +1,10 @@
 # Octopus Development Roadmap
 
-This directory contains detailed implementation plans for extending Octopus with Railgun-inspired features.
+This directory contains detailed implementation plans for extending Octopus with privacy protocol features.
 
 ## Overview
 
-Octopus currently implements the core privacy technology (shield/unshield with ZK-SNARKs) but lacks several advanced features from the production Railgun protocol. These milestones outline the path to a full-featured privacy protocol on Sui.
+Octopus currently implements the core privacy technology (shield/unshield with ZK-SNARKs) but lacks several advanced features from the production privacy protocols. These milestones outline the path to a full-featured privacy protocol on Sui.
 
 ## Milestone Priorities
 
@@ -85,7 +85,7 @@ Octopus currently implements the core privacy technology (shield/unshield with Z
 
 ## Features Explicitly Excluded
 
-Per user request, the following Railgun features are **NOT** planned:
+Per user request, the following privacy protocol features are **NOT** planned:
 
 - ❌ **Multi-Chain Support** - Sui-only is acceptable
 - ❌ **Advanced Wallet Features** - Multi-sig, hardware wallet integration

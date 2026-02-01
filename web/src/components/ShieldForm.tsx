@@ -9,7 +9,7 @@ import {
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
-import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   initPoseidon,
   createNote,
@@ -20,7 +20,7 @@ import {
 } from "@octopus/sdk";
 
 interface ShieldFormProps {
-  keypair: RailgunKeypair | null;
+  keypair: OctopusKeypair | null;
   onSuccess?: () => void | Promise<void>;
 }
 

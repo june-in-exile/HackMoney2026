@@ -4,7 +4,6 @@ include "../node_modules/circomlib/circuits/poseidon.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
 
 /// Merkle proof verifier using Poseidon hash
-/// Based on Railgun's merkle-proof-verifier.circom
 template MerkleProof(levels) {
     signal input leaf;
     signal input path_indices;           // Leaf position as integer

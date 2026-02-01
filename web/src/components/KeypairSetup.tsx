@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { truncateAddress, bigIntToHex } from "@/lib/utils";
-import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 
 interface KeypairSetupProps {
-  keypair: RailgunKeypair | null;
+  keypair: OctopusKeypair | null;
   isLoading: boolean;
-  onGenerate: () => Promise<RailgunKeypair>;
+  onGenerate: () => Promise<OctopusKeypair>;
   onClear: () => void;
 }
 

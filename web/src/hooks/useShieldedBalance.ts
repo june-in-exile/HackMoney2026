@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { initPoseidon, decryptNote } from "@octopus/sdk";
-import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import { PACKAGE_ID, POOL_ID, STORAGE_KEYS } from "@/lib/constants";
 import type { ShieldedNote, StoredNote } from "@/types/note";
 import { noteToStored, storedToNote } from "@/types/note";
@@ -29,7 +29,7 @@ interface UseShieldedBalanceResult {
  * Fetch and decrypt shielded notes from blockchain events
  */
 export function useShieldedBalance(
-  keypair: RailgunKeypair | null
+  keypair: OctopusKeypair | null
 ): UseShieldedBalanceResult {
   const [notes, setNotes] = useState<ShieldedNote[]>([]);
   const [isLoading, setIsLoading] = useState(false);

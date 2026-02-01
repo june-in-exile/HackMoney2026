@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
-import type { RailgunKeypair } from "./useLocalKeypair";
+import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
 import {
@@ -40,7 +40,7 @@ export interface OwnedNote {
  * For each event, attempts to decrypt the note using the user's MPK.
  * If successful, the note belongs to this user.
  */
-export function useNotes(keypair: RailgunKeypair | null) {
+export function useNotes(keypair: OctopusKeypair | null) {
   const client = useSuiClient();
   const [notes, setNotes] = useState<OwnedNote[]>([]);
   const [loading, setLoading] = useState(false);

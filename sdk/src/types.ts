@@ -1,5 +1,5 @@
 /**
- * Railgun on Sui - Type Definitions
+ * Octopus SDK - Type Definitions
  */
 
 /** BN254 curve field modulus */
@@ -19,9 +19,9 @@ export const MERKLE_TREE_DEPTH = 16;
 export const ROOT_HISTORY_SIZE = 100;
 
 /**
- * Railgun keypair derived from master spending key
+ * Keypair derived from master spending key
  */
-export interface RailgunKeypair {
+export interface OctopusKeypair {
   /** Master spending key (private) */
   spendingKey: bigint;
   /** Nullifying key derived from spending key */
@@ -57,7 +57,7 @@ export interface SpendInput {
   /** Merkle proof path elements */
   pathElements: bigint[];
   /** The keypair that owns this note */
-  keypair: RailgunKeypair;
+  keypair: OctopusKeypair;
 }
 
 /**
@@ -139,7 +139,7 @@ export interface PoolState {
  */
 export interface TransferInput {
   /** Sender's keypair */
-  keypair: RailgunKeypair;
+  keypair: OctopusKeypair;
   /** Input notes to spend (1 or 2, will be padded to 2 with dummy if needed) */
   inputNotes: Note[];
   /** Leaf indices for input notes */

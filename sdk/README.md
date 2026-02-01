@@ -1,6 +1,6 @@
 # @octopus/sdk
 
-TypeScript SDK for Railgun on Sui privacy protocol.
+TypeScript SDK for Octopus privacy protocol on Sui.
 
 ## Installation
 
@@ -17,7 +17,7 @@ import {
   createNote,
   generateUnshieldProof,
   convertProofToSui,
-  RailgunClient,
+  OctopusClient,
 } from "@octopus/sdk";
 
 // 1. Initialize (required once)
@@ -46,7 +46,7 @@ const { proof, publicSignals } = await generateUnshieldProof({
 const suiProof = convertProofToSui(proof, publicSignals);
 
 // 6. Execute on Sui
-const client = new RailgunClient({
+const client = new OctopusClient({
   rpcUrl: "https://fullnode.testnet.sui.io:443",
   packageId: "0x...",
   poolId: "0x...",
@@ -74,7 +74,7 @@ const keypair = generateKeypair();
 const keypair = deriveKeypair(spendingKey);
 
 // Keypair structure
-interface RailgunKeypair {
+interface OctopusKeypair {
   spendingKey: bigint;      // Private
   nullifyingKey: bigint;    // Private
   masterPublicKey: bigint;  // Can be shared
@@ -113,7 +113,7 @@ const vk = loadVerificationKey(vkPath?);
 ### Sui Interactions
 
 ```typescript
-const client = new RailgunClient(config);
+const client = new OctopusClient(config);
 
 // Shield tokens
 await client.shield(coinType, coinObjectId, note, recipientMpk, signer);

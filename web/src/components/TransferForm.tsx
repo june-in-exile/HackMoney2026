@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { cn } from "@/lib/utils";
-import type { RailgunKeypair } from "@/hooks/useLocalKeypair";
+import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import { useNotes } from "@/hooks/useNotes";
 import {
   selectNotesForTransfer,
@@ -18,7 +18,7 @@ import {
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
 
 interface TransferFormProps {
-  keypair: RailgunKeypair | null;
+  keypair: OctopusKeypair | null;
   onSuccess?: () => void | Promise<void>;
 }
 

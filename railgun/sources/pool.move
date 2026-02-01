@@ -1,5 +1,4 @@
-/// Privacy Pool for Railgun on Sui
-/// Based on Railgun Privacy protocol architecture
+/// Privacy Pool for Octopus on Sui
 /// Implements shield (deposit) and unshield (withdraw with ZK proof) functionality
 module railgun::pool {
     use sui::balance::{Self, Balance};
@@ -143,7 +142,7 @@ module railgun::pool {
 
     /// Shield tokens into the privacy pool.
     ///
-    /// The commitment is computed off-chain using Railgun formulas:
+    /// The commitment is computed off-chain using the following formulas:
     /// - MPK = Poseidon(spending_key, nullifying_key)
     /// - NPK = Poseidon(MPK, random)
     /// - commitment = Poseidon(NPK, token, value)

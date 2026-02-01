@@ -1,4 +1,4 @@
-/// Unit tests for Railgun core data structures
+/// Unit tests for Octopus core data structures
 #[test_only]
 module railgun::tests {
     use sui::test_scenario::{Self as ts};

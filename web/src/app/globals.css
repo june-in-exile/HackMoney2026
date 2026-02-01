@@ -14,9 +14,31 @@ body {
   font-family: 'Courier New', monospace, system-ui, -apple-system, sans-serif;
   position: relative;
   overflow-x: hidden;
+  cursor: url('/images/tentacle.png') 16 16, auto;
 }
 
-/* Cyberpunk Grid Background */
+/* Preload cursor images to prevent flickering */
+body::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  z-index: -9999;
+  background: url('/images/tentacle.png'), url('/images/tentacle_hover.png');
+}
+
+/* Custom cursor for interactive elements */
+button:hover,
+a:hover,
+.btn:hover,
+.tab-button:hover,
+input[type="text"]:hover,
+input[type="number"]:hover {
+  cursor: url('/images/tentacle_hover.png') 16 16, pointer !important;
+}
+
+/* Cyberpunk Grid Background with purple accent */
 body::before {
   content: '';
   position: fixed;
@@ -25,31 +47,14 @@ body::before {
   width: 100%;
   height: 100%;
   background-image:
-    linear-gradient(rgba(0, 217, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 217, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(0, 217, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(157, 0, 255, 0.025) 1px, transparent 1px);
   background-size: 50px 50px;
   pointer-events: none;
-  z-index: 0;
+  z-index: 5;
 }
 
-/* Scanline Effect */
-body::after {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    rgba(0, 217, 255, 0.3),
-    transparent
-  );
-  animation: scan 8s linear infinite;
-  pointer-events: none;
-  z-index: 1;
-}
+/* Removed scanline effect */
 
 @layer utilities {
   .text-balance {
@@ -57,7 +62,7 @@ body::after {
   }
 
   .text-cyber {
-    text-shadow: 0 0 10px rgba(0, 217, 255, 0.8);
+    text-shadow: 0 0 10px rgba(0, 217, 255, 0.8), 0 0 20px rgba(157, 0, 255, 0.3);
   }
 
   .border-glow {
@@ -95,7 +100,7 @@ body::after {
   }
 
   .btn-primary {
-    @apply btn bg-transparent text-cyber-blue border-2 border-cyber-blue hover:bg-cyber-blue hover:text-black hover:shadow-glow;
+    @apply btn bg-gray-900/80 text-gray-300 border-2 border-gray-700 hover:bg-gray-800 hover:text-gray-200 hover:border-gray-600;
   }
 
   .btn-secondary {
@@ -108,7 +113,7 @@ body::after {
 
   .card {
     @apply bg-cyber-card-bg border-2 border-gray-800 p-6 shadow-lg relative clip-corner-both;
-    background: linear-gradient(135deg, rgba(15, 15, 24, 0.9) 0%, rgba(10, 10, 15, 0.95) 100%);
+    background: linear-gradient(135deg, rgba(15, 15, 24, 0.92) 0%, rgba(10, 10, 15, 0.95) 50%, rgba(15, 10, 20, 0.93) 100%);
   }
 
   .card::before {
@@ -118,7 +123,9 @@ body::after {
     left: 0;
     right: 0;
     bottom: 0;
-    border: 1px solid rgba(0, 217, 255, 0.1);
+    border: 1px solid rgba(0, 217, 255, 0.12);
+    border-right: 1px solid rgba(157, 0, 255, 0.08);
+    border-bottom: 1px solid rgba(157, 0, 255, 0.08);
     clip-path: inherit;
     pointer-events: none;
   }
@@ -139,7 +146,7 @@ body::after {
     transform: translateX(-50%);
     width: 0;
     height: 2px;
-    background: linear-gradient(90deg, transparent, #00d9ff, transparent);
+    background: linear-gradient(90deg, transparent, #00d9ff, #9d00ff, transparent);
     transition: width 0.3s ease;
   }
 

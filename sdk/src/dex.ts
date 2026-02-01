@@ -1,5 +1,5 @@
 /**
- * Railgun on Sui - DEX Integration
+ * Octopus SDK - DEX Integration
  *
  * Functions for fetching real-time prices from Cetus DEX
  */

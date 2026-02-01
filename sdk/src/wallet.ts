@@ -1,10 +1,10 @@
 /**
- * Railgun on Sui - Wallet Utilities
+ * Octopus SDK - Wallet Utilities
  *
  * Note selection and UTXO management for private transfers.
  */
 
-import type { Note, RailgunKeypair } from "./types.js";
+import type { Note, OctopusKeypair } from "./types.js";
 import { createNote } from "./crypto.js";
 
 /**
@@ -169,7 +169,7 @@ export function validateTransferParams(
  * @returns TransferInput ready for proof generation
  */
 export function buildTransferFromSelection(
-  keypair: RailgunKeypair,
+  keypair: OctopusKeypair,
   selectedNotes: SelectableNote[],
   recipientMpk: bigint,
   amount: bigint,

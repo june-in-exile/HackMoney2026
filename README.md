@@ -1,6 +1,8 @@
-# Octopus - Railgun on Sui
+# Octopus - On-chain Transaction Obfuscated Protocol Underlying Sui
 
-A privacy protocol implementation for the Sui blockchain, bringing Railgun-style shielded transactions using zero-knowledge proofs.
+**OCTOPUS** stands for **On-chain Transaction Obfuscated Protocol Underlying Sui**.
+
+A privacy protocol implementation for the Sui blockchain, enabling shielded transactions using zero-knowledge proofs.
 
 [**ETHGlobal HackMoney 2026**](https://ethglobal.com/events/hackmoney2026)
 
@@ -31,7 +33,7 @@ Octopus enables private token transfers on Sui by implementing a UTXO-based priv
 | Proof System | Groth16 |
 | Merkle Tree | Incremental, depth 16 (65,536 notes) |
 
-### Key Formulas (following Railgun)
+### Key Formulas
 
 ```
 MPK = Poseidon(spending_key, nullifying_key)   // Master Public Key
@@ -103,12 +105,12 @@ npm run demo
 
 Demo output:
 ```
-Railgun on Sui - SDK Demo
+Octopus SDK Demo
 
 Step 1: Initialize Poseidon Hash
 ✓ Poseidon initialized
 
-Step 2: Generate Railgun Keypair
+Step 2: Generate Keypair
 ✓ Keypair generated
 
 Step 3: Create Note (Simulating Shield)
@@ -139,7 +141,7 @@ import {
   createNote,
   generateUnshieldProof,
   convertProofToSui,
-  RailgunClient,
+  OctopusClient,
 } from "@octopus/sdk";
 
 // Initialize cryptographic primitives
@@ -167,7 +169,7 @@ const { proof, publicSignals } = await generateUnshieldProof({
 const suiProof = convertProofToSui(proof, publicSignals);
 
 // Execute on Sui
-const client = new RailgunClient({
+const client = new OctopusClient({
   rpcUrl: "https://fullnode.testnet.sui.io:443",
   packageId: "0x...",
   poolId: "0x...",
@@ -223,7 +225,7 @@ The circuit proves:
 ## Security Considerations
 
 - **MVP Simplifications**: This is a hackathon proof-of-concept
-  - 1-input-1-output transactions (vs Railgun's multi-input/output)
+  - 1-input-1-output transactions only
   - Simplified note encryption (not production-ready)
   - No viewing key separation
 - **For Production**: Add EdDSA signature verification, proper ECIES encryption, and audit all cryptographic implementations
@@ -244,7 +246,8 @@ The circuit proves:
 
 ## Acknowledgments
 
-- [Railgun](https://railgun.org/) - Privacy protocol architecture reference
+This project was inspired by privacy protocol architectures, particularly [Railgun](https://railgun.org/).
+
 - [Sui](https://sui.io/) - Native Groth16 verification support
 - [circomlib](https://github.com/iden3/circomlib) - Poseidon hash implementation
 - [snarkjs](https://github.com/iden3/snarkjs) - Groth16 proof generation
