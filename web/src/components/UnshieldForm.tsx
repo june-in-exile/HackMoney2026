@@ -223,19 +223,12 @@ export function UnshieldForm({
   const isProcessing = state === "generating-proof" || state === "submitting";
 
   return (
-    <div className="card">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-        Unshield Tokens
-      </h2>
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Withdraw tokens from the privacy pool with ZK proof verification.
-      </p>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-4">
         <div>
           <label
             htmlFor="unshield-amount"
-            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono"
           >
             Amount (SUI)
           </label>
@@ -246,22 +239,22 @@ export function UnshieldForm({
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.0"
+            placeholder="0.000"
             className="input"
             disabled={isProcessing}
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-2 text-[10px] text-gray-500 font-mono">
             {notes.length > 0 ? (
               <>
-                Max per note: {formatSui(notes.filter(n => !n.spent).sort((a, b) => Number(b.value - a.value))[0]?.value ?? 0n)} SUI
+                MAX/NOTE: {formatSui(notes.filter(n => !n.spent).sort((a, b) => Number(b.value - a.value))[0]?.value ?? 0n)}
                 {notes.filter(n => !n.spent).length > 1 && (
-                  <span className="text-gray-400">
-                    {" "}(Total: {formatSui(maxAmount)} SUI across {notes.filter(n => !n.spent).length} notes)
+                  <span className="text-gray-600">
+                    {" "}// TOTAL: {formatSui(maxAmount)} ({notes.filter(n => !n.spent).length} NOTES)
                   </span>
                 )}
               </>
             ) : (
-              <>Max: {formatSui(maxAmount)} SUI</>
+              <>MAX: {formatSui(maxAmount)}</>
             )}
           </p>
         </div>
@@ -269,7 +262,7 @@ export function UnshieldForm({
         <div>
           <label
             htmlFor="recipient"
-            className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono"
           >
             Recipient Address
           </label>
@@ -286,105 +279,112 @@ export function UnshieldForm({
             <button
               type="button"
               onClick={handleUseMyAddress}
-              className="btn-secondary whitespace-nowrap"
+              className="btn-secondary whitespace-nowrap text-xs"
               disabled={!account || isProcessing}
             >
-              Use Mine
+              MY ADDR
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Available Notes Display */}
-        {notes.filter(n => !n.spent).length > 1 && (
-          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-              Available Notes (UTXO Model)
-            </p>
-            <div className="space-y-1 text-xs text-blue-700 dark:text-blue-300">
-              {notes
-                .filter(n => !n.spent)
-                .sort((a, b) => Number(b.value - a.value))
-                .slice(0, 5)
-                .map((note, i) => (
-                  <div key={i} className="flex justify-between font-mono">
-                    <span>Note #{i + 1}:</span>
-                    <span>{formatSui(note.value)} SUI</span>
-                  </div>
-                ))}
-              {notes.filter(n => !n.spent).length > 5 && (
-                <p className="text-blue-600 dark:text-blue-400">
-                  ... and {notes.filter(n => !n.spent).length - 5} more note(s)
-                </p>
-              )}
+      {/* Available Notes Display */}
+      {notes.filter(n => !n.spent).length > 1 && (
+        <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+          <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
+            Available Notes (UTXO)
+          </p>
+          <div className="space-y-1.5 text-[10px] text-gray-300">
+            {notes
+              .filter(n => !n.spent)
+              .sort((a, b) => Number(b.value - a.value))
+              .slice(0, 5)
+              .map((note, i) => (
+                <div key={i} className="flex justify-between font-mono p-1.5 bg-black/30 clip-corner">
+                  <span className="text-gray-500">NOTE #{(i + 1).toString().padStart(2, '0')}:</span>
+                  <span className="text-cyber-blue">{formatSui(note.value)} SUI</span>
+                </div>
+              ))}
+            {notes.filter(n => !n.spent).length > 5 && (
+              <p className="text-gray-500 font-mono pl-1.5">
+                ... +{notes.filter(n => !n.spent).length - 5} MORE
+              </p>
+            )}
+          </div>
+          <p className="mt-3 text-[10px] text-gray-400 font-mono flex items-start gap-2">
+            <span className="text-cyber-blue">ℹ</span>
+            <span>Single note spending only. Use transfer to merge.</span>
+          </p>
+        </div>
+      )}
+
+      {/* Progress indicator */}
+      {isProcessing && (
+        <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-5 w-5 animate-spin text-cyber-blue"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            <div>
+              <p className="font-bold text-cyber-blue text-xs uppercase tracking-wider">
+                {state === "generating-proof"
+                  ? "Generating ZK Proof..."
+                  : "Submitting Transaction..."}
+              </p>
+              <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                {state === "generating-proof"
+                  ? "// Proof generation in progress"
+                  : "// Awaiting wallet confirmation"}
+              </p>
             </div>
-            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-              ℹ️ Currently supports spending 1 note at a time. Use private transfer to merge notes.
-            </p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Progress indicator */}
-        {isProcessing && (
-          <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
-            <div className="flex items-center gap-3">
-              <svg
-                className="h-5 w-5 animate-spin text-blue-600"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              <div>
-                <p className="font-medium text-blue-900 dark:text-blue-100">
-                  {state === "generating-proof"
-                    ? "Generating ZK Proof..."
-                    : "Submitting Transaction..."}
-                </p>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  {state === "generating-proof"
-                    ? "This may take a few seconds"
-                    : "Please confirm in your wallet"}
-                </p>
-              </div>
-            </div>
+      {error && (
+        <div className="p-3 border border-red-600/30 bg-red-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-red-500 text-sm">✕</span>
+            <p className="text-xs text-red-400 font-mono leading-relaxed">{error}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-            {error}
+      {success && (
+        <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-green-500 text-sm">✓</span>
+            <p className="text-xs text-green-400 font-mono leading-relaxed">{success}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {success && (
-          <div className="rounded-lg bg-green-50 p-3 text-sm text-green-600 dark:bg-green-900/20 dark:text-green-400">
-            {success}
-          </div>
+      <button
+        type="submit"
+        disabled={!account || !keypair || isProcessing || maxAmount === 0n}
+        className={cn(
+          "btn-primary w-full",
+          isProcessing && "cursor-wait opacity-70"
         )}
-
-        <button
-          type="submit"
-          disabled={!account || !keypair || isProcessing || maxAmount === 0n}
-          className={cn(
-            "btn-primary w-full",
-            isProcessing && "cursor-wait opacity-70"
-          )}
-        >
-          {isProcessing ? "Processing..." : "Unshield"}
-        </button>
-      </form>
-    </div>
+      >
+        {isProcessing ? "◉ PROCESSING..." : "▼ UNSHIELD TOKENS"}
+      </button>
+    </form>
   );
 }

@@ -51,7 +51,7 @@ function logSection(title: string) {
 }
 
 async function main() {
-  log("\n🐙 Railgun on Sui - SDK Demo\n", "bright");
+  log("\nRailgun on Sui - SDK Demo\n", "bright");
 
   // Check if circuit files exist
   const circuitDir = path.resolve(__dirname, "../../circuits/build");
@@ -195,7 +195,7 @@ async function main() {
 
   // ============ Final ============
   logSection("Demo Complete!");
-  log("🐙 Railgun on Sui SDK is ready for use.\n", "bright");
+  log("Railgun on Sui SDK is ready for use.\n", "bright");
 }
 
 main().catch((error) => {

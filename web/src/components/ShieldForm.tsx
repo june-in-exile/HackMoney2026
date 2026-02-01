@@ -168,31 +168,24 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
   };
 
   return (
-    <div className="card">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-        Shield Tokens
-      </h2>
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Deposit SUI into the privacy pool to shield your tokens.
-      </p>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-4">
         <div>
-          <div className="mb-1 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between">
             <label
               htmlFor="shield-amount"
-              className="text-sm font-medium text-gray-700 dark:text-gray-300"
+              className="text-xs font-bold uppercase tracking-wider text-gray-400 font-mono"
             >
               Amount (SUI)
             </label>
             {account && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-[10px] text-gray-500 font-mono">
                 {isLoadingBalance ? (
-                  "Loading balance..."
+                  "// Loading..."
                 ) : balance !== null ? (
-                  <>Balance: {formatSui(balance)} SUI</>
+                  <>BAL: {formatSui(balance)}</>
                 ) : (
-                  "Balance unavailable"
+                  "// Unavailable"
                 )}
               </span>
             )}
@@ -204,60 +197,66 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.0"
+            placeholder="0.000"
             className="input"
             disabled={isSubmitting}
           />
         </div>
 
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-            {error}
+          <div className="p-3 border border-red-600/30 bg-red-900/20 clip-corner">
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 text-sm">✕</span>
+              <p className="text-xs text-red-400 font-mono leading-relaxed">{error}</p>
+            </div>
           </div>
         )}
 
         {success && (
-          <div className="rounded-lg bg-green-50 p-3 text-sm text-green-600 dark:bg-green-900/20 dark:text-green-400">
-            {success}
+          <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
+            <div className="flex items-start gap-2">
+              <span className="text-green-500 text-sm">✓</span>
+              <p className="text-xs text-green-400 font-mono leading-relaxed whitespace-pre-wrap">{success}</p>
+            </div>
           </div>
         )}
+      </div>
 
-        <button
-          type="submit"
-          disabled={!account || !keypair || isSubmitting}
-          className={cn(
-            "btn-primary w-full",
-            isSubmitting && "cursor-wait opacity-70"
-          )}
-        >
-          {isSubmitting ? (
-            <span className="flex items-center gap-2">
-              <svg
-                className="h-4 w-4 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              Shielding...
-            </span>
-          ) : (
-            "Shield"
-          )}
-        </button>
-      </form>
-    </div>
+      <button
+        type="submit"
+        disabled={!account || !keypair || isSubmitting}
+        className={cn(
+          "btn-primary w-full",
+          isSubmitting && "cursor-wait opacity-70"
+        )}
+      >
+        {isSubmitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg
+              className="h-4 w-4 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            SHIELDING...
+          </span>
+        ) : (
+          "▲ SHIELD TOKENS"
+        )}
+      </button>
+    </form>
   );
 }

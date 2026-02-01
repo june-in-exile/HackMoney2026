@@ -69,33 +69,43 @@ export default function Home() {
     <div className="min-h-screen">
       <Header />
 
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-8">
         {/* Hero Section */}
-        <div className="mb-8 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
-            Privacy Pool Demo
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Shield and unshield SUI tokens with zero-knowledge proofs
+        <div className="mb-12 text-center relative">
+          <div className="inline-block relative mb-4">
+            <h1 className="text-5xl font-black tracking-tighter text-cyber-blue uppercase relative z-10 text-cyber">
+              PRIVACY PROTOCOL
+            </h1>
+            <div className="absolute -inset-1 bg-cyber-blue/20 blur-xl -z-10 animate-pulse-slow" />
+          </div>
+          <p className="text-gray-400 text-sm tracking-wider uppercase font-mono">
+            [ SHIELD // TRANSFER // UNSHIELD ] — ZK-PROOF ENABLED
           </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-600 font-mono">
+            <span className="w-2 h-2 bg-cyber-blue rounded-full animate-pulse" />
+            <span>SYSTEM ONLINE</span>
+          </div>
         </div>
 
         {!account ? (
           // Not connected state
-          <div className="mx-auto max-w-md">
-            <div className="card text-center">
-              <div className="mb-4 text-5xl">🔐</div>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-                Connect Your Wallet
+          <div className="mx-auto max-w-xl">
+            <div className="card-glow text-center py-12">
+              <div className="mb-6 w-20 h-20 mx-auto border-4 border-cyber-blue bg-cyber-blue/10 flex items-center justify-center clip-corner filter drop-shadow-[0_0_20px_rgba(0,217,255,0.5)]">
+                <span className="text-cyber-blue text-4xl font-black">◐</span>
+              </div>
+              <h2 className="mb-3 text-2xl font-black uppercase tracking-wider text-cyber-blue text-cyber">
+                WALLET CONNECTION REQUIRED
               </h2>
-              <p className="text-gray-500 dark:text-gray-400">
-                Connect your Sui wallet to start using the privacy pool.
+              <p className="text-gray-400 font-mono text-sm">
+                // Initialize Sui wallet to access privacy protocol
               </p>
+              <div className="mt-6 h-px bg-gradient-to-r from-transparent via-cyber-blue to-transparent" />
             </div>
           </div>
         ) : (
           // Connected state
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
             {/* Left Column */}
             <div className="space-y-6">
               <KeypairSetup
@@ -116,36 +126,36 @@ export default function Home() {
             <div className="space-y-6">
               {/* Tab Navigation */}
               <div className="card">
-                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                <div className="flex border-b-2 border-gray-800 relative">
                   <button
                     onClick={() => setActiveTab("shield")}
-                    className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    className={`tab-button flex-1 ${
                       activeTab === "shield"
-                        ? "border-b-2 border-purple-500 text-purple-600 dark:text-purple-400"
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        ? "text-cyber-blue active"
+                        : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
-                    Shield
+                    ▲ SHIELD
                   </button>
                   <button
                     onClick={() => setActiveTab("transfer")}
-                    className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    className={`tab-button flex-1 ${
                       activeTab === "transfer"
-                        ? "border-b-2 border-purple-500 text-purple-600 dark:text-purple-400"
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        ? "text-cyber-blue active"
+                        : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
-                    Transfer
+                    ⇄ TRANSFER
                   </button>
                   <button
                     onClick={() => setActiveTab("unshield")}
-                    className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    className={`tab-button flex-1 ${
                       activeTab === "unshield"
-                        ? "border-b-2 border-purple-500 text-purple-600 dark:text-purple-400"
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        ? "text-cyber-blue active"
+                        : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
-                    Unshield
+                    ▼ UNSHIELD
                   </button>
                 </div>
 
@@ -172,66 +182,92 @@ export default function Home() {
         )}
 
         {/* Info Section */}
-        <div className="mt-12 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-            How It Works
-          </h2>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <div className="mb-2 text-2xl">1️⃣</div>
-              <h3 className="mb-1 font-medium text-gray-900 dark:text-white">
-                Shield
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Deposit SUI into the privacy pool. Your tokens become private
-                notes.
-              </p>
+        <div className="mt-16 card border-gray-800">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 bg-gradient-to-b from-cyber-blue to-transparent" />
+            <h2 className="text-xl font-black uppercase tracking-wider text-cyber-blue">
+              PROTOCOL WORKFLOW
+            </h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-4">
+            <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
+              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">01</div>
+              <div className="relative z-10">
+                <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
+                  <span className="text-cyber-blue text-xl">▲</span>
+                </div>
+                <h3 className="mb-2 font-bold uppercase tracking-wider text-cyber-blue text-sm">
+                  SHIELD
+                </h3>
+                <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                  Deposit SUI into privacy pool. Tokens converted to encrypted notes.
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="mb-2 text-2xl">2️⃣</div>
-              <h3 className="mb-1 font-medium text-gray-900 dark:text-white">
-                Transfer
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Send private notes to other users within the pool. Sender, recipient, and amount remain hidden.
-              </p>
+            <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
+              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">02</div>
+              <div className="relative z-10">
+                <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
+                  <span className="text-cyber-blue text-xl">⇄</span>
+                </div>
+                <h3 className="mb-2 font-bold uppercase tracking-wider text-cyber-blue text-sm">
+                  TRANSFER
+                </h3>
+                <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                  Private transactions within pool. Sender, recipient, amount hidden.
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="mb-2 text-2xl">3️⃣</div>
-              <h3 className="mb-1 font-medium text-gray-900 dark:text-white">
-                Hold
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Your shielded balance is private. Only you can see it with your
-                keypair.
-              </p>
+            <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
+              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">03</div>
+              <div className="relative z-10">
+                <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
+                  <span className="text-cyber-blue text-xl">●</span>
+                </div>
+                <h3 className="mb-2 font-bold uppercase tracking-wider text-cyber-blue text-sm">
+                  HOLD
+                </h3>
+                <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                  Shielded balance encrypted. Only accessible with your keypair.
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="mb-2 text-2xl">4️⃣</div>
-              <h3 className="mb-1 font-medium text-gray-900 dark:text-white">
-                Unshield
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Withdraw using a ZK proof. No one can link your deposit to
-                withdrawal.
-              </p>
+            <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
+              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">04</div>
+              <div className="relative z-10">
+                <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
+                  <span className="text-cyber-blue text-xl">▼</span>
+                </div>
+                <h3 className="mb-2 font-bold uppercase tracking-wider text-cyber-blue text-sm">
+                  UNSHIELD
+                </h3>
+                <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                  Withdraw via ZK-proof. Deposit-withdrawal linkage impossible.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="mt-12 border-t border-gray-200 py-6 dark:border-gray-800">
-        <div className="mx-auto max-w-5xl px-4 text-center text-sm text-gray-500">
-          <p>
+      <footer className="mt-16 border-t-2 border-gray-900 py-8 relative">
+        <div className="absolute inset-0 bg-gradient-to-t from-cyber-dark-bg to-transparent opacity-50" />
+        <div className="mx-auto max-w-6xl px-4 text-center relative z-10">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <div className="h-px w-16 bg-gradient-to-r from-transparent to-cyber-blue/50" />
+            <span className="text-xs text-gray-600 font-mono tracking-widest uppercase">OCTOPUS PROTOCOL</span>
+            <div className="h-px w-16 bg-gradient-to-l from-transparent to-cyber-blue/50" />
+          </div>
+          <p className="text-xs text-gray-500 font-mono">
             Built with Railgun protocol on Sui •{" "}
             <a
               href="https://github.com/june-in-exile/Octopus"
-              className="text-primary-600 hover:underline"
+              className="text-cyber-blue hover:text-cyber-blue/80 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
-              GitHub
+              [SOURCE_CODE]
             </a>
           </p>
         </div>

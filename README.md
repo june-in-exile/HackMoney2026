@@ -103,7 +103,7 @@ npm run demo
 
 Demo output:
 ```
-🐙 Railgun on Sui - SDK Demo
+Railgun on Sui - SDK Demo
 
 Step 1: Initialize Poseidon Hash
 ✓ Poseidon initialized

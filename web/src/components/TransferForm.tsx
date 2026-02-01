@@ -148,7 +148,7 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
       // 8. Success!
       if (onSuccess) await onSuccess();
       setSuccess(
-        `✅ Transfer of ${amount} SUI completed! TX: ${result.digest.slice(0, 8)}...`
+        `Transfer of ${amount} SUI completed! TX: ${result.digest.slice(0, 8)}...`
       );
       setRecipientMpk("");
       setAmount("");
@@ -162,116 +162,119 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-4">
         {/* Recipient MPK Input */}
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
             Recipient Master Public Key (MPK)
           </label>
           <input
             type="text"
             value={recipientMpk}
             onChange={(e) => setRecipientMpk(e.target.value)}
-            placeholder="Enter recipient's MPK (BigInt)"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            placeholder="Enter recipient's MPK..."
+            className="input"
             disabled={isSubmitting}
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Example: 13495179815785639161754474937963198890594537595864620153224650766581810632235
+          <p className="mt-2 text-[10px] text-gray-600 font-mono break-all">
+            // Example: 13495...632235
           </p>
         </div>
 
         {/* Amount Input */}
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
             Amount (SUI)
           </label>
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.0"
+            placeholder="0.000"
             step="0.000000001"
             min="0"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="input"
             disabled={isSubmitting}
           />
         </div>
 
         {/* Note Selection Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-800">
-            <strong>Auto Note Selection:</strong> The SDK will automatically select optimal notes to cover the transfer amount.
+        <div className="p-3 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+          <p className="text-[10px] text-gray-300 font-mono leading-relaxed">
+            <span className="text-cyber-blue font-bold">AUTO SELECT:</span> SDK automatically selects optimal notes to cover transfer amount
           </p>
         </div>
 
         {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="p-3 border border-red-600/30 bg-red-900/20 clip-corner">
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 text-sm">✕</span>
+              <p className="text-xs text-red-400 font-mono leading-relaxed">{error}</p>
+            </div>
           </div>
         )}
 
         {/* Success Display */}
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-sm text-green-800">{success}</p>
+          <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
+            <div className="flex items-start gap-2">
+              <span className="text-green-500 text-sm">✓</span>
+              <p className="text-xs text-green-400 font-mono leading-relaxed">{success}</p>
+            </div>
           </div>
         )}
+      </div>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={isSubmitting || !account || !keypair}
-          className={cn(
-            "w-full px-6 py-3 rounded-lg font-medium transition-all",
-            "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
-            "hover:from-purple-600 hover:to-pink-600",
-            "disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed",
-            "focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-          )}
-        >
-          {isSubmitting ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Generating Proof...
-            </span>
-          ) : (
-            "Private Transfer"
-          )}
-        </button>
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={isSubmitting || !account || !keypair}
+        className={cn(
+          "btn-primary w-full",
+          isSubmitting && "cursor-wait opacity-70"
+        )}
+      >
+        {isSubmitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            GENERATING PROOF...
+          </span>
+        ) : (
+          "⇄ PRIVATE TRANSFER"
+        )}
+      </button>
 
-        {/* Info Box */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
-          <h4 className="font-medium text-sm">Transfer Process:</h4>
-          <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
-            <li>Select notes to cover amount (1-2 inputs)</li>
-            <li>Create output notes (recipient + change)</li>
-            <li>Generate Merkle proofs for inputs</li>
-            <li>Generate ZK proof (30-60 seconds)</li>
-            <li>Submit private transfer transaction</li>
-          </ol>
-          <p className="text-xs text-gray-500 mt-2">
-            <strong>Privacy:</strong> Sender, recipient, and amount remain completely hidden on-chain.
-          </p>
-        </div>
-      </form>
-    </div>
+      {/* Info Box */}
+      <div className="p-4 border border-gray-800 bg-black/30 clip-corner space-y-3">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-cyber-blue font-mono">
+          Transfer Process:
+        </h4>
+        <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
+          <li>Select notes (1-2 inputs)</li>
+          <li>Create output notes (recipient + change)</li>
+          <li>Generate Merkle proofs</li>
+          <li>Generate ZK proof (30-60s)</li>
+          <li>Submit private transaction</li>
+        </ol>
+        <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+        <p className="text-[10px] text-gray-500 font-mono">
+          <span className="text-cyber-blue">◉</span> Privacy: Sender, recipient, amount remain hidden on-chain
+        </p>
+      </div>
+    </form>
   );
 }
