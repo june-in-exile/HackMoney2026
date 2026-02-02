@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
-import { initPoseidon, decryptNote, computeNullifier, bigIntToBytes } from "@octopus/sdk";
+import { decryptNote, computeNullifier, bigIntToBytes } from "@octopus/sdk";
+import { initPoseidon } from "@/lib/poseidon";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import { PACKAGE_ID, POOL_ID, STORAGE_KEYS } from "@/lib/constants";
 import type { ShieldedNote, StoredNote } from "@/types/note";

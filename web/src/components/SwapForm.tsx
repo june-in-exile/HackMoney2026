@@ -11,7 +11,6 @@ import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
-  initPoseidon,
   generateSwapProof,
   calculateMinAmountOut,
   estimateSwapOutput,
@@ -19,6 +18,7 @@ import {
   type SwapParams,
   type SwapInput,
 } from "@octopus/sdk";
+import { initPoseidon } from "@/lib/poseidon";
 
 interface SwapFormProps {
   keypair: OctopusKeypair | null;

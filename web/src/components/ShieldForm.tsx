@@ -11,13 +11,13 @@ import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
-  initPoseidon,
   createNote,
   encryptNote,
   bigIntToBytes,
   poseidonHash,
   deriveViewingPublicKey
 } from "@octopus/sdk";
+import { initPoseidon } from "@/lib/poseidon";
 
 interface ShieldFormProps {
   keypair: OctopusKeypair | null;

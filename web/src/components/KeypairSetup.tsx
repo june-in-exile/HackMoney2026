@@ -39,17 +39,6 @@ export function KeypairSetup({
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="card">
-        <div className="animate-pulse space-y-3">
-          <div className="h-6 w-40 bg-gray-800 clip-corner" />
-          <div className="h-4 w-56 bg-gray-800 clip-corner" />
-        </div>
-      </div>
-    );
-  }
-
   if (!keypair) {
     const hasSavedKeypairs = savedKeypairs.length > 0;
 
@@ -156,7 +145,7 @@ export function KeypairSetup({
 
           <button
             onClick={handleGenerate}
-            disabled={isGenerating}
+            disabled={isGenerating || isLoading}
             className="btn-primary w-full"
           >
             {isGenerating ? (

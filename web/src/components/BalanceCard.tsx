@@ -8,6 +8,7 @@ interface BalanceCardProps {
   shieldedBalance: bigint;
   noteCount: number;
   isLoading?: boolean;
+  isRefreshing?: boolean;
   onRefresh?: () => void;
 }
 
@@ -15,6 +16,7 @@ export function BalanceCard({
   shieldedBalance,
   noteCount,
   isLoading,
+  isRefreshing,
   onRefresh,
 }: BalanceCardProps) {
   const account = useCurrentAccount();
@@ -46,12 +48,11 @@ export function BalanceCard({
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                disabled={isLoading}
-                className="p-1.5 text-gray-500 hover:text-cyber-blue disabled:opacity-50 transition-colors border border-gray-800 hover:border-cyber-blue clip-corner"
+                className="p-1.5 text-gray-500 hover:text-cyber-blue transition-colors border border-gray-800 hover:border-cyber-blue clip-corner"
                 title="Refresh balance"
               >
                 <svg
-                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                  className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -80,12 +81,17 @@ export function BalanceCard({
         ) : (
           <>
             <div className="mb-3 flex items-baseline gap-3">
-              <span className="text-5xl font-black text-cyber-blue text-cyber tabular-nums">
+              <span className={`text-5xl font-black text-cyber-blue text-cyber tabular-nums ${isRefreshing ? "opacity-60" : ""}`}>
                 {formatSui(shieldedBalance)}
               </span>
               <span className="text-xl text-gray-500 font-mono uppercase tracking-wider">
                 SUI
               </span>
+              {isRefreshing && (
+                <span className="text-xs text-cyber-blue font-mono animate-pulse">
+                  UPDATING...
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <div className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />

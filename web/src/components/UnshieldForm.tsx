@@ -4,24 +4,24 @@ import { useState } from "react";
 import {
   useCurrentAccount,
   useSignAndExecuteTransaction,
-  useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
-import type { ShieldedNote } from "@/types/note";
+import type { OwnedNote } from "@/hooks/useNotes";
 import {
   generateUnshieldProof,
   convertProofToSui,
   type SpendInput,
 } from "@octopus/sdk";
-import { getMerkleProofForNote } from "@/lib/merkleProof";
 
 interface UnshieldFormProps {
   keypair: OctopusKeypair | null;
   maxAmount: bigint;
-  notes: ShieldedNote[];
+  notes: OwnedNote[];
+  loading: boolean;
+  error: string | null;
   onSuccess?: () => void | Promise<void>;
 }
 
@@ -36,6 +36,8 @@ export function UnshieldForm({
   keypair,
   maxAmount,
   notes,
+  loading: notesLoading,
+  error: notesError,
   onSuccess,
 }: UnshieldFormProps) {
   const [amount, setAmount] = useState("");
@@ -46,7 +48,6 @@ export function UnshieldForm({
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const suiClient = useSuiClient();
 
   // Auto-fill recipient with connected wallet
   const handleUseMyAddress = () => {
@@ -106,83 +107,42 @@ export function UnshieldForm({
       }
 
       // Get unspent notes
-      const unspentNotes = notes.filter((note) => !note.spent);
+      const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
       if (unspentNotes.length === 0) {
         throw new Error("No unspent notes available");
       }
 
       // Sort notes by value (largest first) for better UX
-      const sortedNotes = unspentNotes.sort((a, b) => Number(b.value - a.value));
+      const sortedNotes = unspentNotes.sort((a: OwnedNote, b: OwnedNote) => Number(b.note.value - a.note.value));
 
       // Use the largest note (current implementation supports 1-input only)
-      const noteToSpend = sortedNotes.find((note) => note.value >= amountMist);
+      const noteToSpend = sortedNotes.find((n: OwnedNote) => n.note.value >= amountMist);
       if (!noteToSpend) {
-        const maxSingleNote = sortedNotes[0]?.value ?? 0n;
+        const maxSingleNote = sortedNotes[0]?.note.value ?? 0n;
         throw new Error(
           `No single note with sufficient balance. Largest note: ${formatSui(maxSingleNote)} SUI. ` +
           `To unshield larger amounts, use private transfer to merge notes first.`
         );
       }
 
-      // Get Merkle proof from on-chain state
-      console.log("=== Unshield Debug Info ===");
-      console.log("Note to spend:", {
-        commitment: noteToSpend.commitment,
-        npk: noteToSpend.npk,
-        token: noteToSpend.token,
-        value: noteToSpend.value.toString(),
-        random: noteToSpend.random,
-        position: noteToSpend.position,
-      });
+      // Validate that Merkle proof exists
+      if (!noteToSpend.pathElements || noteToSpend.pathElements.length === 0) {
+        throw new Error("Merkle proof not available for this note. Please refresh and try again.");
+      }
 
-      const merkleProofData = await getMerkleProofForNote(
-        suiClient,
-        noteToSpend.position,
-        POOL_ID // FIX: Pass pool ID to get on-chain root (same as swap tests)
-      );
-
-      console.log("Merkle proof retrieved:");
-      console.log("- On-chain root:", "0x" + merkleProofData.merkleRoot.toString(16).padStart(64, "0"));
-      console.log("- Path elements count:", merkleProofData.pathElements.length);
-
-      // Build SpendInput for proof generation
+      // Build SpendInput for proof generation using already-loaded Merkle proof
       const spendInput: SpendInput = {
-        note: {
-          npk: BigInt(noteToSpend.npk),
-          token: BigInt(noteToSpend.token),
-          value: noteToSpend.value,
-          random: BigInt(noteToSpend.random),
-          commitment: BigInt("0x" + noteToSpend.commitment),
-        },
-        leafIndex: noteToSpend.position,
-        pathElements: merkleProofData.pathElements,
+        note: noteToSpend.note,
+        leafIndex: noteToSpend.leafIndex,
+        pathElements: noteToSpend.pathElements,
         keypair: keypair,
       };
 
       // Generate ZK proof (this takes 10-30 seconds)
-      console.log("Generating ZK proof with snarkjs...");
       const { proof, publicSignals } = await generateUnshieldProof(spendInput);
-
-      console.log("ZK proof generated successfully!");
-      console.log("Public signals (circuit outputs):");
-      console.log("- merkle_root:", publicSignals[0]);
-      console.log("- nullifier:", publicSignals[1]);
-      console.log("- commitment:", publicSignals[2]);
-
-      // Compare circuit root with on-chain root
-      const circuitRoot = BigInt(publicSignals[0]);
-      const rootMatch = circuitRoot === merkleProofData.merkleRoot;
-      console.log("Root comparison:");
-      console.log("- Circuit root:", "0x" + circuitRoot.toString(16).padStart(64, "0"));
-      console.log("- On-chain root:", "0x" + merkleProofData.merkleRoot.toString(16).padStart(64, "0"));
-      console.log("- Match:", rootMatch ? "✅" : "❌ MISMATCH!");
 
       // Convert to Sui format
       const suiProof = convertProofToSui(proof, publicSignals);
-
-      console.log("Proof converted to Sui format");
-      console.log("Proof bytes:", suiProof.proofBytes.length, "bytes");
-      console.log("Public inputs:", suiProof.publicInputsBytes.length, "bytes");
 
       // Use real proof bytes
       const proofBytes = suiProof.proofBytes;          // 128 bytes
@@ -246,10 +206,10 @@ export function UnshieldForm({
           <p className="mt-2 text-[10px] text-gray-500 font-mono">
             {notes.length > 0 ? (
               <>
-                MAX/NOTE: {formatSui(notes.filter(n => !n.spent).sort((a, b) => Number(b.value - a.value))[0]?.value ?? 0n)}
-                {notes.filter(n => !n.spent).length > 1 && (
+                MAX/NOTE: {formatSui(notes.filter((n: OwnedNote) => !n.spent).sort((a: OwnedNote, b: OwnedNote) => Number(b.note.value - a.note.value))[0]?.note.value ?? 0n)}
+                {notes.filter((n: OwnedNote) => !n.spent).length > 1 && (
                   <span className="text-gray-600">
-                    {" "}// TOTAL: {formatSui(maxAmount)} ({notes.filter(n => !n.spent).length} NOTES)
+                    {" "}// TOTAL: {formatSui(maxAmount)} ({notes.filter((n: OwnedNote) => !n.spent).length} NOTES)
                   </span>
                 )}
               </>
@@ -289,25 +249,55 @@ export function UnshieldForm({
       </div>
 
       {/* Available Notes Display */}
-      {
+      {notesLoading ? (
+        <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+          <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
+            Available Notes (UTXO)
+          </p>
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-4 w-4 animate-spin text-cyber-blue"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            <p className="text-[10px] text-gray-400 font-mono">Loading notes from blockchain...</p>
+          </div>
+        </div>
+      ) : notesError ? (
+        <div className="p-4 border border-red-600/30 bg-red-900/20 clip-corner">
+          <p className="text-xs font-bold uppercase tracking-wider text-red-400 mb-2 font-mono">
+            Error Loading Notes
+          </p>
+          <p className="text-[10px] text-red-400 font-mono">{notesError}</p>
+        </div>
+      ) : notes.filter((n: OwnedNote) => !n.spent).length > 0 ? (
         <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
           <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
             Available Notes (UTXO)
           </p>
           <div className="space-y-1.5 text-[10px] text-gray-300">
             {notes
-              .filter(n => !n.spent)
-              .sort((a, b) => Number(b.value - a.value))
+              .filter((n: OwnedNote) => !n.spent)
+              .sort((a: OwnedNote, b: OwnedNote) => Number(b.note.value - a.note.value))
               .slice(0, 5)
-              .map((note, i) => (
+              .map((note: OwnedNote, i: number) => (
                 <div key={i} className="flex justify-between font-mono p-1.5 bg-black/30 clip-corner">
                   <span className="text-gray-500">NOTE #{(i + 1).toString().padStart(2, '0')}:</span>
-                  <span className="text-cyber-blue">{formatSui(note.value)} SUI</span>
+                  <span className="text-cyber-blue">{formatSui(note.note.value)} SUI</span>
                 </div>
               ))}
-            {notes.filter(n => !n.spent).length > 5 && (
+            {notes.filter((n: OwnedNote) => !n.spent).length > 5 && (
               <p className="text-gray-500 font-mono pl-1.5">
-                ... +{notes.filter(n => !n.spent).length - 5} MORE
+                ... +{notes.filter((n: OwnedNote) => !n.spent).length - 5} MORE
               </p>
             )}
           </div>
@@ -316,7 +306,16 @@ export function UnshieldForm({
             <span>Single note spending only. Use transfer to merge.</span>
           </p>
         </div>
-      }
+      ) : (
+        <div className="p-4 border border-gray-800 bg-black/30 clip-corner">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 font-mono">
+            No Notes Available
+          </p>
+          <p className="text-[10px] text-gray-400 font-mono">
+            Shield some tokens first to create notes for unshield.
+          </p>
+        </div>
+      )}
 
       {/* Progress indicator */}
       {isProcessing && (

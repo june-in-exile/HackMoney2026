@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { Header } from "@/components/Header";
 import { KeypairSetup } from "@/components/KeypairSetup";
@@ -9,14 +9,22 @@ import { ShieldForm } from "@/components/ShieldForm";
 import { UnshieldForm } from "@/components/UnshieldForm";
 import { TransferForm } from "@/components/TransferForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
-import { useShieldedBalance } from "@/hooks/useShieldedBalance";
+import { useNotes } from "@/hooks/useNotes";
 import { PACKAGE_ID, POOL_ID, NETWORK } from "@/lib/constants";
+import { initPoseidon } from "@/lib/poseidon";
 
 type TabType = "shield" | "unshield" | "transfer";
 
 export default function Home() {
   const account = useCurrentAccount();
   const [activeTab, setActiveTab] = useState<TabType>("shield");
+
+  // Initialize Poseidon early to prevent race conditions
+  useEffect(() => {
+    initPoseidon().catch((err) => {
+      console.error("[App] Failed to initialize Poseidon:", err);
+    });
+  }, []);
 
   const {
     keypair,
@@ -28,48 +36,53 @@ export default function Home() {
     removeKeypair,
   } = useLocalKeypair(account?.address);
 
-  // Fetch shielded balance from blockchain
+  // Fetch all notes from blockchain (includes Merkle proofs)
+  // Loads in background as soon as keypair is selected
   const {
-    balance: shieldedBalance,
-    noteCount,
     notes,
-    isLoading: isLoadingBalance,
-    refresh: refreshBalance,
-  } = useShieldedBalance(keypair);
+    loading: isLoadingNotes,
+    error: notesError,
+    refresh: refreshNotes,
+  } = useNotes(keypair);
+
+  // Calculate balance and note count from loaded notes
+  const unspentNotes = notes.filter((n) => !n.spent);
+  const shieldedBalance = unspentNotes.reduce((sum, n) => sum + n.note.value, 0n);
+  const noteCount = unspentNotes.length;
 
   const handleShieldSuccess = async () => {
-    // Refresh balance from blockchain after successful shield
+    // Refresh notes from blockchain after successful shield
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    await refreshBalance();
+    refreshNotes();
 
     // Retry after another delay to ensure we catch the event
-    setTimeout(async () => {
-      await refreshBalance();
+    setTimeout(() => {
+      refreshNotes();
     }, 3000);
   };
 
   const handleUnshieldSuccess = async () => {
-    // Refresh balance from blockchain after successful unshield
+    // Refresh notes from blockchain after successful unshield
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    await refreshBalance();
+    refreshNotes();
 
     // Retry after another delay to ensure we catch the event
-    setTimeout(async () => {
-      await refreshBalance();
+    setTimeout(() => {
+      refreshNotes();
     }, 3000);
   };
 
   const handleTransferSuccess = async () => {
-    // Refresh balance from blockchain after successful transfer
+    // Refresh notes from blockchain after successful transfer
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    await refreshBalance();
+    refreshNotes();
 
     // Retry after another delay to ensure we catch the event
-    setTimeout(async () => {
-      await refreshBalance();
+    setTimeout(() => {
+      refreshNotes();
     }, 3000);
   };
 
@@ -82,7 +95,7 @@ export default function Home() {
           {/* Scanning line effect */}
           <div className="absolute inset-0 pointer-events-none z-20">
             <div className="absolute w-full h-0.5 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-50 animate-scan"
-                 style={{ filter: 'blur(1px)' }} />
+              style={{ filter: 'blur(1px)' }} />
           </div>
 
           {/* Top corner accent */}
@@ -105,11 +118,11 @@ export default function Home() {
               <div className="flex flex-col gap-1 text-xs text-gray-600 font-mono ml-auto">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-pulse" />
-                  <span>ACTIVE</span>
+                  <span >ACTIVE</span>
                 </div>
                 <div className="flex items-center gap-2 opacity-70">
                   <span className="w-1 h-1 bg-cyber-purple rounded-full" />
-                  <span className="text-[10px]">v1.0</span>
+                  <span className="text-[12px]">v1.0</span>
                 </div>
               </div>
             </div>
@@ -117,8 +130,8 @@ export default function Home() {
             {/* Subtitle with grid accent */}
             <div className="relative">
               <div className="absolute -left-6 top-0 w-1 h-full bg-gradient-to-b from-transparent via-cyber-purple/30 to-transparent" />
-              <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono mb-2 max-w-2xl">
-                On-chain Transaction Obfuscated Protocol Underlying Sui
+              <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono mb-4 max-w-2xl">
+                On-Chain Transaction Obfuscation Protocol Underlying Sui
               </p>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-mono">
@@ -186,8 +199,9 @@ export default function Home() {
               <BalanceCard
                 shieldedBalance={shieldedBalance}
                 noteCount={noteCount}
-                isLoading={isLoading || isLoadingBalance}
-                onRefresh={refreshBalance}
+                isLoading={isLoading}
+                isRefreshing={isLoadingNotes}
+                onRefresh={refreshNotes}
               />
             </div>
 
@@ -198,31 +212,28 @@ export default function Home() {
                 <div className="flex border-b-2 border-gray-800 relative">
                   <button
                     onClick={() => setActiveTab("shield")}
-                    className={`tab-button flex-1 ${
-                      activeTab === "shield"
+                    className={`tab-button flex-1 ${activeTab === "shield"
                         ? "text-cyber-blue active"
                         : "text-gray-500 hover:text-gray-300"
-                    }`}
+                      }`}
                   >
                     ▲ SHIELD
                   </button>
                   <button
                     onClick={() => setActiveTab("transfer")}
-                    className={`tab-button flex-1 ${
-                      activeTab === "transfer"
+                    className={`tab-button flex-1 ${activeTab === "transfer"
                         ? "text-cyber-blue active"
                         : "text-gray-500 hover:text-gray-300"
-                    }`}
+                      }`}
                   >
                     ⇄ TRANSFER
                   </button>
                   <button
                     onClick={() => setActiveTab("unshield")}
-                    className={`tab-button flex-1 ${
-                      activeTab === "unshield"
+                    className={`tab-button flex-1 ${activeTab === "unshield"
                         ? "text-cyber-blue active"
                         : "text-gray-500 hover:text-gray-300"
-                    }`}
+                      }`}
                   >
                     ▼ UNSHIELD
                   </button>
@@ -234,13 +245,21 @@ export default function Home() {
                     <ShieldForm keypair={keypair} onSuccess={handleShieldSuccess} />
                   )}
                   {activeTab === "transfer" && (
-                    <TransferForm keypair={keypair} onSuccess={handleTransferSuccess} />
+                    <TransferForm
+                      keypair={keypair}
+                      notes={notes}
+                      loading={isLoadingNotes}
+                      error={notesError}
+                      onSuccess={handleTransferSuccess}
+                    />
                   )}
                   {activeTab === "unshield" && (
                     <UnshieldForm
                       keypair={keypair}
                       maxAmount={shieldedBalance}
                       notes={notes}
+                      loading={isLoadingNotes}
+                      error={notesError}
                       onSuccess={handleUnshieldSuccess}
                     />
                   )}

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Octopus (On-chain Transaction Obfuscated Protocol Underlying Sui) is a privacy protocol for Sui implementing shielded transactions using Groth16 ZK-SNARKs. Users shield tokens into a privacy pool and unshield with ZK proofs.
+Octopus (On-Chain Transaction Obfuscation Protocol Underlying Sui) is a privacy protocol for Sui implementing shielded transactions using Groth16 ZK-SNARKs. Users shield tokens into a privacy pool and unshield with ZK proofs.
 
 ## Build & Test Commands
 

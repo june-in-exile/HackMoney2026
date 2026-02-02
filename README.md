@@ -1,6 +1,6 @@
-# Octopus - On-chain Transaction Obfuscated Protocol Underlying Sui
+# Octopus - On-Chain Transaction Obfuscation Protocol Underlying Sui
 
-**OCTOPUS** stands for **On-chain Transaction Obfuscated Protocol Underlying Sui**.
+**OCTOPUS** stands for **On-Chain Transaction Obfuscation Protocol Underlying Sui**.
 
 A privacy protocol implementation for the Sui blockchain, enabling shielded transactions using zero-knowledge proofs.
 

@@ -6,12 +6,12 @@ import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
 import {
-  initPoseidon,
   computeNullifier,
   decryptNote as sdkDecryptNote,
   buildMerkleTreeFromEvents,
   bigIntToBytes,
 } from "@octopus/sdk";
+import { initPoseidon } from "@/lib/poseidon";
 
 /**
  * Owned note with metadata for selection and spending
@@ -46,6 +46,12 @@ export function useNotes(keypair: OctopusKeypair | null) {
   const [notes, setNotes] = useState<OwnedNote[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Manual refresh function
+  const refresh = () => {
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
   useEffect(() => {
     if (!keypair) {
@@ -228,9 +234,9 @@ export function useNotes(keypair: OctopusKeypair | null) {
     return () => {
       isCancelled = true;
     };
-  }, [keypair, client]);
+  }, [keypair, client, refreshTrigger]);
 
-  return { notes, loading, error };
+  return { notes, loading, error, refresh };
 }
 
 /**

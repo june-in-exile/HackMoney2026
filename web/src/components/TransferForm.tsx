@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { cn, formatSui } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
-import { useNotes } from "@/hooks/useNotes";
+import type { OwnedNote } from "@/hooks/useNotes";
 import {
   selectNotesForTransfer,
   createTransferOutputs,
@@ -19,10 +19,13 @@ import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constant
 
 interface TransferFormProps {
   keypair: OctopusKeypair | null;
+  notes: OwnedNote[];
+  loading: boolean;
+  error: string | null;
   onSuccess?: () => void | Promise<void>;
 }
 
-export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
+export function TransferForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess }: TransferFormProps) {
   const [recipientMpk, setRecipientMpk] = useState("");
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,7 +34,6 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const { notes, loading: notesLoading, error: notesError } = useNotes(keypair);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +70,7 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
       // ============================================
 
       // 1. Get unspent notes
-      const unspentNotes = notes.filter((n) => !n.spent);
+      const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
 
       if (unspentNotes.length === 0) {
         setError("No unspent notes available. Shield some tokens first!");
@@ -95,7 +97,7 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
 
       // 3. Create output notes (recipient + change)
       const recipientMpkBigInt = BigInt(recipientMpk);
-      const inputTotal = selectedNotes.reduce((sum, n) => sum + n.note.value, 0n);
+      const inputTotal = selectedNotes.reduce((sum: bigint, n: { note: { value: bigint } }) => sum + n.note.value, 0n);
       const [recipientNote, changeNote] = createTransferOutputs(
         recipientMpkBigInt,
         keypair.masterPublicKey,
@@ -202,10 +204,10 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
               <>LOADING NOTES...</>
             ) : notes.length > 0 ? (
               <>
-                TOTAL: {formatSui(notes.filter(n => !n.spent).reduce((sum, n) => sum + n.note.value, 0n))}
-                {notes.filter(n => !n.spent).length > 1 && (
+                TOTAL: {formatSui(notes.filter((n: OwnedNote) => !n.spent).reduce((sum: bigint, n: OwnedNote) => sum + n.note.value, 0n))}
+                {notes.filter((n: OwnedNote) => !n.spent).length > 1 && (
                   <span className="text-gray-600">
-                    {" "}// {notes.filter(n => !n.spent).length} NOTES
+                    {" "}// {notes.filter((n: OwnedNote) => !n.spent).length} NOTES
                   </span>
                 )}
               </>
@@ -246,25 +248,25 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
             </p>
             <p className="text-[10px] text-red-400 font-mono">{notesError}</p>
           </div>
-        ) : notes.filter(n => !n.spent).length > 0 ? (
+        ) : notes.filter((n: OwnedNote) => !n.spent).length > 0 ? (
           <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
             <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
               Available Notes (UTXO)
             </p>
             <div className="space-y-1.5 text-[10px] text-gray-300">
               {notes
-                .filter(n => !n.spent)
-                .sort((a, b) => Number(b.note.value - a.note.value))
+                .filter((n: OwnedNote) => !n.spent)
+                .sort((a: OwnedNote, b: OwnedNote) => Number(b.note.value - a.note.value))
                 .slice(0, 5)
-                .map((note, i) => (
+                .map((note: OwnedNote, i: number) => (
                   <div key={i} className="flex justify-between font-mono p-1.5 bg-black/30 clip-corner">
                     <span className="text-gray-500">NOTE #{(i + 1).toString().padStart(2, '0')}:</span>
                     <span className="text-cyber-blue">{formatSui(note.note.value)} SUI</span>
                   </div>
                 ))}
-              {notes.filter(n => !n.spent).length > 5 && (
+              {notes.filter((n: OwnedNote) => !n.spent).length > 5 && (
                 <p className="text-gray-500 font-mono pl-1.5">
-                  ... +{notes.filter(n => !n.spent).length - 5} MORE
+                  ... +{notes.filter((n: OwnedNote) => !n.spent).length - 5} MORE
                 </p>
               )}
             </div>

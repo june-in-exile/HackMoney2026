@@ -34,17 +34,9 @@ export function useLocalKeypair(walletAddress: string | undefined) {
   useEffect(() => {
     async function init() {
       try {
-        // Dynamically import SDK to avoid SSR issues
-        const { initPoseidon } = await import("circomlibjs").then(
-          async (mod) => {
-            const poseidon = await mod.buildPoseidon();
-            return {
-              initPoseidon: async () => {},
-              poseidon,
-            };
-          }
-        );
-
+        // Use shared singleton to avoid concurrent WebAssembly allocations
+        const { initPoseidon } = await import("@/lib/poseidon");
+        await initPoseidon();
         setPoseidonReady(true);
       } catch (error) {
         console.error("Failed to initialize:", error);
@@ -54,7 +46,7 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     }
 
     init();
-  }, [walletAddress]);
+  }, []);
 
   // Auto-load active keypair when wallet address changes
   useEffect(() => {
@@ -98,28 +90,16 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     }
 
     try {
-      const { buildPoseidon } = await import("circomlibjs");
-      const poseidon = await buildPoseidon();
+      const { poseidonHash, randomFieldElement } = await import("@octopus/sdk");
 
-      // Generate random spending key
-      const bytes = new Uint8Array(32);
-      crypto.getRandomValues(bytes);
-      let spendingKey = BigInt(0);
-      for (let i = 0; i < 32; i++) {
-        spendingKey = (spendingKey << 8n) | BigInt(bytes[i]);
-      }
-      // Reduce to scalar field
-      const SCALAR_MODULUS =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-      spendingKey = spendingKey % SCALAR_MODULUS;
+      // Generate random spending key using SDK's secure random generator
+      const spendingKey = randomFieldElement();
 
       // Derive nullifying key: Poseidon(spendingKey, 1)
-      const nullifyingKeyHash = poseidon([spendingKey, 1n]);
-      const nullifyingKey = BigInt(poseidon.F.toString(nullifyingKeyHash));
+      const nullifyingKey = poseidonHash([spendingKey, 1n]);
 
       // Derive master public key: Poseidon(spendingKey, nullifyingKey)
-      const mpkHash = poseidon([spendingKey, nullifyingKey]);
-      const masterPublicKey = BigInt(poseidon.F.toString(mpkHash));
+      const masterPublicKey = poseidonHash([spendingKey, nullifyingKey]);
 
       const newKeypair: OctopusKeypair = {
         spendingKey,

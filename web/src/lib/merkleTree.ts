@@ -5,24 +5,16 @@
  */
 
 import type { SuiClient } from "@mysten/sui/client";
-import { poseidonHash, initPoseidon } from "@octopus/sdk";
+import { poseidonHash } from "@octopus/sdk";
+import { initPoseidon } from "@/lib/poseidon";
 
 const TREE_DEPTH = 16;
-
-// Ensure Poseidon is initialized
-let poseidonInitialized = false;
-async function ensurePoseidonInit() {
-  if (!poseidonInitialized) {
-    await initPoseidon();
-    poseidonInitialized = true;
-  }
-}
 
 /**
  * Fetch all commitments from Shield events
  */
 export async function fetchAllCommitments(client: SuiClient, packageId: string): Promise<bigint[]> {
-  await ensurePoseidonInit();
+  await initPoseidon();
 
   const events = await client.queryEvents({
     query: {
