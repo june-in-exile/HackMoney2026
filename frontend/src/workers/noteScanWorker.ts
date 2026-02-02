@@ -245,16 +245,20 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         console.log('[Worker] Querying ShieldEvents...');
         const shieldQuery = await client.query({
           query: graphql(`
-            query ShieldEvents($eventType: String!) {
-              events(filter: { eventType: $eventType }) {
+            query ShieldEvents($eventType: String!, $first: Int) {
+              events(first: $first, filter: { type: $eventType }) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
                 nodes {
-                  sendingModule {
+                  transactionModule {
                     package { address }
                   }
                   contents {
                     json
                   }
-                  transactionBlock {
+                  transaction {
                     digest
                   }
                 }
@@ -263,6 +267,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           `),
           variables: {
             eventType: `${request.packageId}::pool::ShieldEvent`,
+            first: 10,
           },
         });
 
@@ -280,12 +285,32 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           const position = eventData.position;
           const commitment = eventData.commitment;
 
+          // Decode encrypted_note from Base64 if needed
+          let encryptedNoteBytes: number[];
+          if (typeof encrypted_note === 'string') {
+            encryptedNoteBytes = decodeBase64(encrypted_note);
+          } else if (Array.isArray(encrypted_note)) {
+            encryptedNoteBytes = encrypted_note;
+          } else {
+            console.error('[Worker] Unexpected encrypted_note format:', typeof encrypted_note);
+            continue;
+          }
+
+          // Debug: Log on first event
+          if (shieldEventsProcessed === 1) {
+            console.log('[Worker] Decoded encrypted_note length:', encryptedNoteBytes.length, '(expected 188)');
+          }
+
           // Try to decrypt
           const note = decryptNote(
-            encrypted_note,
+            encryptedNoteBytes,
             BigInt(request.spendingKey),
             BigInt(request.masterPublicKey)
           );
+
+          if (shieldEventsProcessed === 1) {
+            console.log('[Worker] First decryption result:', note ? 'SUCCESS ✓' : 'FAILED (not our note)');
+          }
 
           if (note) {
             shieldNotesDecrypted++;
@@ -301,15 +326,25 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               leafIndex,
               pathElements: [], // Will be filled later
               nullifier,
-              txDigest: node.transactionBlock?.digest || "",
+              txDigest: (node.transaction as any)?.digest || "",
             });
           }
 
           // Collect all commitments for Merkle tree
-          allCommitments.push({
-            commitment: bytesToBigInt(commitment),
-            leafIndex: Number(position),
-          });
+          try {
+            allCommitments.push({
+              commitment: bytesToBigInt(commitment),
+              leafIndex: Number(position),
+            });
+          } catch (err) {
+            console.error('[Worker] Failed to convert commitment to BigInt:', {
+              position,
+              commitment,
+              commitmentType: typeof commitment,
+              error: err instanceof Error ? err.message : err,
+            });
+            throw new Error(`Failed to parse commitment at position ${position}: ${err instanceof Error ? err.message : err}`);
+          }
         }
 
         console.log('[Worker] ShieldEvents processed:', shieldEventsProcessed, '| Decrypted:', shieldNotesDecrypted);
@@ -318,16 +353,20 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         console.log('[Worker] Querying TransferEvents...');
         const transferQuery = await client.query({
           query: graphql(`
-            query TransferEvents($eventType: String!) {
-              events(filter: { eventType: $eventType }) {
+            query TransferEvents($eventType: String!, $first: Int) {
+              events(first: $first, filter: { type: $eventType }) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
                 nodes {
-                  sendingModule {
+                  transactionModule {
                     package { address }
                   }
                   contents {
                     json
                   }
-                  transactionBlock {
+                  transaction {
                     digest
                   }
                 }
@@ -336,6 +375,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           `),
           variables: {
             eventType: `${request.packageId}::pool::TransferEvent`,
+            first: 10,
           },
         });
 
@@ -354,8 +394,19 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           const output_commitments = eventData.output_commitments;
 
           for (let i = 0; i < encrypted_notes.length; i++) {
+            // Decode encrypted_note from Base64 if needed
+            let encryptedNoteBytes: number[];
+            if (typeof encrypted_notes[i] === 'string') {
+              encryptedNoteBytes = decodeBase64(encrypted_notes[i]);
+            } else if (Array.isArray(encrypted_notes[i])) {
+              encryptedNoteBytes = encrypted_notes[i];
+            } else {
+              console.error('[Worker] Unexpected encrypted_note format in TransferEvent:', typeof encrypted_notes[i]);
+              continue;
+            }
+
             const note = decryptNote(
-              encrypted_notes[i],
+              encryptedNoteBytes,
               BigInt(request.spendingKey),
               BigInt(request.masterPublicKey)
             );
@@ -374,15 +425,26 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 leafIndex,
                 pathElements: [],
                 nullifier,
-                txDigest: node.transactionBlock?.digest || "",
+                txDigest: (node.transaction as any)?.digest || "",
               });
             }
 
             // Collect all commitments
-            allCommitments.push({
-              commitment: bytesToBigInt(output_commitments[i]),
-              leafIndex: Number(output_positions[i]),
-            });
+            try {
+              allCommitments.push({
+                commitment: bytesToBigInt(output_commitments[i]),
+                leafIndex: Number(output_positions[i]),
+              });
+            } catch (err) {
+              console.error('[Worker] Failed to convert TransferEvent commitment to BigInt:', {
+                index: i,
+                position: output_positions[i],
+                commitment: output_commitments[i],
+                commitmentType: typeof output_commitments[i],
+                error: err instanceof Error ? err.message : err,
+              });
+              throw new Error(`Failed to parse transfer commitment at index ${i}: ${err instanceof Error ? err.message : err}`);
+            }
           }
         }
 
@@ -511,13 +573,112 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 };
 
 /**
- * Utility: Convert byte array to BigInt (little-endian as used by Move)
+ * Utility: Decode Base64 string to Uint8Array or number[]
  */
-function bytesToBigInt(bytes: number[]): bigint {
+function decodeBase64(input: string): number[] {
+  try {
+    // Use built-in atob (browser) or Buffer (Node.js)
+    const binaryString = typeof atob !== 'undefined'
+      ? atob(input)
+      : Buffer.from(input, 'base64').toString('binary');
+
+    return Array.from(binaryString, char => char.charCodeAt(0));
+  } catch (err) {
+    throw new Error(`Failed to decode Base64 string: ${input}`);
+  }
+}
+
+/**
+ * Utility: Convert byte array to BigInt (little-endian as used by Move)
+ * Handles multiple input formats:
+ * - number[] (direct byte array)
+ * - string (hex string with or without 0x prefix, or Base64)
+ * - object with nested structure
+ */
+function bytesToBigInt(input: any): bigint {
+  let bytes: number[];
+
+  // Handle different input formats
+  if (Array.isArray(input)) {
+    // Already a byte array
+    bytes = input;
+  } else if (typeof input === 'string') {
+    // Check if it's Base64 (contains +, /, or = characters, or non-hex characters)
+    const isBase64 = /[+/=]/.test(input) || !/^(0x)?[0-9a-fA-F]+$/.test(input);
+
+    if (isBase64) {
+      // Base64 string - decode it
+      try {
+        // Use built-in atob (browser) or Buffer (Node.js)
+        const binaryString = typeof atob !== 'undefined'
+          ? atob(input)
+          : Buffer.from(input, 'base64').toString('binary');
+
+        bytes = Array.from(binaryString, char => char.charCodeAt(0));
+      } catch (err) {
+        throw new Error(`Failed to decode Base64 string: ${input}`);
+      }
+    } else {
+      // Hex string (with or without 0x prefix)
+      const hexStr = input.startsWith('0x') ? input.slice(2) : input;
+
+      // Validate hex string
+      if (!/^[0-9a-fA-F]+$/.test(hexStr)) {
+        throw new Error(`Invalid hex string: ${input}`);
+      }
+
+      // Convert hex to bytes (big-endian first, as hex strings are typically big-endian)
+      bytes = [];
+      for (let i = 0; i < hexStr.length; i += 2) {
+        bytes.push(parseInt(hexStr.slice(i, i + 2), 16));
+      }
+    }
+  } else if (typeof input === 'object' && input !== null) {
+    // Try to extract bytes from object (might have nested structure)
+    console.warn('[bytesToBigInt] Received object, attempting to extract bytes:', input);
+
+    // Try common field names
+    if ('bytes' in input) {
+      return bytesToBigInt(input.bytes);
+    } else if ('data' in input) {
+      return bytesToBigInt(input.data);
+    } else if ('value' in input) {
+      return bytesToBigInt(input.value);
+    } else {
+      throw new Error(`Unsupported object format: ${JSON.stringify(input)}`);
+    }
+  } else {
+    throw new Error(`Cannot convert ${typeof input} to BigInt: ${input}`);
+  }
+
+  // Validate byte array
+  if (!Array.isArray(bytes) || bytes.length === 0) {
+    throw new Error(`Invalid byte array: ${bytes}`);
+  }
+
+  // Ensure all elements are valid numbers
+  for (let i = 0; i < bytes.length; i++) {
+    if (typeof bytes[i] !== 'number' || bytes[i] < 0 || bytes[i] > 255) {
+      throw new Error(`Invalid byte at index ${i}: ${bytes[i]} (type: ${typeof bytes[i]})`);
+    }
+  }
+
+  // Pad or trim to exactly 32 bytes
+  while (bytes.length < 32) {
+    bytes.push(0);
+  }
+  if (bytes.length > 32) {
+    bytes = bytes.slice(0, 32);
+  }
+
+  // Convert byte array to BigInt
+  // Base64-decoded bytes are in big-endian order (most significant byte first)
+  // So we read from index 0 (MSB) to index 31 (LSB)
   let result = 0n;
-  for (let i = 31; i >= 0; i--) {
+  for (let i = 0; i < 32; i++) {
     result = (result << 8n) | BigInt(bytes[i]);
   }
+
   const SCALAR_MODULUS = BigInt(
     "21888242871839275222246405745257275088548364400416034343698204186575808495617"
   );

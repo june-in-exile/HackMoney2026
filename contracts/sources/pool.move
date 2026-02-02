@@ -260,7 +260,7 @@ module octopus::pool {
     /// NOTE: This is a TEST-ONLY version using 1:1 swap ratio.
     /// For production use, implement execute_cetus_swap() with real Cetus DEX integration.
     #[test_only]
-    public entry fun swap<TokenIn, TokenOut>(
+    public fun swap<TokenIn, TokenOut>(
         pool_in: &mut PrivacyPool<TokenIn>,
         pool_out: &mut PrivacyPool<TokenOut>,
         proof_bytes: vector<u8>,

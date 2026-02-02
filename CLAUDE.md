@@ -64,14 +64,17 @@ nullifier = Poseidon(nullifying_key, leaf_index)
 - Requires 128-byte Groth16 proof + 96-byte public inputs (root, nullifier, commitment)
 - Verifies proof, marks nullifier spent, transfers tokens
 
-## SDK Critical Initialization
+**Transfer** (private transfer): `pool::transfer<T>(pool, proof_bytes, public_inputs_bytes, encrypted_notes, ctx)`
 
-Always call `initPoseidon()` before any cryptographic operations:
+- Requires Groth16 proof for a 2-input, 2-output private transfer.
+- Public inputs (160 bytes): root, 2 input nullifiers, 2 output commitments.
+- Spends two input notes and creates two new output notes within the pool.
 
-```typescript
-import { initPoseidon, generateKeypair, createNote } from "@octopus/sdk";
-await initPoseidon();  // Required first!
-```
+**Swap** (private swap): `pool::swap<TokenIn, TokenOut>(pool_in, pool_out, proof_bytes, ...)`
+
+- Requires Groth16 proof for a private swap. Public inputs (192 bytes) include root, nullifiers, and commitments.
+- Spends input notes, performs a swap (currently mock), and creates new output and change notes.
+- Note: Current implementation is `#[test_only]`. A `swap_production` function exists for full DEX integration.
 
 ## Version Constraints
 
@@ -89,12 +92,6 @@ await initPoseidon();  // Required first!
 - Network: Sui Testnet
 - Verification Key: Embedded in pool (360 bytes, Arkworks compressed BN254)
 - Hash Function: **Poseidon BN254** (circuit-compatible)
-
-**Explorer Links:**
-
-- [Package](https://suiscan.xyz/testnet/object/0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080)
-- [Pool Object](https://suiscan.xyz/testnet/object/0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3)
-- [Pool Creation TX](https://suiscan.xyz/testnet/tx/D8EAjXrRBmQHfdrZwJUubvd5RuawPu8eQu1Q4w1qGxzm)
 
 ## Current Implementation
 
@@ -132,4 +129,4 @@ Detailed implementation plans are available in the [milestones/](milestones/) di
    - View keys for selective disclosure
    - Tax reporting tools
 
-See [milestones/README.md](docs/README.md) for complete roadmap and timeline
+See [milestones/README.md](docs/README.md) for details.
