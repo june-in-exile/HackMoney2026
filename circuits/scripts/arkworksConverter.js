@@ -1,5 +1,5 @@
 // Convert snarkjs output to Sui's Arkworks compressed format
-// For swap circuit
+// For unshield circuit
 // BN254 curve: G1 = 32 bytes compressed, G2 = 64 bytes compressed, Fr = 32 bytes LE
 
 const fs = require("fs");
@@ -83,11 +83,13 @@ function convertPublicInput(input) {
     return bigIntToLE32(BigInt(input));
 }
 
-// Load files for swap circuit
+// Load files for unshield circuit
 const baseDir = path.dirname(__filename);
-const vk = JSON.parse(fs.readFileSync(path.join(baseDir, "build/swap_vk.json")));
+const vk = JSON.parse(fs.readFileSync(path.join(baseDir, "../build/unshield_vk.json")));
+const proof = JSON.parse(fs.readFileSync(path.join(baseDir, "../build/unshield_proof.json")));
+const publicInputs = JSON.parse(fs.readFileSync(path.join(baseDir, "../build/unshield_public.json")));
 
-console.log("=== Converting swap circuit VK to Sui format ===\n");
+console.log("=== Converting unshield circuit output to Sui format ===\n");
 
 // === Verification Key ===
 const alpha_g1 = compressG1(vk.vk_alpha_1);
@@ -114,22 +116,45 @@ const vkBytes = Buffer.concat([
 console.log("Verifying Key (hex):");
 console.log(vkBytes.toString("hex"));
 console.log(`\nVK length: ${vkBytes.length} bytes`);
-console.log(`IC points: ${ic_points.length} (expected: 7 for 6 public inputs)`);
+console.log(`IC points: ${ic_points.length} (expected: 4 for 3 public inputs)`);
 
-// === Write output ===
-fs.writeFileSync(path.join(baseDir, "build/swap_vk_bytes.hex"), vkBytes.toString("hex"));
+// === Proof ===
+const pi_a = compressG1(proof.pi_a);
+const pi_b = compressG2(proof.pi_b);
+const pi_c = compressG1(proof.pi_c);
 
-console.log("\n=== File written to build/ ===");
-console.log("- swap_vk_bytes.hex");
+const proofBytes = Buffer.concat([pi_a, pi_b, pi_c]);
 
-// Output as Move vector literal
-console.log("\n=== Move literal (for pool creation) ===");
-console.log(`\nconst SWAP_VK: vector<u8> = x"${vkBytes.toString("hex")}";`);
+console.log("\nProof Points (hex):");
+console.log(proofBytes.toString("hex"));
+console.log(`\nProof length: ${proofBytes.length} bytes`);
 
-console.log("\n=== Public Inputs Order (for reference) ===");
-console.log("1. merkle_root");
-console.log("2. input_nullifier1");
-console.log("3. input_nullifier2");
-console.log("4. output_commitment");
-console.log("5. change_commitment");
-console.log("6. swap_data_hash");
+// === Public Inputs ===
+// Order: merkle_root, nullifier, commitment
+const publicInputsBytes = Buffer.concat(publicInputs.map(p => convertPublicInput(p)));
+
+console.log("\nPublic Inputs (hex):");
+console.log(publicInputsBytes.toString("hex"));
+console.log(`\nPublic inputs length: ${publicInputsBytes.length} bytes (${publicInputs.length} inputs)`);
+
+// === Write outputs ===
+fs.writeFileSync(path.join(baseDir, "build/unshield_vk_bytes.hex"), vkBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "build/unshield_proof_bytes.hex"), proofBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "build/unshield_public_inputs_bytes.hex"), publicInputsBytes.toString("hex"));
+
+console.log("\n=== Files written to build/ ===");
+console.log("- unshield_vk_bytes.hex");
+console.log("- unshield_proof_bytes.hex");
+console.log("- unshield_public_inputs_bytes.hex");
+
+// Output as Move vector literals
+console.log("\n=== Move literals (for tests) ===");
+console.log(`\nconst TEST_VK: vector<u8> = x"${vkBytes.toString("hex")}";`);
+console.log(`\nconst TEST_PROOF: vector<u8> = x"${proofBytes.toString("hex")}";`);
+console.log(`\nconst TEST_PUBLIC_INPUTS: vector<u8> = x"${publicInputsBytes.toString("hex")}";`);
+
+// Also show individual public inputs for reference
+console.log("\n=== Individual Public Inputs ===");
+console.log(`merkle_root: ${publicInputs[0]}`);
+console.log(`nullifier: ${publicInputs[1]}`);
+console.log(`commitment: ${publicInputs[2]}`);

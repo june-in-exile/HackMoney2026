@@ -1,5 +1,6 @@
 const { buildPoseidon } = require("circomlibjs");
 const fs = require("fs");
+const path = require("path");
 
 // Field modulus for BN254 curve
 const FIELD_SIZE = BigInt("21888242871839275222246405745257275088548364400416034343698204186575808495617");
@@ -87,7 +88,7 @@ async function main() {
     };
 
     // Save to file
-    fs.writeFileSync("build/unshield_input.json", JSON.stringify(input, null, 2));
+    fs.writeFileSync(path.join(__dirname, "../build/unshield_input.json"), JSON.stringify(input, null, 2));
     console.log("\nInput saved to build/unshield_input.json");
 
     // Also print public inputs for reference

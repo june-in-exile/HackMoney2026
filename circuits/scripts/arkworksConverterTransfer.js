@@ -85,9 +85,9 @@ function convertPublicInput(input) {
 
 // Load files for transfer circuit
 const baseDir = path.dirname(__filename);
-const vk = JSON.parse(fs.readFileSync(path.join(baseDir, "build/transfer_vk.json")));
-const proof = JSON.parse(fs.readFileSync(path.join(baseDir, "build/transfer_proof.json")));
-const publicInputs = JSON.parse(fs.readFileSync(path.join(baseDir, "build/transfer_public.json")));
+const vk = JSON.parse(fs.readFileSync(path.join(baseDir, "../build/transfer_vk.json")));
+const proof = JSON.parse(fs.readFileSync(path.join(baseDir, "../build/transfer_proof.json")));
+const publicInputs = JSON.parse(fs.readFileSync(path.join(baseDir, "../build/transfer_public.json")));
 
 console.log("=== Converting transfer circuit output to Sui format ===\n");
 
@@ -138,9 +138,9 @@ console.log(publicInputsBytes.toString("hex"));
 console.log(`\nPublic inputs length: ${publicInputsBytes.length} bytes (${publicInputs.length} inputs)`);
 
 // === Write outputs ===
-fs.writeFileSync(path.join(baseDir, "build/transfer_vk_bytes.hex"), vkBytes.toString("hex"));
-fs.writeFileSync(path.join(baseDir, "build/transfer_proof_bytes.hex"), proofBytes.toString("hex"));
-fs.writeFileSync(path.join(baseDir, "build/transfer_public_inputs_bytes.hex"), publicInputsBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "../build/transfer_vk_bytes.hex"), vkBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "../build/transfer_proof_bytes.hex"), proofBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "../build/transfer_public_inputs_bytes.hex"), publicInputsBytes.toString("hex"));
 
 console.log("\n=== Files written to build/ ===");
 console.log("- transfer_vk_bytes.hex");
