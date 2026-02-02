@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
-import { cn } from "@/lib/utils";
+import { cn, formatSui } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import { useNotes } from "@/hooks/useNotes";
 import {
@@ -31,7 +31,7 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const { notes, loading: notesLoading } = useNotes(keypair);
+  const { notes, loading: notesLoading, error: notesError } = useNotes(keypair);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,12 +192,97 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.000"
-            step="any"
+            step="0.001"
             min="0"
             className="input"
             disabled={isSubmitting}
           />
+          <p className="mt-2 text-[10px] text-gray-500 font-mono">
+            {notesLoading ? (
+              <>LOADING NOTES...</>
+            ) : notes.length > 0 ? (
+              <>
+                TOTAL: {formatSui(notes.filter(n => !n.spent).reduce((sum, n) => sum + n.note.value, 0n))}
+                {notes.filter(n => !n.spent).length > 1 && (
+                  <span className="text-gray-600">
+                    {" "}// {notes.filter(n => !n.spent).length} NOTES
+                  </span>
+                )}
+              </>
+            ) : (
+              <>NO NOTES // Shield tokens first</>
+            )}
+          </p>
         </div>
+
+        {/* Available Notes Display */}
+        {notesLoading ? (
+          <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+            <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
+              Available Notes (UTXO)
+            </p>
+            <div className="flex items-center gap-3">
+              <svg
+                className="h-4 w-4 animate-spin text-cyber-blue"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              <p className="text-[10px] text-gray-400 font-mono">Loading notes from blockchain...</p>
+            </div>
+          </div>
+        ) : notesError ? (
+          <div className="p-4 border border-red-600/30 bg-red-900/20 clip-corner">
+            <p className="text-xs font-bold uppercase tracking-wider text-red-400 mb-2 font-mono">
+              Error Loading Notes
+            </p>
+            <p className="text-[10px] text-red-400 font-mono">{notesError}</p>
+          </div>
+        ) : notes.filter(n => !n.spent).length > 0 ? (
+          <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+            <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
+              Available Notes (UTXO)
+            </p>
+            <div className="space-y-1.5 text-[10px] text-gray-300">
+              {notes
+                .filter(n => !n.spent)
+                .sort((a, b) => Number(b.note.value - a.note.value))
+                .slice(0, 5)
+                .map((note, i) => (
+                  <div key={i} className="flex justify-between font-mono p-1.5 bg-black/30 clip-corner">
+                    <span className="text-gray-500">NOTE #{(i + 1).toString().padStart(2, '0')}:</span>
+                    <span className="text-cyber-blue">{formatSui(note.note.value)} SUI</span>
+                  </div>
+                ))}
+              {notes.filter(n => !n.spent).length > 5 && (
+                <p className="text-gray-500 font-mono pl-1.5">
+                  ... +{notes.filter(n => !n.spent).length - 5} MORE
+                </p>
+              )}
+            </div>
+            <p className="mt-3 text-[10px] text-gray-400 font-mono flex items-start gap-2">
+              <span className="text-cyber-blue">ℹ</span>
+              <span>SDK auto-selects 1-2 notes to cover transfer amount.</span>
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 border border-gray-800 bg-black/30 clip-corner">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 font-mono">
+              No Notes Available
+            </p>
+            <p className="text-[10px] text-gray-400 font-mono">
+              Shield some tokens first to create notes for transfer.
+            </p>
+          </div>
+        )}
 
         {/* Note Selection Info */}
         <div className="p-3 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">

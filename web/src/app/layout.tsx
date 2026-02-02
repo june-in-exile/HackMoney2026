@@ -3,7 +3,7 @@ import { SuiProvider } from "@/providers/SuiProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "O.C.T.O.P.U.S. Protocol // On-chain Confidential Transaction",
+  title: "Octopus",
   description: "On-chain Confidential Transaction Omni-directional Privacy-enhanced Underlying Sui - Shield and unshield tokens with ZK proofs",
 };
 

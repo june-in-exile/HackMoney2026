@@ -46,15 +46,6 @@ export function useLocalKeypair(walletAddress: string | undefined) {
         );
 
         setPoseidonReady(true);
-
-        // Load saved keypairs list if wallet is connected
-        // Note: We don't auto-load the active keypair on reconnect
-        // User must manually select from saved keypairs
-        if (walletAddress) {
-          const identifier = getDefaultIdentifier(walletAddress);
-          const saved = getSavedKeypairs(identifier);
-          setSavedKeypairs(saved);
-        }
       } catch (error) {
         console.error("Failed to initialize:", error);
       } finally {
@@ -65,12 +56,35 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     init();
   }, [walletAddress]);
 
-  // Clear keypair when wallet disconnects
+  // Auto-load active keypair when wallet address changes
   useEffect(() => {
     if (!walletAddress) {
+      // Wallet disconnected - clear everything
       setKeypair(null);
       setSavedKeypairs([]);
+      return;
     }
+
+    // Wallet address changed - try to load active keypair for new address
+    const identifier = getDefaultIdentifier(walletAddress);
+    const activeKeypair = getActiveKeypair(identifier);
+
+    if (activeKeypair) {
+      // Auto-load active keypair for this address
+      const keypairObj: OctopusKeypair = {
+        spendingKey: hexToBigInt(activeKeypair.spendingKey),
+        nullifyingKey: hexToBigInt(activeKeypair.nullifyingKey),
+        masterPublicKey: hexToBigInt(activeKeypair.masterPublicKey),
+      };
+      setKeypair(keypairObj);
+    } else {
+      // No active keypair for this address - clear
+      setKeypair(null);
+    }
+
+    // Update saved keypairs list
+    const saved = getSavedKeypairs(identifier);
+    setSavedKeypairs(saved);
   }, [walletAddress]);
 
   // Generate a new keypair

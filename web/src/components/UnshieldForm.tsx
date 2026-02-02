@@ -289,7 +289,7 @@ export function UnshieldForm({
       </div>
 
       {/* Available Notes Display */}
-      {notes.filter(n => !n.spent).length > 1 && (
+      {
         <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
           <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
             Available Notes (UTXO)
@@ -316,7 +316,7 @@ export function UnshieldForm({
             <span>Single note spending only. Use transfer to merge.</span>
           </p>
         </div>
-      )}
+      }
 
       {/* Progress indicator */}
       {isProcessing && (

@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
-import { initPoseidon, decryptNote } from "@octopus/sdk";
+import { initPoseidon, decryptNote, computeNullifier, bigIntToBytes } from "@octopus/sdk";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import { PACKAGE_ID, POOL_ID, STORAGE_KEYS } from "@/lib/constants";
 import type { ShieldedNote, StoredNote } from "@/types/note";
@@ -70,10 +70,51 @@ export function useShieldedBalance(
   }, []);
 
   /**
+   * Check if nullifier is spent on-chain
+   */
+  const isNullifierSpent = useCallback(
+    async (nullifier: bigint): Promise<boolean> => {
+      try {
+        const poolObject = await client.getObject({
+          id: POOL_ID,
+          options: { showContent: true },
+        });
+
+        if (
+          poolObject.data?.content?.dataType === "moveObject" &&
+          poolObject.data.content.fields
+        ) {
+          const fields = poolObject.data.content.fields as any;
+          const nullifierRegistryId = fields.nullifiers.fields.id.id;
+
+          const nullifierBytes = Array.from(bigIntToBytes(nullifier));
+
+          const dynamicField = await client.getDynamicFieldObject({
+            parentId: nullifierRegistryId,
+            name: {
+              type: 'vector<u8>',
+              value: nullifierBytes
+            }
+          });
+
+          // If field exists (no error and has data), nullifier is spent
+          return !dynamicField.error && dynamicField.data !== null && dynamicField.data !== undefined;
+        }
+
+        return false;
+      } catch (err) {
+        // If field not found, nullifier is NOT spent
+        return false;
+      }
+    },
+    [client]
+  );
+
+  /**
    * Scan blockchain for ShieldEvent emissions and decrypt notes
    */
   const scanShieldEvents = useCallback(
-    async (spendingKey: bigint, mpk: bigint): Promise<ShieldedNote[]> => {
+    async (spendingKey: bigint, mpk: bigint, nullifyingKey: bigint): Promise<ShieldedNote[]> => {
       try {
         // Initialize Poseidon if not already done
         await initPoseidon();
@@ -103,6 +144,11 @@ export function useShieldedBalance(
             );
 
             if (decrypted) {
+              // Compute nullifier and check if spent
+              const position = parseInt(eventData.position);
+              const nullifier = computeNullifier(nullifyingKey, position);
+              const spent = await isNullifierSpent(nullifier);
+
               // This note belongs to us!
               decryptedNotes.push({
                 commitment: Buffer.from(eventData.commitment).toString("hex"),
@@ -110,9 +156,9 @@ export function useShieldedBalance(
                 token: decrypted.token.toString(),
                 value: decrypted.value,
                 random: decrypted.random.toString(),
-                position: parseInt(eventData.position),
+                position,
                 txDigest: event.id.txDigest,
-                spent: false, // Will update this when we implement unshield tracking
+                spent,
               });
             }
           } catch (err) {
@@ -127,7 +173,7 @@ export function useShieldedBalance(
         throw err;
       }
     },
-    [client]
+    [client, isNullifierSpent]
   );
 
   /**
@@ -146,7 +192,8 @@ export function useShieldedBalance(
       // Scan blockchain for our notes
       const scannedNotes = await scanShieldEvents(
         keypair.spendingKey,
-        keypair.masterPublicKey
+        keypair.masterPublicKey,
+        keypair.nullifyingKey
       );
 
       // Merge with existing notes from storage to preserve spent status

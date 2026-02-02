@@ -158,33 +158,6 @@ const client = new OctopusClient({
 await client.unshield(coinType, suiProof, amount, recipient, signer);
 ```
 
-## Move Contract API
-
-### Shield (Deposit)
-
-```move
-public entry fun shield<T>(
-    pool: &mut PrivacyPool<T>,
-    coin: Coin<T>,
-    commitment: vector<u8>,      // 32 bytes
-    encrypted_note: vector<u8>,  // For recipient scanning
-    ctx: &mut TxContext,
-)
-```
-
-### Unshield (Withdraw with ZK Proof)
-
-```move
-public entry fun unshield<T>(
-    pool: &mut PrivacyPool<T>,
-    proof_bytes: vector<u8>,         // 128 bytes (Groth16 proof)
-    public_inputs_bytes: vector<u8>, // 96 bytes (root, nullifier, commitment)
-    amount: u64,
-    recipient: address,
-    ctx: &mut TxContext,
-)
-```
-
 ## Circuit Details
 
 **Unshield Circuit** (`unshield.circom`)
@@ -210,20 +183,6 @@ The circuit proves:
   - Simplified note encryption (not production-ready)
   - No viewing key separation
 - **For Production**: Add EdDSA signature verification, proper ECIES encryption, and audit all cryptographic implementations
-
-## Testnet Deployment
-
-| Contract | Address |
-|----------|---------|
-| Verifier PoC | `0xb963001568c4672969bc91a4b3e76305008621cd79830329bfb88c721ce9208b` |
-
-## Milestones
-
-- [x] **Milestone 1**: Environment setup, Sui CLI, Move basics
-- [x] **Milestone 2**: Groth16 verification PoC on Sui
-- [x] **Milestone 3**: Core data structures (Merkle tree, nullifiers)
-- [x] **Milestone 4**: Shield/Unshield with ZK verification
-- [x] **Milestone 5**: TypeScript SDK & Demo
 
 ## Acknowledgments
 

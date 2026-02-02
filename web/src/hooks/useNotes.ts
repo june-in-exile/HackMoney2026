@@ -10,6 +10,7 @@ import {
   computeNullifier,
   decryptNote as sdkDecryptNote,
   buildMerkleTreeFromEvents,
+  bigIntToBytes,
 } from "@octopus/sdk";
 
 /**
@@ -172,7 +173,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
           setNotes(ownedNotes);
         }
       } catch (err) {
-        console.error("Failed to scan notes:", err);
+        console.error("[useNotes] Failed to scan notes:", err);
         if (!isCancelled) {
           setError(err instanceof Error ? err.message : "Failed to scan notes");
         }
@@ -186,7 +187,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
     // Check if nullifier is spent on-chain
     async function isNullifierSpent(nullifier: bigint): Promise<boolean> {
       try {
-        // Query pool object to check nullifier registry
+        // Query pool object to get nullifier registry ID
         const poolObject = await client.getObject({
           id: POOL_ID,
           options: { showContent: true },
@@ -197,18 +198,27 @@ export function useNotes(keypair: OctopusKeypair | null) {
           poolObject.data.content.fields
         ) {
           const fields = poolObject.data.content.fields as any;
-          const nullifiers = fields.nullifiers?.fields?.spent || [];
+          const nullifierRegistryId = fields.nullifiers.fields.id.id;
 
-          // Nullifier is stored as 32-byte hex string
-          const nullifierHex = bigIntToHex32(nullifier);
+          // Convert nullifier to byte array (big-endian 32 bytes)
+          const nullifierBytes = Array.from(bigIntToBytes(nullifier));
 
-          // Check if nullifier exists in spent set
-          return nullifiers.some((spent: string) => spent === nullifierHex);
+          // Query dynamic field directly from Table
+          const dynamicField = await client.getDynamicFieldObject({
+            parentId: nullifierRegistryId,
+            name: {
+              type: 'vector<u8>',
+              value: nullifierBytes
+            }
+          });
+
+          // If field exists (no error and has data), nullifier is spent
+          return !dynamicField.error && dynamicField.data !== null && dynamicField.data !== undefined;
         }
 
         return false;
       } catch (err) {
-        console.error("Failed to check nullifier:", err);
+        // If field not found, nullifier is NOT spent (expected for unspent notes)
         return false; // Assume not spent if check fails
       }
     }
@@ -243,14 +253,3 @@ function tryDecryptNote(
   }
 }
 
-/**
- * Convert BigInt to 32-byte hex string (for nullifier comparison)
- */
-function bigIntToHex32(value: bigint): string {
-  let hex = value.toString(16);
-  // Pad to 64 hex characters (32 bytes)
-  while (hex.length < 64) {
-    hex = "0" + hex;
-  }
-  return "0x" + hex;
-}

@@ -10,6 +10,7 @@ import { UnshieldForm } from "@/components/UnshieldForm";
 import { TransferForm } from "@/components/TransferForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
 import { useShieldedBalance } from "@/hooks/useShieldedBalance";
+import { PACKAGE_ID, POOL_ID, NETWORK } from "@/lib/constants";
 
 type TabType = "shield" | "unshield" | "transfer";
 
@@ -119,9 +120,32 @@ export default function Home() {
               <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono mb-2 max-w-2xl">
                 On-chain Transaction Obfuscated Protocol Underlying Sui
               </p>
-              <p className="text-gray-600 text-xs font-mono tracking-widest uppercase">
-                Privacy-Preserving Layer • Zero-Knowledge Proofs • Sui Network
-              </p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span className="text-gray-500 uppercase tracking-wider">Package:</span>
+                  <a
+                    href={`https://${NETWORK}.suivision.xyz/package/${PACKAGE_ID}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyber-blue hover:text-cyber-blue/80 transition-colors truncate max-w-md"
+                    title={PACKAGE_ID}
+                  >
+                    {PACKAGE_ID.slice(0, 8)}...{PACKAGE_ID.slice(-6)}
+                  </a>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span className="text-gray-500 uppercase tracking-wider">Pool ID:</span>
+                  <a
+                    href={`https://${NETWORK}.suivision.xyz/object/${POOL_ID}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyber-blue hover:text-cyber-blue/80 transition-colors truncate max-w-md"
+                    title={POOL_ID}
+                  >
+                    {POOL_ID.slice(0, 8)}...{POOL_ID.slice(-6)}
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 

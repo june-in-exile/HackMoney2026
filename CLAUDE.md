@@ -104,8 +104,8 @@ await initPoseidon();  // Required first!
 
 **Octopus Privacy Pool (SUI) - Poseidon Hash (2026-01-31):**
 
-- Package ID: `0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080`
-- Pool ID (Shared Object): `0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3`
+- Package ID: `0x9c01494d8616465b314bd372325d0911df664e52632c4448b1bd231f1f77c0a0`
+- Pool ID (Shared Object): `0xbba5cfb8f48abdd10b59b31ab17c65b35899f6ae2ce4114f2c8a419a94d2a49a`
 - Modules: `pool`, `merkle_tree`, `nullifier`, `note`
 - Network: Sui Testnet
 - Verification Key: Embedded in pool (360 bytes, Arkworks compressed BN254)
@@ -116,31 +116,6 @@ await initPoseidon();  // Required first!
 - [Package](https://suiscan.xyz/testnet/object/0xb2ab082080abf37b3e0a1130db3f656eba53c7aa6e847ae3f9d1d5112248a080)
 - [Pool Object](https://suiscan.xyz/testnet/object/0x032f9f9fb7f79afe60ceb9bd22e31b5cbbc06f6c68c1608bd677886efc1f23d3)
 - [Pool Creation TX](https://suiscan.xyz/testnet/tx/D8EAjXrRBmQHfdrZwJUubvd5RuawPu8eQu1Q4w1qGxzm)
-
-**Previous Deployment (Deprecated - Keccak256):**
-
-- Old Package ID: `0x802ba1f07807fd1d73ee9391145265cefdae4e3b097f66bfbfde13c47406ff19`
-- ⚠️ Incompatible with ZK circuit - do not use
-
-## End-to-End Testing - PENDING
-
-1. **Manual Testing**
-   - Start dev server: `cd web && npm run dev`
-   - Shield 1 SUI → verify commitment in Merkle tree
-   - Unshield 0.5 SUI → generate real ZK proof → verify on-chain
-   - Confirm nullifier prevents double-spend
-   - Validate transaction on [Sui explorer](https://suiscan.xyz/testnet)
-
-2. **Performance Validation**
-   - Measure proof generation time (expected: 10-30 seconds)
-   - Verify browser doesn't freeze during proof generation
-   - Check console logs for circuit artifact loading
-
-3. **Error Handling**
-   - Test with insufficient balance
-   - Test with invalid recipient address
-   - Test double-spend attempt (should fail)
-   - Test with disconnected wallet
 
 ## Current Implementation
 
@@ -154,7 +129,7 @@ await initPoseidon();  // Required first!
 - **TypeScript SDK**: Browser-compatible proof generation and transaction building
 - **Web Frontend**: Basic UI for shield/unshield operations with wallet integration
 
-### 🚧 Future Milestones
+### Milestones
 
 Detailed implementation plans are available in the [milestones/](milestones/) directory:
 
@@ -178,4 +153,4 @@ Detailed implementation plans are available in the [milestones/](milestones/) di
    - View keys for selective disclosure
    - Tax reporting tools
 
-See [milestones/README.md](milestones/README.md) for complete roadmap and timeline
+See [milestones/README.md](docs/README.md) for complete roadmap and timeline
