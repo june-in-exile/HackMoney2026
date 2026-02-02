@@ -116,10 +116,10 @@ template PrivateProofOfInnocence(sanctioned_tree_depth) {
 
 ### 1. Sanctioned Address List Management
 
-**File:** `railgun/sources/compliance.move`
+**File:** `contracts/sources/compliance.move`
 
 ```move
-module railgun::compliance {
+module octopus::compliance {
     use sui::object::{Self, UID};
     use sui::tx_context::TxContext;
     use std::vector;
@@ -158,7 +158,7 @@ module railgun::compliance {
 
 ### 2. Shield with PPOI
 
-**Modified Function:** `railgun/sources/pool.move::shield()`
+**Modified Function:** `contracts/sources/pool.move::shield()`
 
 ```move
 public entry fun shield_with_ppoi<T>(
@@ -613,7 +613,7 @@ Features:
 
 - `circuits/ppoi.circom` - PPOI circuit
 - `circuits/compile_ppoi.sh` - Compilation script
-- `railgun/sources/compliance.move` - Compliance registry
+- `contracts/sources/compliance.move` - Compliance registry
 - `compliance-updater/src/index.ts` - List updater
 - `sdk/src/compliance.ts` - PPOI SDK
 - `sdk/src/viewkey.ts` - View key SDK
@@ -624,7 +624,7 @@ Features:
 
 ### Modified Files
 
-- `railgun/sources/pool.move` - Add shield_with_ppoi()
+- `contracts/sources/pool.move` - Add shield_with_ppoi()
 - `web/src/components/ShieldForm.tsx` - Add PPOI step
 
 ## Success Criteria
@@ -725,7 +725,7 @@ Features:
 
 ## References
 
-- [Railgun Private Proofs of Innocence](https://docs.railgun.org/wiki/learn/privacy-system/private-proofs-of-innocence)
+- [Railgun Private Proofs of Innocence](https://docs.octopus.org/wiki/learn/privacy-system/private-proofs-of-innocence)
 - [Zcash Viewing Keys](https://z.cash/technology/viewing-keys/)
 - [OFAC Sanctions Lists](https://ofac.treasury.gov/specially-designated-nationals-and-blocked-persons-list-sdn-human-readable-lists)
 - [Chainalysis Compliance Solutions](https://www.chainalysis.com/solutions/compliance/)

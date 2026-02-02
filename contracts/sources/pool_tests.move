@@ -1,10 +1,10 @@
 /// Integration tests for Privacy Pool
 #[test_only]
-module railgun::pool_tests {
+module octopus::pool_tests {
     use sui::test_scenario::{Self as ts, Scenario};
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use railgun::pool::{Self, PrivacyPool};
+    use octopus::pool::{Self, PrivacyPool};
 
     // Test addresses
     const ADMIN: address = @0xAD;

@@ -55,6 +55,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
     let isCancelled = false;
 
     async function scanNotes() {
+      if (!keypair) return; // TypeScript null check
       setLoading(true);
       setError(null);
 

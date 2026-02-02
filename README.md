@@ -42,28 +42,6 @@ commitment = Poseidon(NPK, token, value)       // Note Commitment
 nullifier = Poseidon(nullifying_key, leaf_index) // Prevents double-spend
 ```
 
-## Project Structure
-
-```
-octopus/
-├── circuits/              # Circom ZK circuits
-│   ├── unshield.circom   # Main unshield circuit
-│   ├── lib/              # Circuit libraries (Merkle proof)
-│   └── build/            # Compiled circuits & keys
-├── railgun/              # Sui Move contracts
-│   └── sources/
-│       ├── pool.move         # Privacy pool (shield/unshield)
-│       ├── merkle_tree.move  # Incremental Merkle tree
-│       ├── nullifier.move    # Nullifier registry
-│       └── note.move         # Note structure
-└── sdk/                  # TypeScript SDK
-    └── src/
-        ├── crypto.ts     # Poseidon, key derivation
-        ├── prover.ts     # Groth16 proof generation
-        ├── sui.ts        # Sui transaction builders
-        └── demo.ts       # Interactive demo
-```
-
 ## Quick Start
 
 ### Prerequisites
@@ -81,6 +59,7 @@ npm install
 ```
 
 This generates:
+
 - `build/unshield_js/unshield.wasm` - Circuit WASM
 - `build/unshield_final.zkey` - Proving key
 - `build/unshield_vk.json` - Verification key
@@ -88,7 +67,7 @@ This generates:
 ### 2. Build & Test Move Contracts
 
 ```bash
-cd railgun
+cd contracts
 sui move build
 sui move test
 ```
@@ -104,6 +83,7 @@ npm run demo
 ```
 
 Demo output:
+
 ```
 Octopus SDK Demo
 
@@ -217,6 +197,7 @@ public entry fun unshield<T>(
 | Merkle Depth | 16 levels |
 
 The circuit proves:
+
 1. Knowledge of spending_key and nullifying_key (ownership)
 2. Correct commitment computation
 3. Commitment exists in Merkle tree

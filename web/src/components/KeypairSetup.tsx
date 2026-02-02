@@ -3,22 +3,30 @@
 import { useState } from "react";
 import { truncateAddress, bigIntToHex } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
+import type { StoredKeypair } from "@/lib/keypairStorage";
 
 interface KeypairSetupProps {
   keypair: OctopusKeypair | null;
   isLoading: boolean;
+  savedKeypairs: StoredKeypair[];
   onGenerate: () => Promise<OctopusKeypair>;
+  onSelect: (masterPublicKey: string) => void;
   onClear: () => void;
+  onRemove: (masterPublicKey: string) => void;
 }
 
 export function KeypairSetup({
   keypair,
   isLoading,
+  savedKeypairs,
   onGenerate,
+  onSelect,
   onClear,
+  onRemove,
 }: KeypairSetupProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showSavedKeypairs, setShowSavedKeypairs] = useState(false);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -43,6 +51,8 @@ export function KeypairSetup({
   }
 
   if (!keypair) {
+    const hasSavedKeypairs = savedKeypairs.length > 0;
+
     return (
       <div className="card relative overflow-hidden">
         {/* Background pattern */}
@@ -62,6 +72,88 @@ export function KeypairSetup({
             <br />
             // Stored locally in browser storage
           </p>
+
+          {hasSavedKeypairs && (
+            <div className="mb-4">
+              <button
+                onClick={() => setShowSavedKeypairs(!showSavedKeypairs)}
+                className="btn-secondary w-full text-xs flex items-center justify-between"
+              >
+                <span>
+                  {showSavedKeypairs ? "▼" : "►"} LOAD EXISTING KEYPAIR
+                </span>
+                <span className="text-cyber-blue font-bold">
+                  {savedKeypairs.length}
+                </span>
+              </button>
+
+              {showSavedKeypairs && (
+                <div className="mt-2 space-y-2 max-h-48 overflow-y-auto p-2 bg-black/30 border border-gray-800 clip-corner">
+                  {savedKeypairs.map((kp, index) => {
+                    const mpkShort = truncateAddress(kp.masterPublicKey, 6);
+                    const date = new Date(kp.timestamp);
+                    const dateStr = date.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+
+                    return (
+                      <div
+                        key={kp.masterPublicKey}
+                        className="group flex items-center gap-2 p-2 bg-gray-900/50 border border-gray-800 hover:border-cyber-blue transition-colors clip-corner"
+                      >
+                        <button
+                          onClick={() => {
+                            onSelect(kp.masterPublicKey);
+                            setShowSavedKeypairs(false);
+                          }}
+                          className="flex-1 text-left"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] text-gray-500 font-mono">
+                              #{index + 1}
+                            </span>
+                            <span className="text-xs text-cyber-blue font-mono">
+                              {mpkShort}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-gray-600 font-mono">
+                            {dateStr}
+                          </p>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                `Delete keypair ${mpkShort}? This cannot be undone.`
+                              )
+                            ) {
+                              onRemove(kp.masterPublicKey);
+                            }
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-400 text-xs px-2"
+                          title="Delete keypair"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="my-4 flex items-center gap-3">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+                <span className="text-[10px] text-gray-600 font-mono uppercase">
+                  OR
+                </span>
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
@@ -91,7 +183,7 @@ export function KeypairSetup({
                 GENERATING...
               </span>
             ) : (
-              "GENERATE KEYPAIR"
+              "GENERATE NEW KEYPAIR"
             )}
           </button>
           <div className="mt-4 flex items-start gap-2 p-3 border border-yellow-600/30 bg-yellow-900/10 clip-corner">

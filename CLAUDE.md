@@ -19,7 +19,7 @@ npm install
 ### Move Contracts
 
 ```bash
-cd railgun
+cd contracts
 sui move build
 sui move test          # 23 tests expected
 sui move test -f <test_name>  # Run single test
@@ -47,11 +47,11 @@ npm run build          # Production build (uses --webpack flag for Next.js 16)
 ## Architecture
 
 ```
-octopus/
+contracts/
 ├── circuits/          # Circom ZK circuits (BN254, Poseidon, Groth16)
 │   ├── unshield.circom    # Main circuit (10,477 constraints)
 │   └── lib/               # Merkle proof template
-├── railgun/           # Sui Move smart contracts
+├── contracts/           # Sui Move smart contracts
 │   └── sources/
 │       ├── pool.move          # Privacy pool (shield/unshield entry functions)
 │       ├── merkle_tree.move   # Incremental Merkle tree (depth 16)

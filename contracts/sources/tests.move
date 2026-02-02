@@ -1,11 +1,11 @@
 /// Unit tests for Octopus core data structures
 #[test_only]
-module railgun::tests {
+module octopus::tests {
     use sui::test_scenario::{Self as ts};
     use std::type_name;
-    use railgun::merkle_tree::{Self};
-    use railgun::note::{Self};
-    use railgun::nullifier::{Self};
+    use octopus::merkle_tree::{Self};
+    use octopus::note::{Self};
+    use octopus::nullifier::{Self};
 
     const ADMIN: address = @0xAD;
 
@@ -215,7 +215,7 @@ module railgun::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = railgun::nullifier::ENullifierAlreadySpent)]
+    #[expected_failure(abort_code = octopus::nullifier::ENullifierAlreadySpent)]
     fun test_nullifier_double_spend() {
         let mut scenario = ts::begin(ADMIN);
         {

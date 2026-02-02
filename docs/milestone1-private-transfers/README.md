@@ -65,7 +65,7 @@ signal input output_commitments[2]; // Output commitments
 
 ### 2. Move Contract Changes
 
-**File:** `railgun/sources/pool.move`
+**File:** `contracts/sources/pool.move`
 
 Add new entry function:
 
@@ -252,8 +252,8 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - ✅ `circuits/generateTransferTestInput.js` - Test input generator (186 lines)
 - ✅ `circuits/arkworksConverterTransfer.js` - VK converter for transfer circuit (170 lines)
 - ✅ `sdk/src/wallet.ts` - Note selection & UTXO management (205 lines)
-- ✅ `railgun/sources/transfer_tests.move` - Move tests (7 test cases, 280 lines)
-- ✅ `railgun/deploy.sh` - Automated deployment script (77 lines)
+- ✅ `contracts/sources/transfer_tests.move` - Move tests (7 test cases, 280 lines)
+- ✅ `contracts/deploy.sh` - Automated deployment script (77 lines)
 - ✅ `circuits/build/transfer_final.zkey` - Proving key (9.5 MB)
 - ✅ `circuits/build/transfer_vk.json` - Verification key (3.6 KB)
 - ✅ `circuits/build/transfer_vk_bytes.hex` - Sui-compatible VK hex (424 bytes)
@@ -267,8 +267,8 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 
 ### Modified Files
 
-- ✅ `railgun/sources/pool.move` - Add transfer() function, TransferEvent, parse_transfer_public_inputs()
-- ✅ `railgun/sources/pool_tests.move` - Update create_pool() calls to include transfer VK
+- ✅ `contracts/sources/pool.move` - Add transfer() function, TransferEvent, parse_transfer_public_inputs()
+- ✅ `contracts/sources/pool_tests.move` - Update create_pool() calls to include transfer VK
 - ✅ `sdk/src/types.ts` - Add TransferInput, TransferCircuitInput, SuiTransferProof
 - ✅ `sdk/src/prover.ts` - Add buildTransferInput(), generateTransferProof(), convertTransferProofToSui()
 - ✅ `sdk/src/sui.ts` - Add transfer(), queryTransferEvents(), buildTransferTransaction(), update shield()
@@ -317,6 +317,7 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 **Status:** ✅ **All Implementation Complete - Ready for End-to-End Testing**
 
 **Implemented Components:**
+
 - ✅ ChaCha20-Poly1305 + ECDH note encryption
 - ✅ Client-side Merkle tree reconstruction
 - ✅ Automatic Merkle proof generation

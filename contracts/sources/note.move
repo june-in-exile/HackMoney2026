@@ -1,6 +1,6 @@
 /// UTXO Note structure for the privacy system.
 /// Notes represent shielded tokens that can only be spent by the owner.
-module railgun::note {
+module octopus::note {
     use std::type_name::{Self, TypeName};
     use sui::poseidon;
 

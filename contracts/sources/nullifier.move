@@ -1,6 +1,6 @@
 /// Nullifier Registry to prevent double-spending.
 /// A nullifier is hash(spending_key, note_position) - only the owner can compute it.
-module railgun::nullifier {
+module octopus::nullifier {
     use sui::table::{Self, Table};
     use sui::poseidon;
 

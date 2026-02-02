@@ -1,10 +1,10 @@
 /// Tests for private swap functionality
 #[test_only]
-module railgun::swap_tests {
+module octopus::swap_tests {
     use sui::test_scenario::{Self as ts, Scenario};
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use railgun::pool::{Self, PrivacyPool};
+    use octopus::pool::{Self, PrivacyPool};
 
     // Test token for USDC simulation
     public struct USDC has drop {}

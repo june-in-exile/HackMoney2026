@@ -1,6 +1,6 @@
 /// Incremental Merkle Tree for tracking note commitments.
 /// Uses Poseidon hash (BN254) and supports 2^16 leaves.
-module railgun::merkle_tree {
+module octopus::merkle_tree {
     use sui::poseidon;
 
     // ============ Constants ============

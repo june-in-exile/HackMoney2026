@@ -60,6 +60,8 @@ export {
 export {
   buildUnshieldInput,
   generateUnshieldProof,
+  generateTransferProof,
+  convertTransferProofToSui,
   verifyProofLocal,
   convertProofToSui,
   loadVerificationKey,
@@ -110,3 +112,12 @@ export {
   type CetusPoolConfig,
   type SwapEstimation,
 } from "./dex.js";
+
+// Wallet utilities (Note selection for transfers)
+export {
+  selectNotesForTransfer,
+  createTransferOutputs,
+  validateTransferParams,
+  buildTransferFromSelection,
+  type SelectableNote,
+} from "./wallet.js";

@@ -192,7 +192,7 @@ export function TransferForm({ keypair, onSuccess }: TransferFormProps) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.000"
-            step="0.000000001"
+            step="any"
             min="0"
             className="input"
             disabled={isSubmitting}

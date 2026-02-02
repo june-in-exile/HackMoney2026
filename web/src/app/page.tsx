@@ -17,8 +17,15 @@ export default function Home() {
   const account = useCurrentAccount();
   const [activeTab, setActiveTab] = useState<TabType>("shield");
 
-  const { keypair, isLoading, generateKeypair, clearKeypair } =
-    useLocalKeypair();
+  const {
+    keypair,
+    isLoading,
+    savedKeypairs,
+    generateKeypair,
+    selectKeypair,
+    clearKeypair,
+    removeKeypair,
+  } = useLocalKeypair(account?.address);
 
   // Fetch shielded balance from blockchain
   const {
@@ -146,8 +153,11 @@ export default function Home() {
               <KeypairSetup
                 keypair={keypair}
                 isLoading={isLoading}
+                savedKeypairs={savedKeypairs}
                 onGenerate={generateKeypair}
+                onSelect={selectKeypair}
                 onClear={clearKeypair}
+                onRemove={removeKeypair}
               />
               <BalanceCard
                 shieldedBalance={shieldedBalance}
@@ -291,7 +301,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 text-center relative z-10">
           <div className="flex items-center justify-center gap-3 mb-3">
             <div className="h-px w-16 bg-gradient-to-r from-transparent to-cyber-blue/50" />
-            <span className="text-xs text-gray-600 font-mono tracking-widest uppercase">OCTOPUS PROTOCOL</span>
+            <span className="text-xs text-gray-600 font-mono tracking-widest uppercase">OCTOPUS</span>
             <div className="h-px w-16 bg-gradient-to-l from-transparent to-cyber-blue/50" />
           </div>
           <p className="text-xs text-gray-500 font-mono">

@@ -10,6 +10,7 @@ import {
 } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { type Keypair } from "@mysten/sui/cryptography";
+import { bcs } from "@mysten/sui/bcs";
 import { type SuiProof, type SuiVerificationKey, type SuiTransferProof, type Note } from "./types.js";
 import { type SuiSwapProof } from "./defi.js";
 import { bigIntToBytes, encryptNote, deriveViewingPublicKey } from "./crypto.js";
@@ -65,7 +66,7 @@ export class OctopusClient {
     tx.moveCall({
       target: `${this.config.packageId}::pool::create_shared_pool`,
       typeArguments: [coinType],
-      arguments: [tx.pure("vector<u8>", Array.from(vk.vkBytes))],
+      arguments: [tx.pure.vector("u8", Array.from(vk.vkBytes))],
     });
 
     return await this.client.signAndExecuteTransaction({
@@ -102,8 +103,8 @@ export class OctopusClient {
       arguments: [
         tx.object(this.config.poolId),
         tx.object(coinObjectId),
-        tx.pure("vector<u8>", commitmentBytes),
-        tx.pure("vector<u8>", encryptedNote),
+        tx.pure.vector("u8", commitmentBytes),
+        tx.pure.vector("u8", encryptedNote),
       ],
     });
 
@@ -131,10 +132,10 @@ export class OctopusClient {
       typeArguments: [coinType],
       arguments: [
         tx.object(this.config.poolId),
-        tx.pure("vector<u8>", Array.from(proof.proofBytes)),
-        tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
-        tx.pure("u64", amount.toString()),
-        tx.pure("address", recipient),
+        tx.pure.vector("u8", Array.from(proof.proofBytes)),
+        tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
+        tx.pure.u64(amount),
+        tx.pure.address(recipient),
       ],
     });
 
@@ -165,12 +166,9 @@ export class OctopusClient {
       typeArguments: [coinType],
       arguments: [
         tx.object(this.config.poolId),
-        tx.pure("vector<u8>", Array.from(proof.proofBytes)),
-        tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
-        tx.pure(
-          "vector<vector<u8>>",
-          encryptedNotes.map((n) => Array.from(n))
-        ),
+        tx.pure.vector("u8", Array.from(proof.proofBytes)),
+        tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
+        tx.pure(bcs.vector(bcs.vector(bcs.u8())).serialize(encryptedNotes).toBytes()),
       ],
     });
 
@@ -354,8 +352,8 @@ export function buildShieldTransaction<T extends string>(
     arguments: [
       tx.object(poolId),
       tx.object(coinObjectId),
-      tx.pure("vector<u8>", Array.from(commitment)),
-      tx.pure("vector<u8>", Array.from(encryptedNote)),
+      tx.pure.vector("u8", Array.from(commitment)),
+      tx.pure.vector("u8", Array.from(encryptedNote)),
     ],
   });
 
@@ -380,10 +378,10 @@ export function buildUnshieldTransaction<T extends string>(
     typeArguments: [coinType],
     arguments: [
       tx.object(poolId),
-      tx.pure("vector<u8>", Array.from(proof.proofBytes)),
-      tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
-      tx.pure("u64", amount.toString()),
-      tx.pure("address", recipient),
+      tx.pure.vector("u8", Array.from(proof.proofBytes)),
+      tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
+      tx.pure.u64(amount),
+      tx.pure.address(recipient),
     ],
   });
 
@@ -411,12 +409,9 @@ export function buildTransferTransaction<T extends string>(
     typeArguments: [coinType],
     arguments: [
       tx.object(poolId),
-      tx.pure("vector<u8>", Array.from(proof.proofBytes)),
-      tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
-      tx.pure(
-        "vector<vector<u8>>",
-        encryptedNotes.map((n) => Array.from(n))
-      ),
+      tx.pure.vector("u8", Array.from(proof.proofBytes)),
+      tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
+      tx.pure(bcs.vector(bcs.vector(bcs.u8())).serialize(encryptedNotes).toBytes()),
     ],
   });
 
@@ -457,12 +452,12 @@ export function buildSwapTransaction<TokenIn extends string, TokenOut extends st
     arguments: [
       tx.object(poolInId),
       tx.object(poolOutId),
-      tx.pure("vector<u8>", Array.from(proof.proofBytes)),
-      tx.pure("vector<u8>", Array.from(proof.publicInputsBytes)),
-      tx.pure("u64", amountIn.toString()),
-      tx.pure("u64", minAmountOut.toString()),
-      tx.pure("vector<u8>", Array.from(encryptedOutputNote)),
-      tx.pure("vector<u8>", Array.from(encryptedChangeNote)),
+      tx.pure.vector("u8", Array.from(proof.proofBytes)),
+      tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
+      tx.pure.u64(amountIn),
+      tx.pure.u64(minAmountOut),
+      tx.pure.vector("u8", Array.from(encryptedOutputNote)),
+      tx.pure.vector("u8", Array.from(encryptedChangeNote)),
     ],
   });
 

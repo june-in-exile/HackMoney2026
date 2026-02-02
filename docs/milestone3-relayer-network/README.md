@@ -216,7 +216,7 @@ export class Relayer {
 
 ### 4. Move Contract Changes
 
-**File:** `railgun/sources/pool.move`
+**File:** `contracts/sources/pool.move`
 
 No contract changes needed! Relayers simply submit transactions on behalf of users using existing entry functions.
 
@@ -340,10 +340,10 @@ if (useRelayer && selectedRelayer) {
 
 ### 1. Relayer Registry Contract
 
-**File:** `railgun/sources/relayer_registry.move`
+**File:** `contracts/sources/relayer_registry.move`
 
 ```move
-module railgun::relayer_registry {
+module octopus::relayer_registry {
     use sui::object::{Self, UID};
     use sui::tx_context::{Self, TxContext};
     use sui::table::{Self, Table};
@@ -518,7 +518,7 @@ Relayers commit to:
 - `relayer/src/validator.ts` - Request validation
 - `relayer/src/fee-calculator.ts` - Fee logic
 - `relayer/tests/relayer.test.ts` - Tests
-- `railgun/sources/relayer_registry.move` - Registry contract
+- `contracts/sources/relayer_registry.move` - Registry contract
 - `sdk/src/relayer.ts` - Relayer client SDK
 - `web/src/components/RelayerSelector.tsx` - UI component
 - `web/src/lib/relayerRegistry.ts` - Registry fetching
@@ -593,7 +593,7 @@ Relayers commit to:
 
 ## References
 
-- [Railgun Broadcaster Network](https://docs.railgun.org/wiki/learn/privacy-system/broadcaster-network)
+- [Railgun Broadcaster Network](https://docs.octopus.org/wiki/learn/privacy-system/broadcaster-network)
 - [Tornado Cash Relayer](https://github.com/tornadocash/tornado-relayer) - Reference implementation
 - [Aztec Falafel](https://aztec.network/falafel/) - ZK-rollup relayer architecture
 - [zkBob Relayer](https://docs.zkbob.com/implementation/relayer) - Privacy relayer design
