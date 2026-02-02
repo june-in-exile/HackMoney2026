@@ -38,31 +38,10 @@ npm test               # Run Vitest tests
 ### Web Frontend
 
 ```bash
-cd web
+cd frontend
 npm install
 npm run dev            # Dev server at localhost:3000
 npm run build          # Production build (uses --webpack flag for Next.js 16)
-```
-
-## Architecture
-
-```
-contracts/
-├── circuits/          # Circom ZK circuits (BN254, Poseidon, Groth16)
-│   ├── unshield.circom    # Main circuit (10,477 constraints)
-│   └── lib/               # Merkle proof template
-├── contracts/           # Sui Move smart contracts
-│   └── sources/
-│       ├── pool.move          # Privacy pool (shield/unshield entry functions)
-│       ├── merkle_tree.move   # Incremental Merkle tree (depth 16)
-│       ├── nullifier.move     # Double-spend prevention
-│       └── note.move          # UTXO note structure
-├── sdk/               # TypeScript SDK
-│   └── src/
-│       ├── crypto.ts      # Poseidon hash, key derivation, note creation
-│       ├── prover.ts      # Groth16 proof generation via snarkjs
-│       └── sui.ts         # Transaction builders, OctopusClient
-└── web/               # Next.js 16 frontend with @mysten/dapp-kit
 ```
 
 ## Key Cryptographic Formulas
@@ -104,8 +83,8 @@ await initPoseidon();  // Required first!
 
 **Octopus Privacy Pool (SUI) - Poseidon Hash (2026-01-31):**
 
-- Package ID: `0x9c01494d8616465b314bd372325d0911df664e52632c4448b1bd231f1f77c0a0`
-- Pool ID (Shared Object): `0xbba5cfb8f48abdd10b59b31ab17c65b35899f6ae2ce4114f2c8a419a94d2a49a`
+- Package ID: `0x6458f0cc338813b938f7f75cdf56ae8ffdd4872b6e32f4229ef9e68c43032649`
+- Pool ID (Shared Object): `0x55fb89a925d2f7b45ea4a847c6fb893e300eadfdf1a1f783fe0ec4910bdb4847`
 - Modules: `pool`, `merkle_tree`, `nullifier`, `note`
 - Network: Sui Testnet
 - Verification Key: Embedded in pool (360 bytes, Arkworks compressed BN254)
@@ -133,22 +112,22 @@ await initPoseidon();  // Required first!
 
 Detailed implementation plans are available in the [milestones/](milestones/) directory:
 
-1. 🔴 **[Private Transfers](milestones/01-private-transfers.md)** (Priority 1)
+1. **[Private Transfers](milestones/01-private-transfers.md)** (Fixing)
    - Extends utility beyond entry/exit
    - Foundation for all other features
    - 2-input, 2-output transfer circuit
 
-2. 🟡 **[DeFi Integration](milestones/02-defi-integration.md)** (Priority 2)
+2. **[DeFi Integration](milestones/02-defi-integration.md)** (Fixing)
    - Private swaps through Cetus DEX
    - Increases transaction volume and anonymity set
    - Requires Private Transfers first
 
-3. 🟠 **[Relayer Network](milestones/03-relayer-network.md)** (Priority 3)
+3. **[Relayer Network](milestones/03-relayer-network.md)** (Future)
    - Improves privacy by hiding transaction origin
    - Decentralized broadcaster network
    - Fee payment in shielded tokens
 
-4. 🟢 **[Compliance Features](milestones/04-compliance-features.md)** (Priority 4)
+4. **[Compliance Features](milestones/04-compliance-features.md)** (Future)
    - Private Proofs of Innocence (PPOI)
    - View keys for selective disclosure
    - Tax reporting tools

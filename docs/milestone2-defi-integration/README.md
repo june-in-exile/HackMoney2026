@@ -299,15 +299,15 @@ If Cetus integration proves difficult, Turbos Finance is an alternative:
 ### Step 1: Deploy Circuit Artifacts (15 min)
 
 ```bash
-# Copy swap circuit to web public directory
+# Copy swap circuit to frontend public directory
 cd /Users/june/Projects/HackMoney2026
-mkdir -p web/public/circuits/swap_js
-cp circuits/build/swap_js/swap.wasm web/public/circuits/swap_js/
-cp circuits/build/swap_final.zkey web/public/circuits/
-cp circuits/build/swap_vk.json web/public/circuits/
+mkdir -p frontend/public/circuits/swap_js
+cp circuits/build/swap_js/swap.wasm frontend/public/circuits/swap_js/
+cp circuits/build/swap_final.zkey frontend/public/circuits/
+cp circuits/build/swap_vk.json frontend/public/circuits/
 
 # Verify files
-ls -lh web/public/circuits/swap*
+ls -lh frontend/public/circuits/swap*
 ```
 
 **Expected Output:**
@@ -475,7 +475,7 @@ Create `contracts/sources/pool_swap_production.move`:
 
 **3. Update Frontend**
 
-Create `web/src/components/SwapForm.tsx`:
+Create `frontend/src/components/SwapForm.tsx`:
 
 ```typescript
 export function SwapForm() {
@@ -515,7 +515,7 @@ export function SwapForm() {
 
 ### Testnet Deployment
 
-- [ ] Circuit artifacts deployed to web/public/
+- [ ] Circuit artifacts deployed to frontend/public/
 - [ ] Swap VK converted to Sui format
 - [ ] Updated pool contract deployed
 - [ ] SUI and USDC pools created
@@ -549,7 +549,7 @@ sui client call --package [PKG] --module pool --function create_shared_pool ...
 cd sdk && npm run test:swap
 
 # Deploy frontend
-cd web && npm run build && npm run deploy
+cd frontend && npm run build && npm run deploy
 ```
 
 ---
@@ -1470,7 +1470,7 @@ function buildSwapTransaction<TokenIn, TokenOut>(
 
 **Steps:**
 
-1. Copy swap circuit artifacts to web/public/circuits/
+1. Copy swap circuit artifacts to frontend/public/circuits/
 2. Create test script to generate real swap proofs
 3. Update Move tests with real proof bytes
 4. Verify all 7 tests pass
@@ -1491,9 +1491,9 @@ function buildSwapTransaction<TokenIn, TokenOut>(
 
 **Required Files:**
 
-- `web/src/components/SwapForm.tsx` - Swap UI component
-- `web/src/hooks/useDexPrice.ts` - Real-time price fetching
-- `web/src/app/page.tsx` - Add Swap tab
+- `frontend/src/components/SwapForm.tsx` - Swap UI component
+- `frontend/src/hooks/useDexPrice.ts` - Real-time price fetching
+- `frontend/src/app/page.tsx` - Add Swap tab
 
 **Features:**
 
@@ -1528,7 +1528,7 @@ function buildSwapTransaction<TokenIn, TokenOut>(
 - [x] Add swap_production() entry function with Cetus scaffold
 - [x] Add Cetus CLMM package address to Move.toml
 - [x] Write Move unit tests (7 created, 2 passing)
-- [x] Deploy circuit artifacts to web/public/
+- [x] Deploy circuit artifacts to frontend/public/
 - [ ] Complete Cetus module imports (5% remaining)
 - [ ] Deploy multi-token pools to testnet
 

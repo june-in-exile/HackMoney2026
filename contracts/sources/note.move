@@ -28,6 +28,7 @@ module octopus::note {
 
     /// Plaintext note (never stored on-chain, used off-chain only).
     /// This is what the user decrypts from EncryptedNote.
+    #[allow(unused_field)]
     public struct NotePlaintext has drop {
         /// Owner's public key (compressed)
         owner_pk: vector<u8>,
@@ -69,10 +70,10 @@ module octopus::note {
             while (j < 32 && i < len) {
                 vector::push_back(&mut chunk, *vector::borrow(&preimage, i));
                 i = i + 1;
-                j = j + 1;
+                j = j + 1u64;
             };
             // Pad last chunk with zeros if needed
-            while (j < 32) {
+            while (j < 32u64) {
                 vector::push_back(&mut chunk, 0u8);
                 j = j + 1;
             };
@@ -102,8 +103,8 @@ module octopus::note {
     fun u256_to_bytes(value: u256): vector<u8> {
         let mut bytes = vector::empty<u8>();
         let mut v = value;
-        let mut i = 0;
-        while (i < 32) {
+        let mut i = 0u64;
+        while (i < 32u64) {
             vector::push_back(&mut bytes, ((v & 0xff) as u8));
             v = v >> 8;
             i = i + 1;

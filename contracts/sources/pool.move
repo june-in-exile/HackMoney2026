@@ -86,6 +86,7 @@ module octopus::pool {
     }
 
     /// Event emitted when tokens are swapped privately through DEX
+    #[allow(unused_field)]
     public struct SwapEvent has copy, drop {
         /// Nullifiers that were spent (2 inputs)
         input_nullifiers: vector<vector<u8>>,
@@ -130,7 +131,7 @@ module octopus::pool {
 
     /// Create and share a privacy pool as a shared object.
     /// This is the typical way to deploy a pool for public use.
-    public entry fun create_shared_pool<T>(
+    public fun create_shared_pool<T>(
         vk_bytes: vector<u8>,
         transfer_vk_bytes: vector<u8>,
         swap_vk_bytes: vector<u8>,
@@ -148,7 +149,7 @@ module octopus::pool {
     /// - commitment = Poseidon(NPK, token, value)
     ///
     /// The encrypted_note allows the recipient to scan and identify their notes.
-    public entry fun shield<T>(
+    public fun shield<T>(
         pool: &mut PrivacyPool<T>,
         coin: Coin<T>,
         commitment: vector<u8>,
@@ -184,7 +185,7 @@ module octopus::pool {
     /// - merkle_root (32 bytes): Merkle tree root
     /// - input_nullifiers[2] (64 bytes): Nullifiers for both input notes
     /// - output_commitments[2] (64 bytes): Commitments for both output notes
-    public entry fun transfer<T>(
+    public fun transfer<T>(
         pool: &mut PrivacyPool<T>,
         proof_bytes: vector<u8>,
         public_inputs_bytes: vector<u8>,
@@ -370,18 +371,18 @@ module octopus::pool {
     /// * `encrypted_output_note` - Encrypted note for recipient
     /// * `encrypted_change_note` - Encrypted change note
     /// * `ctx` - Transaction context
-    public entry fun swap_production<TokenIn, TokenOut>(
+    public fun swap_production<TokenIn, TokenOut>(
         pool_in: &mut PrivacyPool<TokenIn>,
-        pool_out: &mut PrivacyPool<TokenOut>,
+        _pool_out: &mut PrivacyPool<TokenOut>,
         // TODO: Uncomment when Cetus modules are imported:
         // cetus_pool: &mut CetusPool<TokenIn, TokenOut>,
         // cetus_config: &CetusGlobalConfig,
         proof_bytes: vector<u8>,
         public_inputs_bytes: vector<u8>,
         amount_in: u64,
-        min_amount_out: u64,
-        encrypted_output_note: vector<u8>,
-        encrypted_change_note: vector<u8>,
+        _min_amount_out: u64,
+        _encrypted_output_note: vector<u8>,
+        _encrypted_change_note: vector<u8>,
         ctx: &mut TxContext,
     ) {
         // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
@@ -504,7 +505,7 @@ module octopus::pool {
     /// - merkle_root (32 bytes): Merkle tree root
     /// - nullifier (32 bytes): Unique identifier preventing double-spend
     /// - commitment (32 bytes): The note commitment being spent
-    public entry fun unshield<T>(
+    public fun unshield<T>(
         pool: &mut PrivacyPool<T>,
         proof_bytes: vector<u8>,
         public_inputs_bytes: vector<u8>,

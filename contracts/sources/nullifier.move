@@ -91,7 +91,7 @@ module octopus::nullifier {
     fun u256_to_bytes(value: u256): vector<u8> {
         let mut bytes = vector::empty<u8>();
         let mut v = value;
-        let mut i = 0;
+        let mut i = 0u64;
         while (i < 32) {
             vector::push_back(&mut bytes, ((v & 0xff) as u8));
             v = v >> 8;

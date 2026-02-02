@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #00d9ff;
+  --background: #050508;
+  --cyber-grid: #0a1a2a;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Courier New', monospace, system-ui, -apple-system, sans-serif;
+  position: relative;
+  overflow-x: hidden;
+  cursor: url('/images/tentacle.png') 16 16, auto;
+}
+
+/* Preload cursor images to prevent flickering */
+body::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  z-index: -9999;
+  background: url('/images/tentacle.png'), url('/images/tentacle_hover.png');
+}
+
+/* Custom cursor for interactive elements */
+button:hover,
+a:hover,
+.btn:hover,
+.tab-button:hover,
+input[type="text"]:hover,
+input[type="number"]:hover {
+  cursor: url('/images/tentacle_hover.png') 16 16, pointer !important;
+}
+
+/* Cyberpunk Grid Background with purple accent */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(0, 217, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(157, 0, 255, 0.025) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Removed scanline effect */
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-cyber {
+    text-shadow: 0 0 10px rgba(0, 217, 255, 0.8), 0 0 20px rgba(157, 0, 255, 0.3);
+  }
+
+  .border-glow {
+    border-color: #00d9ff;
+    box-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+  }
+
+  .clip-corner {
+    clip-path: polygon(
+      0 0,
+      calc(100% - 15px) 0,
+      100% 15px,
+      100% 100%,
+      0 100%
+    );
+  }
+
+  .clip-corner-both {
+    clip-path: polygon(
+      15px 0,
+      calc(100% - 15px) 0,
+      100% 15px,
+      100% calc(100% - 15px),
+      calc(100% - 15px) 100%,
+      15px 100%,
+      0 calc(100% - 15px),
+      0 15px
+    );
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-6 py-2.5 text-sm font-bold tracking-wider uppercase transition-all duration-300 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed clip-corner relative;
+  }
+
+  .btn-primary {
+    @apply btn bg-gray-900/80 text-gray-300 border-2 border-gray-700 hover:bg-gray-800 hover:text-gray-200 hover:border-gray-600;
+  }
+
+  .btn-secondary {
+    @apply btn bg-transparent text-gray-400 border-2 border-gray-600 hover:border-cyber-blue hover:text-cyber-blue;
+  }
+
+  .input {
+    @apply block w-full bg-cyber-card-bg border-2 border-gray-700 text-cyber-blue px-4 py-2.5 text-sm font-mono focus:border-cyber-blue focus:outline-none focus:shadow-glow-sm transition-all duration-300;
+  }
+
+  .card {
+    @apply bg-cyber-card-bg border-2 border-gray-800 p-6 shadow-lg relative clip-corner-both;
+    background: linear-gradient(135deg, rgba(15, 15, 24, 0.92) 0%, rgba(10, 10, 15, 0.95) 50%, rgba(15, 10, 20, 0.93) 100%);
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 1px solid rgba(0, 217, 255, 0.12);
+    border-right: 1px solid rgba(157, 0, 255, 0.08);
+    border-bottom: 1px solid rgba(157, 0, 255, 0.08);
+    clip-path: inherit;
+    pointer-events: none;
+  }
+
+  .card-glow {
+    @apply card border-cyber-blue shadow-glow;
+  }
+
+  .tab-button {
+    @apply px-4 py-3 text-sm font-bold tracking-wider uppercase transition-all duration-300 relative;
+  }
+
+  .tab-button::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00d9ff, #9d00ff, transparent);
+    transition: width 0.3s ease;
+  }
+
+  .tab-button.active::after {
+    width: 100%;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px #00d9ff, 0 0 10px #00d9ff;
+  }
+  100% {
+    box-shadow: 0 0 10px #00d9ff, 0 0 20px #00d9ff, 0 0 30px #0088ff;
+  }
+}

@@ -2,6 +2,7 @@ pragma circom 2.0.0;
 
 include "node_modules/circomlib/circuits/poseidon.circom";
 include "node_modules/circomlib/circuits/bitify.circom";
+include "node_modules/circomlib/circuits/comparators.circom";
 include "./lib/merkle_proof.circom";
 
 /// Transfer circuit for Octopus on Sui
@@ -65,6 +66,7 @@ template Transfer(levels) {
     component inputCommitmentHashers[2];
     component inputNullifierHashers[2];
     component inputMerkleProofs[2];
+    component isValueZero[2];
 
     for (var i = 0; i < 2; i++) {
         // Verify NPK ownership: NPK = Poseidon(MPK, random)
@@ -92,8 +94,13 @@ template Transfer(levels) {
         for (var j = 0; j < levels; j++) {
             inputMerkleProofs[i].path_elements[j] <== input_path_elements[i][j];
         }
+
         // Both inputs must be in the same tree (same root)
-        merkle_root === inputMerkleProofs[i].root;
+        // If the value is NOT zero, the root must match.
+        // If the value IS zero, this check passes regardless.
+        isValueZero[i] = IsZero();
+        isValueZero[i].in <== input_values[i];
+        (1 - isValueZero[i].out) * (merkle_root - inputMerkleProofs[i].root) === 0;
     }
 
     // ============ Step 3: Verify Output Commitments ============

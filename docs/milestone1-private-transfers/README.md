@@ -144,7 +144,7 @@ export function buildTransferTransaction(
 
 ### 4. Frontend Changes
 
-**New Component:** `web/src/components/TransferForm.tsx`
+**New Component:** `frontend/src/components/TransferForm.tsx`
 
 Features:
 
@@ -165,7 +165,7 @@ Features:
 6. Submit transaction
 7. Update local balance
 
-**File:** `web/src/lib/constants.ts`
+**File:** `frontend/src/lib/constants.ts`
 
 Add transfer verification key URL:
 
@@ -257,10 +257,10 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - ✅ `circuits/build/transfer_final.zkey` - Proving key (9.5 MB)
 - ✅ `circuits/build/transfer_vk.json` - Verification key (3.6 KB)
 - ✅ `circuits/build/transfer_vk_bytes.hex` - Sui-compatible VK hex (424 bytes)
-- ✅ `web/src/components/TransferForm.tsx` - Transfer UI with full flow (276 lines)
-- ✅ `web/src/hooks/useNotes.ts` - Note scanning and management hook (231 lines)
-- ✅ `web/public/circuits/transfer_js/transfer.wasm` - Circuit WASM (2.2 MB)
-- ✅ `web/public/circuits/transfer_final.zkey` - Proving key (9.5 MB)
+- ✅ `frontend/src/components/TransferForm.tsx` - Transfer UI with full flow (276 lines)
+- ✅ `frontend/src/hooks/useNotes.ts` - Note scanning and management hook (231 lines)
+- ✅ `frontend/public/circuits/transfer_js/transfer.wasm` - Circuit WASM (2.2 MB)
+- ✅ `frontend/public/circuits/transfer_final.zkey` - Proving key (9.5 MB)
 - ✅ `sdk/src/merkle.ts` - Merkle tree client and proof generation (220 lines)
 - ✅ `IMPLEMENTATION_SUMMARY.md` - Complete implementation documentation
 - [ ] `sdk/src/__tests__/transfer.test.ts` - SDK tests - PENDING
@@ -272,8 +272,8 @@ export const TRANSFER_VKEY_URL = '/circuits/transfer_vkey.json'
 - ✅ `sdk/src/types.ts` - Add TransferInput, TransferCircuitInput, SuiTransferProof
 - ✅ `sdk/src/prover.ts` - Add buildTransferInput(), generateTransferProof(), convertTransferProofToSui()
 - ✅ `sdk/src/sui.ts` - Add transfer(), queryTransferEvents(), buildTransferTransaction(), update shield()
-- ✅ `web/src/app/page.tsx` - Add Transfer tab with tabbed navigation
-- ✅ `web/src/lib/constants.ts` - Add transfer circuit URLs, update deployment addresses
+- ✅ `frontend/src/app/page.tsx` - Add Transfer tab with tabbed navigation
+- ✅ `frontend/src/lib/constants.ts` - Add transfer circuit URLs, update deployment addresses
 - ✅ `sdk/src/crypto.ts` - Add encryption functions (ChaCha20-Poly1305 + ECDH + viewing keys)
 - ✅ `sdk/src/index.ts` - Export new encryption and Merkle functions
 - ✅ `sdk/package.json` - Add @noble/ciphers, @noble/curves, @noble/hashes dependencies

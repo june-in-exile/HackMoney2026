@@ -19,7 +19,7 @@ node_modules/
 sdk/dist/
 
 # Next.js
-web/.next/
-web/out/
-web/next-env.d.ts
-web/tsconfig.tsbuildinfo
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo

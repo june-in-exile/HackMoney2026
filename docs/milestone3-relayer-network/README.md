@@ -308,7 +308,7 @@ export function verifySignature(
 
 ### 6. Frontend Changes
 
-**New Component:** `web/src/components/RelayerSelector.tsx`
+**New Component:** `frontend/src/components/RelayerSelector.tsx`
 
 Features:
 
@@ -318,7 +318,7 @@ Features:
 - Select preferred relayer
 - Option to use direct submission (no relayer)
 
-**Modified Component:** `web/src/components/TransferForm.tsx`
+**Modified Component:** `frontend/src/components/TransferForm.tsx`
 
 Add relayer option:
 
@@ -402,7 +402,7 @@ module octopus::relayer_registry {
 
 ### 2. Frontend Relayer Discovery
 
-**File:** `web/src/lib/relayerRegistry.ts`
+**File:** `frontend/src/lib/relayerRegistry.ts`
 
 ```typescript
 export async function fetchRelayers(
@@ -520,14 +520,14 @@ Relayers commit to:
 - `relayer/tests/relayer.test.ts` - Tests
 - `contracts/sources/relayer_registry.move` - Registry contract
 - `sdk/src/relayer.ts` - Relayer client SDK
-- `web/src/components/RelayerSelector.tsx` - UI component
-- `web/src/lib/relayerRegistry.ts` - Registry fetching
+- `frontend/src/components/RelayerSelector.tsx` - UI component
+- `frontend/src/lib/relayerRegistry.ts` - Registry fetching
 
 ### Modified Files
 
 - `sdk/src/crypto.ts` - Add signing functions
-- `web/src/components/TransferForm.tsx` - Add relayer option
-- `web/src/lib/constants.ts` - Add relayer URLs
+- `frontend/src/components/TransferForm.tsx` - Add relayer option
+- `frontend/src/lib/constants.ts` - Add relayer URLs
 
 ## Success Criteria
 

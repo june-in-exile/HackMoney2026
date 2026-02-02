@@ -169,7 +169,7 @@ module octopus::merkle_tree {
         while (i < 32) {
             vector::push_back(&mut bytes, ((v & 0xff) as u8));
             v = v >> 8;
-            i = i + 1;
+            i = i + 1u64;
         };
         // REMOVED vector::reverse() - now returns little-endian
         bytes

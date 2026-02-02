@@ -71,8 +71,8 @@ Next steps:
    snarkjs groth16 verify build/transfer_vk.json \
      build/transfer_public.json \
      build/transfer_proof.json
-4. Copy artifacts to web:
-   mkdir -p ../web/public/circuits/transfer_js
-   cp build/transfer_js/transfer.wasm ../web/public/circuits/transfer_js/
-   cp build/transfer_final.zkey ../web/public/circuits/
-   cp build/transfer_vk.json ../web/public/circuits/
+4. Copy artifacts to frontend:
+   mkdir -p ../frontend/public/circuits/transfer_js
+   cp build/transfer_js/transfer.wasm ../frontend/public/circuits/transfer_js/
+   cp build/transfer_final.zkey ../frontend/public/circuits/
+   cp build/transfer_vk.json ../frontend/public/circuits/

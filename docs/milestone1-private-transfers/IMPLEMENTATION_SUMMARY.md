@@ -71,7 +71,7 @@ Receiver:
 
 ### 3. useNotes Hook Integration (Priority 🔴)
 
-**Location:** `web/src/hooks/useNotes.ts`
+**Location:** `frontend/src/hooks/useNotes.ts`
 
 **Updated:**
 
@@ -94,7 +94,7 @@ Receiver:
 
 ### 4. Full Transfer Flow Enabled (Priority 🟡)
 
-**Location:** `web/src/components/TransferForm.tsx`
+**Location:** `frontend/src/components/TransferForm.tsx`
 
 **Implemented:**
 
@@ -131,8 +131,8 @@ Receiver:
 
 ### Frontend Files
 
-- ✅ `web/src/hooks/useNotes.ts` - Integrated decryption and Merkle proofs
-- ✅ `web/src/components/TransferForm.tsx` - Enabled full transfer flow
+- ✅ `frontend/src/hooks/useNotes.ts` - Integrated decryption and Merkle proofs
+- ✅ `frontend/src/components/TransferForm.tsx` - Enabled full transfer flow
 
 ---
 
@@ -247,10 +247,10 @@ If you want to allow third parties to view notes without spending capability, yo
 cd sdk && npm run build
 
 # 2. Check frontend compilation
-cd web && npm run build
+cd frontend && npm run build
 
 # 3. Start dev server
-cd web && npm run dev
+cd frontend && npm run dev
 
 # 4. Check browser console for errors
 # Open DevTools → Console
@@ -357,9 +357,9 @@ cd web && npm run dev
 
 **Circuit Artifacts:**
 
-- `/web/public/circuits/transfer.wasm` (2.2 MB)
-- `/web/public/circuits/transfer_final.zkey` (9.5 MB)
-- `/web/public/circuits/transfer_vk.json` (3.6 KB)
+- `/frontend/public/circuits/transfer.wasm` (2.2 MB)
+- `/frontend/public/circuits/transfer_final.zkey` (9.5 MB)
+- `/frontend/public/circuits/transfer_vk.json` (3.6 KB)
 
 ---
 
@@ -392,4 +392,4 @@ cd web && npm run dev
 
 **🎉 All implementation work is complete! Ready for end-to-end testing.**
 
-Next: Run `cd web && npm run dev` and test the transfer flow in the browser.
+Next: Run `cd frontend && npm run dev` and test the transfer flow in the browser.

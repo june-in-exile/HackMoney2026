@@ -244,7 +244,7 @@ export async function fetchSanctionedRoot(
 
 ### 4. Frontend Changes
 
-**Modified Component:** `web/src/components/ShieldForm.tsx`
+**Modified Component:** `frontend/src/components/ShieldForm.tsx`
 
 Add PPOI generation step:
 
@@ -413,7 +413,7 @@ export async function decryptTransactionHistory(
 
 ### 3. Frontend View Key Management
 
-**New Component:** `web/src/components/ViewKeyManager.tsx`
+**New Component:** `frontend/src/components/ViewKeyManager.tsx`
 
 Features:
 
@@ -423,7 +423,7 @@ Features:
 - Revoke view key (time-limited keys)
 - Preview transaction history with view key
 
-**New Page:** `web/src/app/audit/page.tsx`
+**New Page:** `frontend/src/app/audit/page.tsx`
 
 Auditor portal:
 
@@ -541,7 +541,7 @@ export function exportTaxReportCSV(report: TaxReport): string {
 
 ### 2. Frontend Tax Dashboard
 
-**New Page:** `web/src/app/tax/page.tsx`
+**New Page:** `frontend/src/app/tax/page.tsx`
 
 Features:
 
@@ -618,14 +618,14 @@ Features:
 - `sdk/src/compliance.ts` - PPOI SDK
 - `sdk/src/viewkey.ts` - View key SDK
 - `sdk/src/tax.ts` - Tax reporting
-- `web/src/components/ViewKeyManager.tsx` - View key UI
-- `web/src/app/audit/page.tsx` - Auditor portal
-- `web/src/app/tax/page.tsx` - Tax dashboard
+- `frontend/src/components/ViewKeyManager.tsx` - View key UI
+- `frontend/src/app/audit/page.tsx` - Auditor portal
+- `frontend/src/app/tax/page.tsx` - Tax dashboard
 
 ### Modified Files
 
 - `contracts/sources/pool.move` - Add shield_with_ppoi()
-- `web/src/components/ShieldForm.tsx` - Add PPOI step
+- `frontend/src/components/ShieldForm.tsx` - Add PPOI step
 
 ## Success Criteria
 
