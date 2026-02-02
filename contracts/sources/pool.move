@@ -55,6 +55,8 @@ module octopus::pool {
 
     /// Event emitted when tokens are shielded (deposited) into the pool
     public struct ShieldEvent has copy, drop {
+        /// Pool ID where the note was created
+        pool_id: ID,
         /// Position of the commitment in the Merkle tree
         position: u64,
         /// Note commitment hash
@@ -75,6 +77,8 @@ module octopus::pool {
 
     /// Event emitted when tokens are transferred privately within the pool
     public struct TransferEvent has copy, drop {
+        /// Pool ID where the transfer occurred
+        pool_id: ID,
         /// Nullifiers that were spent (2 inputs)
         input_nullifiers: vector<vector<u8>>,
         /// New commitments created (2 outputs)
@@ -88,6 +92,10 @@ module octopus::pool {
     /// Event emitted when tokens are swapped privately through DEX
     #[allow(unused_field)]
     public struct SwapEvent has copy, drop {
+        /// Input pool ID where notes were spent
+        pool_in_id: ID,
+        /// Output pool ID where note was created
+        pool_out_id: ID,
         /// Nullifiers that were spent (2 inputs)
         input_nullifiers: vector<vector<u8>>,
         /// Output commitment (swapped token)
@@ -169,7 +177,12 @@ module octopus::pool {
         save_historical_root(pool);
 
         // 5. Emit event for wallet scanning
-        event::emit(ShieldEvent { position, commitment, encrypted_note });
+        event::emit(ShieldEvent {
+            pool_id: object::id(pool),
+            position,
+            commitment,
+            encrypted_note
+        });
     }
 
     /// Transfer tokens privately within the pool (0zk-to-0zk transfer).
@@ -233,6 +246,7 @@ module octopus::pool {
 
         // 8. Emit event for wallet scanning
         event::emit(TransferEvent {
+            pool_id: object::id(pool),
             input_nullifiers: vector[nullifier1, nullifier2],
             output_commitments: vector[commitment1, commitment2],
             output_positions: vector[position1, position2],
@@ -329,6 +343,8 @@ module octopus::pool {
 
         // 11. Emit event for wallet scanning
         event::emit(SwapEvent {
+            pool_in_id: object::id(pool_in),
+            pool_out_id: object::id(pool_out),
             input_nullifiers: vector[nullifier1, nullifier2],
             output_commitment,
             change_commitment,
@@ -480,6 +496,8 @@ module octopus::pool {
 
         // 13. Emit event for wallet scanning
         event::emit(SwapEvent {
+            pool_in_id: object::id(pool_in),
+            pool_out_id: object::id(pool_out),
             input_nullifiers: vector[nullifier1, nullifier2],
             output_commitment: _output_commitment,
             change_commitment: _change_commitment,

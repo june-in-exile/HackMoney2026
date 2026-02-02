@@ -24,29 +24,24 @@ declare global {
 export async function initPoseidon(): Promise<void> {
   // If already initialized, return immediately
   if (globalThis.__OCTOPUS_POSEIDON_INITIALIZED__) {
-    console.log("[Poseidon] Already initialized, skipping");
     return;
   }
 
   // If initialization in progress, wait for it
   if (globalThis.__OCTOPUS_POSEIDON_INIT_PROMISE__) {
-    console.log("[Poseidon] Initialization in progress, waiting...");
     return globalThis.__OCTOPUS_POSEIDON_INIT_PROMISE__;
   }
 
   // Start new initialization
-  console.log("[Poseidon] Starting initialization...");
   globalThis.__OCTOPUS_POSEIDON_INIT_PROMISE__ = (async () => {
     try {
       // Use SDK's built-in initialization
       await sdkInitPoseidon();
       globalThis.__OCTOPUS_POSEIDON_INITIALIZED__ = true;
-      console.log("[Poseidon] Initialization complete");
     } catch (error) {
       // Reset on error so retry is possible
       globalThis.__OCTOPUS_POSEIDON_INIT_PROMISE__ = undefined;
       globalThis.__OCTOPUS_POSEIDON_INITIALIZED__ = undefined;
-      console.error("[Poseidon] Initialization failed:", error);
       throw error;
     }
   })();

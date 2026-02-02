@@ -8,12 +8,13 @@ import { BalanceCard } from "@/components/BalanceCard";
 import { ShieldForm } from "@/components/ShieldForm";
 import { UnshieldForm } from "@/components/UnshieldForm";
 import { TransferForm } from "@/components/TransferForm";
+import { SwapForm } from "@/components/SwapForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
 import { useNotes } from "@/hooks/useNotes";
 import { PACKAGE_ID, POOL_ID, NETWORK } from "@/lib/constants";
 import { initPoseidon } from "@/lib/poseidon";
 
-type TabType = "shield" | "unshield" | "transfer";
+type TabType = "shield" | "unshield" | "transfer" | "swap";
 
 export default function Home() {
   const account = useCurrentAccount();
@@ -38,10 +39,6 @@ export default function Home() {
 
   // Debug: Track keypair changes
   useEffect(() => {
-    console.log('[page.tsx] Keypair changed:', keypair ? 'NOT NULL' : 'NULL');
-    if (keypair) {
-      console.log('[page.tsx] MPK:', keypair.masterPublicKey.toString(16).slice(0, 16) + '...');
-    }
   }, [keypair]);
 
   // Fetch all notes from blockchain (includes Merkle proofs)
@@ -55,7 +52,6 @@ export default function Home() {
 
   // Debug: Track loading state changes
   useEffect(() => {
-    console.log('[page.tsx] isLoadingNotes changed:', isLoadingNotes);
   }, [isLoadingNotes]);
 
   // Calculate balance and note count from loaded notes
@@ -89,6 +85,18 @@ export default function Home() {
 
   const handleTransferSuccess = async () => {
     // Refresh notes from blockchain after successful transfer
+    // Add delay to allow blockchain events to be indexed
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    refreshNotes();
+
+    // Retry after another delay to ensure we catch the event
+    setTimeout(() => {
+      refreshNotes();
+    }, 3000);
+  };
+
+  const handleSwapSuccess = async () => {
+    // Refresh notes from blockchain after successful swap
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
@@ -242,6 +250,15 @@ export default function Home() {
                     ⇄ TRANSFER
                   </button>
                   <button
+                    onClick={() => setActiveTab("swap")}
+                    className={`tab-button flex-1 ${activeTab === "swap"
+                        ? "text-cyber-blue active"
+                        : "text-gray-500 hover:text-gray-300"
+                      }`}
+                  >
+                    ⇌ SWAP
+                  </button>
+                  <button
                     onClick={() => setActiveTab("unshield")}
                     className={`tab-button flex-1 ${activeTab === "unshield"
                         ? "text-cyber-blue active"
@@ -264,6 +281,12 @@ export default function Home() {
                       loading={isLoadingNotes}
                       error={notesError}
                       onSuccess={handleTransferSuccess}
+                    />
+                  )}
+                  {activeTab === "swap" && (
+                    <SwapForm
+                      keypair={keypair}
+                      onSuccess={handleSwapSuccess}
                     />
                   )}
                   {activeTab === "unshield" && (
@@ -290,7 +313,7 @@ export default function Home() {
               PROTOCOL WORKFLOW
             </h2>
           </div>
-          <div className="grid gap-6 md:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-5">
             <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
               <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">01</div>
               <div className="relative z-10">
@@ -323,6 +346,20 @@ export default function Home() {
               <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">03</div>
               <div className="relative z-10">
                 <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
+                  <span className="text-cyber-blue text-xl">⇌</span>
+                </div>
+                <h3 className="mb-2 font-bold uppercase tracking-wider text-cyber-blue text-sm">
+                  SWAP
+                </h3>
+                <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                  Private token swaps. Exchange tokens while maintaining full privacy.
+                </p>
+              </div>
+            </div>
+            <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
+              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">04</div>
+              <div className="relative z-10">
+                <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
                   <span className="text-cyber-blue text-xl">●</span>
                 </div>
                 <h3 className="mb-2 font-bold uppercase tracking-wider text-cyber-blue text-sm">
@@ -334,7 +371,7 @@ export default function Home() {
               </div>
             </div>
             <div className="group relative p-4 border border-gray-800 hover:border-cyber-blue transition-all duration-300 clip-corner">
-              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">04</div>
+              <div className="absolute top-0 right-0 text-6xl font-black text-gray-900 opacity-20 select-none">05</div>
               <div className="relative z-10">
                 <div className="mb-3 w-10 h-10 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30">
                   <span className="text-cyber-blue text-xl">▼</span>

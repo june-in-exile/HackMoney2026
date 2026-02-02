@@ -34,6 +34,7 @@ export interface ScanNotesRequest {
   id: string;
   graphqlUrl: string; // GraphQL endpoint
   packageId: string; // Package ID for event filtering
+  poolId: string; // Pool ID for filtering events
   spendingKey: string; // BigInt as string
   nullifyingKey: string; // BigInt as string
   masterPublicKey: string; // BigInt as string

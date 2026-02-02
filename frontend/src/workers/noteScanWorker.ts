@@ -221,10 +221,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           throw new Error("Worker not initialized");
         }
 
-        console.log('[Worker] Starting note scan...');
-        console.log('[Worker] Package ID:', request.packageId);
-        console.log('[Worker] Master Public Key:', BigInt(request.masterPublicKey).toString(16).slice(0, 16) + '...');
-
         // Create GraphQL client
         const client = new SuiGraphQLClient({ url: request.graphqlUrl });
 
@@ -242,7 +238,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         }> = [];
 
         // Query ShieldEvents using GraphQL
-        console.log('[Worker] Querying ShieldEvents...');
         const shieldQuery = await client.query({
           query: graphql(`
             query ShieldEvents($eventType: String!, $first: Int) {
@@ -271,8 +266,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           },
         });
 
-        console.log('[Worker] ShieldEvents query result:', shieldQuery.data?.events?.nodes?.length || 0, 'events found');
-
         // Process Shield events
         let shieldEventsProcessed = 0;
         let shieldNotesDecrypted = 0;
@@ -280,6 +273,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           shieldEventsProcessed++;
           const eventData = node.contents?.json as any;
           if (!eventData) continue; // Skip if no event data
+
+          // Filter by pool_id - only process events from the target pool
+          if (eventData.pool_id && eventData.pool_id !== request.poolId) {
+            continue; // Skip events from other pools
+          }
 
           const encrypted_note = eventData.encrypted_note;
           const position = eventData.position;
@@ -292,13 +290,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           } else if (Array.isArray(encrypted_note)) {
             encryptedNoteBytes = encrypted_note;
           } else {
-            console.error('[Worker] Unexpected encrypted_note format:', typeof encrypted_note);
             continue;
-          }
-
-          // Debug: Log on first event
-          if (shieldEventsProcessed === 1) {
-            console.log('[Worker] Decoded encrypted_note length:', encryptedNoteBytes.length, '(expected 188)');
           }
 
           // Try to decrypt
@@ -308,13 +300,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             BigInt(request.masterPublicKey)
           );
 
-          if (shieldEventsProcessed === 1) {
-            console.log('[Worker] First decryption result:', note ? 'SUCCESS ✓' : 'FAILED (not our note)');
-          }
-
           if (note) {
             shieldNotesDecrypted++;
-            console.log('[Worker] Successfully decrypted ShieldEvent note at position:', position);
             const leafIndex = Number(position);
             const nullifier = computeNullifier(
               BigInt(request.nullifyingKey),
@@ -337,20 +324,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               leafIndex: Number(position),
             });
           } catch (err) {
-            console.error('[Worker] Failed to convert commitment to BigInt:', {
-              position,
-              commitment,
-              commitmentType: typeof commitment,
-              error: err instanceof Error ? err.message : err,
-            });
             throw new Error(`Failed to parse commitment at position ${position}: ${err instanceof Error ? err.message : err}`);
           }
         }
 
-        console.log('[Worker] ShieldEvents processed:', shieldEventsProcessed, '| Decrypted:', shieldNotesDecrypted);
-
         // Query TransferEvents using GraphQL
-        console.log('[Worker] Querying TransferEvents...');
         const transferQuery = await client.query({
           query: graphql(`
             query TransferEvents($eventType: String!, $first: Int) {
@@ -379,8 +357,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           },
         });
 
-        console.log('[Worker] TransferEvents query result:', transferQuery.data?.events?.nodes?.length || 0, 'events found');
-
         // Process Transfer events
         let transferEventsProcessed = 0;
         let transferNotesDecrypted = 0;
@@ -388,6 +364,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           transferEventsProcessed++;
           const eventData = node.contents?.json as any;
           if (!eventData) continue; // Skip if no event data
+
+          // Filter by pool_id - only process events from the target pool
+          if (eventData.pool_id && eventData.pool_id !== request.poolId) {
+            continue; // Skip events from other pools
+          }
 
           const encrypted_notes = eventData.encrypted_notes;
           const output_positions = eventData.output_positions;
@@ -401,7 +382,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             } else if (Array.isArray(encrypted_notes[i])) {
               encryptedNoteBytes = encrypted_notes[i];
             } else {
-              console.error('[Worker] Unexpected encrypted_note format in TransferEvent:', typeof encrypted_notes[i]);
               continue;
             }
 
@@ -413,7 +393,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
             if (note) {
               transferNotesDecrypted++;
-              console.log('[Worker] Successfully decrypted TransferEvent note at position:', output_positions[i]);
               const leafIndex = Number(output_positions[i]);
               const nullifier = computeNullifier(
                 BigInt(request.nullifyingKey),
@@ -436,33 +415,42 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 leafIndex: Number(output_positions[i]),
               });
             } catch (err) {
-              console.error('[Worker] Failed to convert TransferEvent commitment to BigInt:', {
-                index: i,
-                position: output_positions[i],
-                commitment: output_commitments[i],
-                commitmentType: typeof output_commitments[i],
-                error: err instanceof Error ? err.message : err,
-              });
               throw new Error(`Failed to parse transfer commitment at index ${i}: ${err instanceof Error ? err.message : err}`);
             }
           }
         }
 
-        console.log('[Worker] TransferEvents processed:', transferEventsProcessed, '| Decrypted:', transferNotesDecrypted);
-        console.log('[Worker] Total commitments collected:', allCommitments.length);
-        console.log('[Worker] Total owned notes found:', ownedNotes.length);
-
         // Build Merkle tree
         if (allCommitments.length > 0) {
+          console.log('[Worker] Building Merkle tree with', allCommitments.length, 'commitments');
+          console.log('[Worker] Commitments:', allCommitments.map(c => ({ leafIndex: c.leafIndex, commitment: c.commitment.toString().slice(0, 20) + '...' })));
+
           const tree = new ClientMerkleTree();
           for (const { commitment, leafIndex } of allCommitments) {
             tree.insert(leafIndex, commitment);
           }
 
+          const treeRoot = tree.getRoot();
+          console.log('[Worker] Tree root:', treeRoot.toString());
+
           // Generate proofs for owned notes
           for (const ownedNote of ownedNotes) {
+            console.log(`[Worker] Generating proof for note at leafIndex ${ownedNote.leafIndex}`);
             const pathElements = tree.getMerkleProof(ownedNote.leafIndex);
             ownedNote.pathElements = pathElements.map((p) => p.toString());
+
+            // Verify the proof locally (using SDK's logic for consistency)
+            let currentHash = BigInt(ownedNote.note.commitment);
+            const leafIndex = ownedNote.leafIndex;
+            for (let level = 0; level < pathElements.length; level++) {
+              // Use bit manipulation like SDK does: isRight = (leafIndex >> level) & 1
+              const isRight = (leafIndex >> level) & 1;
+              const sibling = pathElements[level];
+              currentHash = isRight
+                ? hash([sibling, currentHash])  // Right: sibling on left
+                : hash([currentHash, sibling]); // Left: sibling on right
+            }
+            console.log(`[Worker] Proof verification: computed root = ${currentHash.toString()}, expected = ${treeRoot.toString()}, match = ${currentHash === treeRoot}`);
           }
         }
 

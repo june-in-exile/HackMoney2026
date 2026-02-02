@@ -70,6 +70,16 @@ export function selectNotesForTransfer(
   // Calculate total available balance
   const totalBalance = validNotes.reduce((sum, n) => sum + n.note.value, 0n);
 
+  // Check if the issue is circuit limitation or actual insufficient balance
+  if (totalBalance >= amount) {
+    throw new Error(
+      `Cannot select notes for transfer. The circuit supports maximum 2 input notes, ` +
+      `but your amount (${amount}) requires 3 or more notes. ` +
+      `Available balance: ${totalBalance} across ${validNotes.length} notes. ` +
+      `Solution: Consolidate your notes first by doing smaller transfers, or wait for multi-input circuit support.`
+    );
+  }
+
   throw new Error(
     `Insufficient balance for transfer. Required: ${amount}, Available: ${totalBalance}`
   );

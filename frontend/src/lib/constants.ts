@@ -4,8 +4,8 @@
 
 // Deployed contract addresses (testnet)
 // Updated 2026-02-02: Redeployed with swapped assertion order (proof check before root check) ✅
-export const PACKAGE_ID = "0x6458f0cc338813b938f7f75cdf56ae8ffdd4872b6e32f4229ef9e68c43032649";
-export const POOL_ID = "0x55fb89a925d2f7b45ea4a847c6fb893e300eadfdf1a1f783fe0ec4910bdb4847";
+export const PACKAGE_ID = "0xa28c94d54c043742f6322070b77ffffd935844c3ab5f3106c21dcd1c50115424";
+export const POOL_ID = "0xbb0ffb1d57ffae497e62302c944e304cebdff923e84aeaa18f6c424be4b151df";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";

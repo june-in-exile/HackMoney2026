@@ -56,7 +56,6 @@ class NoteScanWorkerManager {
       };
 
       this.worker.onerror = (error) => {
-        console.error("[WorkerManager] Worker error:", error);
         this.rejectAllPending(new Error("Worker crashed"));
         this.initPromise = null; // Allow retry
       };
@@ -149,6 +148,7 @@ class NoteScanWorkerManager {
   async scanNotes(
     graphqlUrl: string,
     packageId: string,
+    poolId: string,
     spendingKey: bigint,
     nullifyingKey: bigint,
     masterPublicKey: bigint
@@ -161,25 +161,19 @@ class NoteScanWorkerManager {
       txDigest: string;
     }>
   > {
-    console.log('[WorkerManager] scanNotes called');
-    console.log('[WorkerManager] Initializing worker...');
-
     // Ensure worker is initialized before sending request
     await this.initialize();
-
-    console.log('[WorkerManager] Worker initialized, sending request...');
 
     const response = await this.sendRequest<ScanNotesResponse>({
       type: "scan_notes",
       id: this.generateId(),
       graphqlUrl,
       packageId,
+      poolId,
       spendingKey: spendingKey.toString(),
       nullifyingKey: nullifyingKey.toString(),
       masterPublicKey: masterPublicKey.toString(),
     });
-
-    console.log('[WorkerManager] Response received, notes count:', response.notes.length);
 
     return response.notes.map((n) => ({
       note: n.note,

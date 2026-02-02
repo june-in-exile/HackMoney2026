@@ -96,11 +96,7 @@ template Transfer(levels) {
         }
 
         // Both inputs must be in the same tree (same root)
-        // If the value is NOT zero, the root must match.
-        // If the value IS zero, this check passes regardless.
-        isValueZero[i] = IsZero();
-        isValueZero[i].in <== input_values[i];
-        (1 - isValueZero[i].out) * (merkle_root - inputMerkleProofs[i].root) === 0;
+        merkle_root === inputMerkleProofs[i].root;
     }
 
     // ============ Step 3: Verify Output Commitments ============

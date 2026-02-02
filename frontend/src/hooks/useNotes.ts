@@ -49,11 +49,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
   };
 
   useEffect(() => {
-    console.log('[useNotes] useEffect triggered');
-    console.log('[useNotes] keypair:', keypair ? 'NOT NULL' : 'NULL');
-
     if (!keypair) {
-      console.log('[useNotes] No keypair, clearing notes');
       setNotes([]);
       return;
     }
@@ -61,10 +57,8 @@ export function useNotes(keypair: OctopusKeypair | null) {
     let isCancelled = false;
 
     async function scanNotesWithWorker() {
-      console.log('[useNotes] scanNotesWithWorker STARTED');
       if (!keypair) return; // TypeScript null check
 
-      console.log('[useNotes] Setting loading = true');
       setLoading(true);
       setError(null);
 
@@ -72,20 +66,17 @@ export function useNotes(keypair: OctopusKeypair | null) {
       const startTime = Date.now();
 
       try {
-        console.log('[useNotes] Getting worker manager...');
         const worker = getWorkerManager();
-        console.log('[useNotes] Worker manager obtained, starting scan...');
 
         // Scan notes using Worker (GraphQL + decrypt + Merkle tree in background)
         const scannedNotes = await worker.scanNotes(
           "https://graphql.testnet.sui.io/graphql",
           PACKAGE_ID,
+          POOL_ID,
           keypair.spendingKey,
           keypair.nullifyingKey,
           keypair.masterPublicKey
         );
-
-        console.log('[useNotes] Scan complete, found', scannedNotes.length, 'notes');
 
         if (isCancelled) return;
 
@@ -115,11 +106,9 @@ export function useNotes(keypair: OctopusKeypair | null) {
         }
 
         if (!isCancelled) {
-          console.log('[useNotes] Setting notes state with', ownedNotes.length, 'notes');
           setNotes(ownedNotes);
         }
       } catch (err) {
-        console.error("[useNotes] Failed to scan notes:", err);
         if (!isCancelled) {
           setError(err instanceof Error ? err.message : "Failed to scan notes");
         }
@@ -129,11 +118,9 @@ export function useNotes(keypair: OctopusKeypair | null) {
         const minLoadingDuration = 500; // 500ms minimum
 
         if (elapsed < minLoadingDuration) {
-          console.log('[useNotes] Waiting', minLoadingDuration - elapsed, 'ms to show loading state');
           await new Promise(resolve => setTimeout(resolve, minLoadingDuration - elapsed));
         }
 
-        console.log('[useNotes] Setting loading = false');
         if (!isCancelled) {
           setLoading(false);
         }
@@ -182,7 +169,6 @@ export function useNotes(keypair: OctopusKeypair | null) {
     scanNotesWithWorker();
 
     return () => {
-      console.log('[useNotes] Cleanup function called');
       isCancelled = true;
     };
   }, [keypair, client, refreshTrigger]);

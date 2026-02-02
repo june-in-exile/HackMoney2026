@@ -86,8 +86,8 @@ nullifier = Poseidon(nullifying_key, leaf_index)
 
 **Octopus Privacy Pool (SUI) - Poseidon Hash (2026-01-31):**
 
-- Package ID: `0x6458f0cc338813b938f7f75cdf56ae8ffdd4872b6e32f4229ef9e68c43032649`
-- Pool ID (Shared Object): `0x55fb89a925d2f7b45ea4a847c6fb893e300eadfdf1a1f783fe0ec4910bdb4847`
+- Package ID: `0xa28c94d54c043742f6322070b77ffffd935844c3ab5f3106c21dcd1c50115424`
+- Pool ID (Shared Object): `0xbb0ffb1d57ffae497e62302c944e304cebdff923e84aeaa18f6c424be4b151df`
 - Modules: `pool`, `merkle_tree`, `nullifier`, `note`
 - Network: Sui Testnet
 - Verification Key: Embedded in pool (360 bytes, Arkworks compressed BN254)

@@ -13,7 +13,6 @@ node_modules/
 
 # Environment
 .env
-.env.*
 
 # SDK build outputs
 sdk/dist/
