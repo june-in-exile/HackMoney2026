@@ -85,7 +85,6 @@ export interface UnshieldCircuitInput {
   // Public inputs
   merkle_root: string;
   nullifier: string;
-  commitment: string;
 }
 
 /**
@@ -94,7 +93,7 @@ export interface UnshieldCircuitInput {
 export interface SuiUnshieldProof {
   /** Proof points (128 bytes: A || B || C) */
   proofBytes: Uint8Array;
-  /** Public inputs (96 bytes: root || nullifier || commitment) */
+  /** Public inputs (64 bytes: root || nullifier) - commitment is now private */
   publicInputsBytes: Uint8Array;
 }
 

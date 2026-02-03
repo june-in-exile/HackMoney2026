@@ -83,18 +83,20 @@ async function main() {
 
         // Public inputs
         merkle_root,
-        nullifier,
-        commitment
+        nullifier
     };
 
     // Save to file
     fs.writeFileSync(path.join(__dirname, "../build/unshield_input.json"), JSON.stringify(input, null, 2));
     console.log("\nInput saved to build/unshield_input.json");
 
-    // Also print public inputs for reference
-    console.log("\n=== Public Inputs ===");
+    // Print public inputs for reference
+    console.log("\n=== Public Inputs (2 elements) ===");
     console.log("merkle_root:", merkle_root);
     console.log("nullifier:", nullifier);
+
+    // Print commitment for verification (computed inside circuit)
+    console.log("\n=== Computed Inside Circuit ===");
     console.log("commitment:", commitment);
 }
 

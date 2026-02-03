@@ -31,49 +31,30 @@ template Unshield(levels) {
     // ============ Public Inputs ============
     signal input merkle_root;            // Expected Merkle root
     signal input nullifier;              // Nullifier to prevent double-spend
-    signal input commitment;             // Note commitment being spent
 
     // ============ Step 1: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)
-    // Simplified: MPK = Poseidon(spending_key, nullifying_key)
-    component mpkHasher = Poseidon(2);
-    mpkHasher.inputs[0] <== spending_key;
-    mpkHasher.inputs[1] <== nullifying_key;
-    signal mpk <== mpkHasher.out;
+    signal mpk <== Poseidon(2)([spending_key, nullifying_key]);
 
     // ============ Step 2: Compute NPK ============
     // NPK = Poseidon(MPK, random)
-    component npkHasher = Poseidon(2);
-    npkHasher.inputs[0] <== mpk;
-    npkHasher.inputs[1] <== random;
-    signal npk <== npkHasher.out;
+    signal npk <== Poseidon(2)([mpk, random]);
 
     // ============ Step 3: Verify Commitment ============
-    // commitment === Poseidon(NPK, token, value)
-    component commitmentHasher = Poseidon(3);
-    commitmentHasher.inputs[0] <== npk;
-    commitmentHasher.inputs[1] <== token;
-    commitmentHasher.inputs[2] <== value;
-    commitment === commitmentHasher.out;
+    // commitment = Poseidon(NPK, token, value)
+    signal commitment <== Poseidon(3)([npk, token, value]);
 
     // ============ Step 4: Verify Nullifier ============
     // nullifier === Poseidon(nullifying_key, path_indices)
-    component nullifierHasher = Poseidon(2);
-    nullifierHasher.inputs[0] <== nullifying_key;
-    nullifierHasher.inputs[1] <== path_indices;
-    nullifier === nullifierHasher.out;
+    signal expected_nullifier <== Poseidon(2)([nullifying_key, path_indices]);
+    nullifier === expected_nullifier;
 
     // ============ Step 5: Verify Merkle Proof ============
     // Prove that commitment exists in the Merkle tree at path_indices
-    component merkleProof = MerkleProof(levels);
-    merkleProof.leaf <== commitment;
-    merkleProof.path_indices <== path_indices;
-    for (var i = 0; i < levels; i++) {
-        merkleProof.path_elements[i] <== path_elements[i];
-    }
-    merkle_root === merkleProof.root;
+    signal expected_merkle_root <== MerkleProof(levels)(commitment, path_indices, path_elements);
+    merkle_root === expected_merkle_root;
 }
 
 // Main circuit with 16 levels (supports 2^16 = 65,536 notes)
 // Public inputs: merkle_root, nullifier, commitment
-component main {public [merkle_root, nullifier, commitment]} = Unshield(16);
+component main {public [merkle_root, nullifier]} = Unshield(16);

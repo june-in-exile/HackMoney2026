@@ -146,7 +146,7 @@ export function UnshieldForm({
 
       // Use real proof bytes
       const proofBytes = suiProof.proofBytes;          // 128 bytes
-      const publicInputsBytes = suiProof.publicInputsBytes; // 96 bytes
+      const publicInputsBytes = suiProof.publicInputsBytes; // 64 bytes (commitment now private)
 
       // Step 2: Submit transaction
       setState("submitting");

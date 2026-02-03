@@ -18,8 +18,8 @@ module octopus::pool_tests {
     // Test proof (valid proof for the test input)
     const TEST_PROOF: vector<u8> = x"aca940a9ad7c4beb620beb1b67cd111a2ff32b2f33945bd12cc017c721ec1b91083135faffb3ff4b3cfdcdd0a075154e80b245fa42d14655880096b4ef29fe13f274371b7b8b1d8382f61ba9b61d2901b3557944195ee34771eaee3f0019571cba7b3a4b43ffdd48945edd122d141734a262be4b49e6baf28abeea0c1484050a";
 
-    // Test public inputs [merkle_root, nullifier, commitment]
-    const TEST_PUBLIC_INPUTS: vector<u8> = x"2fcfefda413c3b48e0806fb76f38678760d9dc9e23eaecaec3c5c6265298202350c899e811771f3b5b77a50bcde42ab8822a6c8b41b57e4cea8f0c00645da926589b6f5789efc87da100ca0b91394f7454370d77d4f64569e64bca988b98be2c";
+    // Test public inputs [merkle_root, nullifier]
+    const TEST_PUBLIC_INPUTS: vector<u8> = x"2fcfefda413c3b48e0806fb76f38678760d9dc9e23eaecaec3c5c6265298202350c899e811771f3b5b77a50bcde42ab8822a6c8b41b57e4cea8f0c00645da926";
 
     // Test commitment (from test input generation)
     // commitment = Poseidon(NPK, token, value)
@@ -196,7 +196,7 @@ module octopus::pool_tests {
             pool::unshield(
                 &mut pool,
                 TEST_PROOF,
-                x"0102030405", // Invalid length (5 bytes, should be 96)
+                x"0102030405", // Invalid length (5 bytes, should be 64)
                 1_000_000_000,
                 BOB,
                 ctx

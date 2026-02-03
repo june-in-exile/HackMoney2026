@@ -126,7 +126,6 @@ export function buildUnshieldInput(unshieldInput: UnshieldInput): UnshieldCircui
     // Public inputs
     merkle_root: merkleRoot.toString(),
     nullifier: nullifier.toString(),
-    commitment: note.commitment.toString(),
   };
 }
 

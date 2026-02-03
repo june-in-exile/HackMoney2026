@@ -578,10 +578,9 @@ module octopus::pool {
     /// 3. Correct nullifier computation: nullifier = Poseidon(nullifying_key, leaf_index)
     /// 4. Commitment exists in Merkle tree at the claimed position
     ///
-    /// Public inputs format (96 bytes total):
+    /// Public inputs format (64 bytes total):
     /// - merkle_root (32 bytes): Merkle tree root
     /// - nullifier (32 bytes): Unique identifier preventing double-spend
-    /// - commitment (32 bytes): The note commitment being spent
     public fun unshield<T>(
         pool: &mut PrivacyPool<T>,
         proof_bytes: vector<u8>,
@@ -590,11 +589,11 @@ module octopus::pool {
         recipient: address,
         ctx: &mut TxContext,
     ) {
-        // Validate public inputs length (3 field elements × 32 bytes = 96 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 96, E_INVALID_PUBLIC_INPUTS);
+        // Validate public inputs length (2 field elements × 32 bytes = 64 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 64, E_INVALID_PUBLIC_INPUTS);
 
-        // 1. Parse public inputs [merkle_root, nullifier, commitment]
-        let (merkle_root, nullifier_bytes, _commitment) = parse_public_inputs(&public_inputs_bytes);
+        // 1. Parse public inputs [merkle_root, nullifier]
+        let (merkle_root, nullifier_bytes) = parse_public_inputs(&public_inputs_bytes);
 
         // 2. Verify merkle root is valid (current or in history)
         assert!(is_valid_root(pool, &merkle_root), E_INVALID_ROOT);
@@ -684,11 +683,10 @@ module octopus::pool {
     }
 
     /// Parse public inputs from concatenated bytes (for unshield).
-    /// Returns (merkle_root, nullifier, commitment) each as 32-byte vectors.
-    fun parse_public_inputs(bytes: &vector<u8>): (vector<u8>, vector<u8>, vector<u8>) {
+    /// Returns (merkle_root, nullifier) each as 32-byte vectors.
+    fun parse_public_inputs(bytes: &vector<u8>): (vector<u8>, vector<u8>) {
         let mut merkle_root = vector::empty<u8>();
         let mut nullifier = vector::empty<u8>();
-        let mut commitment = vector::empty<u8>();
 
         // Extract merkle_root (bytes 0-31)
         let mut i = 0;
@@ -703,13 +701,7 @@ module octopus::pool {
             i = i + 1;
         };
 
-        // Extract commitment (bytes 64-95)
-        while (i < 96) {
-            vector::push_back(&mut commitment, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        (merkle_root, nullifier, commitment)
+        (merkle_root, nullifier)
     }
 
     /// Parse transfer public inputs from concatenated bytes (for transfer).
