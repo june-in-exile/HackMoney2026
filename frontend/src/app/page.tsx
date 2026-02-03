@@ -284,7 +284,11 @@ export default function Home() {
                   {activeTab === "swap" && (
                     <SwapForm
                       keypair={keypair}
+                      notes={notes}
+                      loading={isLoadingNotes}
+                      error={notesError}
                       onSuccess={handleSwapSuccess}
+                      onRefresh={refreshNotes}
                     />
                   )}
                   {activeTab === "unshield" && (

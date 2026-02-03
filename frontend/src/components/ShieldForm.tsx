@@ -18,6 +18,7 @@ import {
   deriveViewingPublicKey
 } from "@octopus/sdk";
 import { initPoseidon } from "@/lib/poseidon";
+import { NumberInput } from "@/components/NumberInput";
 
 interface ShieldFormProps {
   keypair: OctopusKeypair | null;
@@ -190,15 +191,13 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
               </span>
             )}
           </div>
-          <input
+          <NumberInput
             id="shield-amount"
-            type="number"
-            step="0.001"
-            min="0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={setAmount}
             placeholder="0.000"
-            className="input"
+            step={0.001}
+            min={0}
             disabled={isSubmitting}
           />
         </div>
@@ -229,6 +228,11 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
           "btn-primary w-full",
           isSubmitting && "cursor-wait opacity-70"
         )}
+        style={{
+          backgroundColor: 'transparent',
+          color: '#00d9ff',
+          borderColor: '#00d9ff',
+        }}
       >
         {isSubmitting ? (
           <span className="flex items-center justify-center gap-2">

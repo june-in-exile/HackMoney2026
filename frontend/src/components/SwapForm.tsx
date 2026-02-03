@@ -10,21 +10,34 @@ import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
+import type { OwnedNote } from "@/hooks/useNotes";
 import {
   generateSwapProof,
   convertSwapProofToSui,
-  calculateMinAmountOut,
-  estimateSwapOutput,
+  calculateMinOutput,
+  estimateCetusSwap,
   buildSwapTransaction,
   type SwapParams,
   type SwapInput,
 } from "@octopus/sdk";
 import { initPoseidon } from "@/lib/poseidon";
+import { NumberInput } from "@/components/NumberInput";
 
 interface SwapFormProps {
   keypair: OctopusKeypair | null;
+  notes: OwnedNote[];
+  loading: boolean;
+  error: string | null;
   onSuccess?: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
 }
+
+// Mock price oracle (for demo purposes)
+// TODO: Replace with real Cetus DEX integration
+const MOCK_PRICES = {
+  SUI_USDC: 3.0, // 1 SUI = 3 USDC
+  USDC_SUI: 1 / 3.0, // 1 USDC = 0.333 SUI
+};
 
 // Token types
 const TOKENS = {
@@ -42,7 +55,7 @@ const TOKENS = {
   },
 };
 
-export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
+export function SwapForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess, onRefresh }: SwapFormProps) {
   const [amountIn, setAmountIn] = useState("");
   const [amountOut, setAmountOut] = useState("");
   const [tokenIn, setTokenIn] = useState<"SUI" | "USDC">("SUI");
@@ -77,20 +90,35 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
 
       setIsEstimating(true);
       try {
-        const amountInBigInt = parseSui(amountIn);
-        const tokenInType = BigInt(TOKENS[tokenIn].type.slice(0, 10)); // Mock token ID
-        const tokenOutType = BigInt(TOKENS[tokenOut].type.slice(0, 10));
+        const amountInFloat = parseFloat(amountIn);
 
-        // TODO: Replace with real Cetus price fetching
-        const { amountOut: estimatedOut, priceImpact: impact } = await estimateSwapOutput(
-          "CETUS_POOL_ID", // TODO: Get real pool ID
-          tokenInType,
-          tokenOutType,
-          amountInBigInt
-        );
+        // Use mock prices for demo
+        // TODO: Replace with real Cetus DEX integration
+        let price: number;
+        let outputDecimals: number;
 
-        setAmountOut(formatSui(estimatedOut));
-        setPriceImpact(impact);
+        if (tokenIn === "SUI" && tokenOut === "USDC") {
+          price = MOCK_PRICES.SUI_USDC;
+          outputDecimals = TOKENS.USDC.decimals;
+        } else if (tokenIn === "USDC" && tokenOut === "SUI") {
+          price = MOCK_PRICES.USDC_SUI;
+          outputDecimals = TOKENS.SUI.decimals;
+        } else {
+          // Same token, no swap
+          setAmountOut(amountIn);
+          setPriceImpact(0);
+          setIsEstimating(false);
+          return;
+        }
+
+        // Calculate output amount
+        const outputAmount = amountInFloat * price;
+
+        // Mock price impact (0.1% - 0.5% based on amount)
+        const mockImpact = Math.min(0.5, (amountInFloat / 100) * 0.1);
+
+        setAmountOut(outputAmount.toFixed(outputDecimals));
+        setPriceImpact(mockImpact);
       } catch (err) {
         console.error("Failed to estimate output:", err);
         setAmountOut("0");
@@ -135,14 +163,13 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
 
       const amountInBigInt = parseSui(amountIn);
       const amountOutBigInt = parseSui(amountOut);
-      const minAmountOut = calculateMinAmountOut(amountOutBigInt, slippage);
+      const minAmountOut = calculateMinOutput(amountOutBigInt, slippage);
 
-      // TODO: Fetch user's private notes from pool
-      // For now, use placeholder notes
-      const inputNotes = []; // TODO: Get actual notes from scanning events
+      // Get unspent notes
+      const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
 
-      if (inputNotes.length === 0) {
-        setError("No private notes found. Please shield tokens first.");
+      if (unspentNotes.length === 0) {
+        setError("No unspent notes found. Please shield tokens first.");
         setIsSubmitting(false);
         return;
       }
@@ -207,26 +234,26 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
     }
   };
 
+  const unspentNotes = notes.filter((n) => !n.spent);
   const isFormValid =
     !!account &&
     !!keypair &&
     !!amountIn &&
     parseFloat(amountIn) > 0 &&
     !!amountOut &&
-    parseFloat(amountOut) > 0;
+    parseFloat(amountOut) > 0 &&
+    unspentNotes.length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {!DEMO_MODE && (
-        <div className="p-3 border border-yellow-600/30 bg-yellow-900/20 clip-corner">
-          <div className="flex items-start gap-2">
-            <span className="text-yellow-500 text-sm">!</span>
-            <p className="text-xs text-yellow-400 font-mono leading-relaxed">
-              Swap functionality requires production Cetus integration. Currently in development.
-            </p>
-          </div>
+      <div className="p-3 border border-yellow-600/30 bg-yellow-900/20 clip-corner">
+        <div className="flex items-start gap-2">
+          <span className="text-yellow-500 text-sm">!</span>
+          <p className="text-xs text-yellow-400 font-mono leading-relaxed">
+            Swap uses simulated prices (1 SUI = 3 USDC). Real Cetus DEX integration in progress.
+          </p>
         </div>
-      )}
+      </div>
 
       <div className="space-y-4">
         {/* Token In */}
@@ -244,15 +271,14 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
               <option value="SUI">SUI</option>
               <option value="USDC">USDC</option>
             </select>
-            <input
-              type="number"
-              step="0.001"
-              min="0"
+            <NumberInput
               value={amountIn}
-              onChange={(e) => setAmountIn(e.target.value)}
+              onChange={setAmountIn}
               placeholder="0.0"
-              className="input flex-1"
+              step={0.001}
+              min={0}
               disabled={isSubmitting}
+              className="flex-1"
             />
           </div>
         </div>
@@ -310,6 +336,12 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
                 />
               </svg>
               FETCHING PRICE...
+            </p>
+          )}
+          {!isEstimating && amountOut && parseFloat(amountOut) > 0 && (
+            <p className="mt-2 text-[10px] text-yellow-500 font-mono flex items-center gap-1">
+              <span>⚠</span>
+              <span>SIMULATED PRICE (1 SUI = {MOCK_PRICES.SUI_USDC} USDC)</span>
             </p>
           )}
         </div>

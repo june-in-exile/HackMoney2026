@@ -16,6 +16,7 @@ import {
   encryptNote,
 } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
+import { NumberInput } from "@/components/NumberInput";
 
 interface TransferFormProps {
   keypair: OctopusKeypair | null;
@@ -200,14 +201,12 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
           <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
             Amount (SUI)
           </label>
-          <input
-            type="number"
+          <NumberInput
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={setAmount}
             placeholder="0.000"
-            step="0.001"
-            min="0"
-            className="input"
+            step={0.001}
+            min={0}
             disabled={isSubmitting}
           />
           <p className="mt-2 text-[10px] text-gray-500 font-mono">

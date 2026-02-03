@@ -71,26 +71,30 @@ body::before {
   }
 
   .clip-corner {
-    clip-path: polygon(
-      0 0,
-      calc(100% - 15px) 0,
-      100% 15px,
-      100% 100%,
-      0 100%
-    );
+    clip-path: polygon(0 0,
+        calc(100% - 15px) 0,
+        100% 15px,
+        100% 100%,
+        0 100%);
   }
 
   .clip-corner-both {
-    clip-path: polygon(
-      15px 0,
-      calc(100% - 15px) 0,
-      100% 15px,
-      100% calc(100% - 15px),
-      calc(100% - 15px) 100%,
-      15px 100%,
-      0 calc(100% - 15px),
-      0 15px
-    );
+    clip-path: polygon(15px 0,
+        calc(100% - 15px) 0,
+        100% 15px,
+        100% calc(100% - 15px),
+        calc(100% - 15px) 100%,
+        15px 100%,
+        0 calc(100% - 15px),
+        0 15px);
+  }
+
+  .clip-corner-small {
+    clip-path: polygon(0 0,
+        calc(100% - 4px) 0,
+        100% 4px,
+        100% 100%,
+        0 100%);
   }
 }
 
@@ -100,7 +104,16 @@ body::before {
   }
 
   .btn-primary {
-    @apply btn bg-gray-900/80 text-gray-300 border-2 border-gray-700 hover:bg-gray-800 hover:text-gray-200 hover:border-gray-600;
+    @apply btn border-2;
+    background-color: transparent !important;
+    color: #00d9ff !important;
+    border-color: #00d9ff !important;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background-color: rgba(0, 217, 255, 0.1) !important;
+    border-color: #00d9ff !important;
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.6), 0 0 40px rgba(0, 136, 255, 0.4);
   }
 
   .btn-secondary {
@@ -109,6 +122,24 @@ body::before {
 
   .input {
     @apply block w-full bg-cyber-card-bg border-2 border-gray-700 text-cyber-blue px-4 py-2.5 text-sm font-mono focus:border-cyber-blue focus:outline-none focus:shadow-glow-sm transition-all duration-300;
+  }
+
+  /* Hide native number input spin buttons */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  /* Custom number input button styles */
+  .number-input-btn {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-cyber-blue/50;
   }
 
   .card {
@@ -159,6 +190,7 @@ body::before {
   0% {
     transform: translateY(-100%);
   }
+
   100% {
     transform: translateY(100vh);
   }
@@ -168,7 +200,32 @@ body::before {
   0% {
     box-shadow: 0 0 5px #00d9ff, 0 0 10px #00d9ff;
   }
+
   100% {
     box-shadow: 0 0 10px #00d9ff, 0 0 20px #00d9ff, 0 0 30px #0088ff;
+  }
+}
+
+@keyframes spin-button-glow {
+  0% {
+    box-shadow:
+      inset 0 0 15px rgba(0, 217, 255, 0.5),
+      0 0 15px rgba(0, 217, 255, 0.6),
+      0 0 25px rgba(0, 136, 255, 0.4);
+  }
+
+  50% {
+    box-shadow:
+      inset 0 0 20px rgba(0, 217, 255, 0.7),
+      0 0 20px rgba(0, 217, 255, 0.8),
+      0 0 35px rgba(0, 136, 255, 0.6),
+      0 0 45px rgba(157, 0, 255, 0.4);
+  }
+
+  100% {
+    box-shadow:
+      inset 0 0 15px rgba(0, 217, 255, 0.5),
+      0 0 15px rgba(0, 217, 255, 0.6),
+      0 0 25px rgba(0, 136, 255, 0.4);
   }
 }

@@ -15,6 +15,7 @@ import {
   convertUnshieldProofToSui,
   type UnshieldInput,
 } from "@octopus/sdk";
+import { NumberInput } from "@/components/NumberInput";
 
 interface UnshieldFormProps {
   keypair: OctopusKeypair | null;
@@ -146,7 +147,7 @@ export function UnshieldForm({
 
       // Use real proof bytes
       const proofBytes = suiProof.proofBytes;          // 128 bytes
-      const publicInputsBytes = suiProof.publicInputsBytes; // 64 bytes (commitment now private)
+      const publicInputsBytes = suiProof.publicInputsBytes; // 64 bytes
 
       // Step 2: Submit transaction
       setState("submitting");
@@ -192,15 +193,13 @@ export function UnshieldForm({
           >
             Amount (SUI)
           </label>
-          <input
+          <NumberInput
             id="unshield-amount"
-            type="number"
-            step="0.001"
-            min="0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={setAmount}
             placeholder="0.000"
-            className="input"
+            step={0.001}
+            min={0}
             disabled={isProcessing}
           />
           <p className="mt-2 text-[10px] text-gray-500 font-mono">
@@ -381,6 +380,11 @@ export function UnshieldForm({
           "btn-primary w-full",
           isProcessing && "cursor-wait opacity-70"
         )}
+        style={{
+          backgroundColor: 'transparent',
+          color: '#00d9ff',
+          borderColor: '#00d9ff',
+        }}
       >
         {isProcessing ? "◉ PROCESSING..." : "▼ UNSHIELD TOKENS"}
       </button>
