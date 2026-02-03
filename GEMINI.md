@@ -61,7 +61,7 @@ sui move build
 sui move test
 ```
 
-*Expect around 37 tests to pass.*
+*Expect around 26 tests to pass.*
 
 ### Step 3: Run the Frontend Application
 

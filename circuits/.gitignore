@@ -4,6 +4,7 @@ node_modules/
 # Build artifacts (large files)
 build/*.ptau
 build/*.zkey
+!build/*_final.zkey
 build/*.wasm
 build/*.wtns
 build/*.r1cs

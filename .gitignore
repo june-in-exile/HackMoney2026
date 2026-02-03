@@ -16,9 +16,3 @@ node_modules/
 
 # SDK build outputs
 sdk/dist/
-
-# Next.js
-frontend/.next/
-frontend/out/
-frontend/next-env.d.ts
-frontend/tsconfig.tsbuildinfo

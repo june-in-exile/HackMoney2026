@@ -4,14 +4,5 @@ node_modules/
 # Next.js
 .next/
 out/
-
-# Environment
-.env
-.env.*
-
-# IDE
-.idea/
-.vscode/
-
-# OS
-.DS_Store
+next-env.d.ts
+tsconfig.tsbuildinfo

@@ -127,7 +127,7 @@ module octopus::pool {
 
     /// Create a new privacy pool for token type T with the given verification keys.
     /// The verification keys are generated from circuit compilation (unshield, transfer, swap).
-    public fun create_pool<T>(
+    fun create_pool<T>(
         vk_bytes: vector<u8>,
         transfer_vk_bytes: vector<u8>,
         swap_vk_bytes: vector<u8>,
@@ -148,6 +148,7 @@ module octopus::pool {
     /// Create and share a privacy pool as a shared object.
     /// This is the typical way to deploy a pool for public use.
     /// Returns an AdminCap to the caller for managing verification keys.
+    #[allow(lint(self_transfer))]
     public fun create_shared_pool<T>(
         vk_bytes: vector<u8>,
         transfer_vk_bytes: vector<u8>,

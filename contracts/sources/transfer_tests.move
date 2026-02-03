@@ -36,8 +36,7 @@ module octopus::transfer_tests {
         ts::next_tx(scenario, ADMIN);
         {
             let ctx = ts::ctx(scenario);
-            let pool = pool::create_pool<SUI>(TEST_VK, TEST_VK, TEST_VK, ctx);
-            transfer::public_share_object(pool);
+            pool::create_shared_pool<SUI>(TEST_VK, TEST_VK, TEST_VK, ctx);
         };
     }
 

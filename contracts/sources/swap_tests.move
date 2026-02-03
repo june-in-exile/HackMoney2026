@@ -39,12 +39,10 @@ module octopus::swap_tests {
         {
             let ctx = ts::ctx(scenario);
             // Create SUI pool
-            let pool_sui = pool::create_pool<SUI>(TEST_VK, TEST_VK, TEST_VK, ctx);
-            transfer::public_share_object(pool_sui);
+            pool::create_shared_pool<SUI>(TEST_VK, TEST_VK, TEST_VK, ctx);
 
             // Create USDC pool
-            let pool_usdc = pool::create_pool<USDC>(TEST_VK, TEST_VK, TEST_VK, ctx);
-            transfer::public_share_object(pool_usdc);
+            pool::create_shared_pool<USDC>(TEST_VK, TEST_VK, TEST_VK, ctx);
         };
     }
 
