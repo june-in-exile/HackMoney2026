@@ -23,9 +23,10 @@ interface TransferFormProps {
   loading: boolean;
   error: string | null;
   onSuccess?: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>; // Accept both sync and async
 }
 
-export function TransferForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess }: TransferFormProps) {
+export function TransferForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess, onRefresh }: TransferFormProps) {
   const [recipientMpk, setRecipientMpk] = useState("");
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +70,14 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       // - Pool deployed with transfer VK
       // ============================================
 
+      // 0. Refresh notes to get latest Merkle paths
+      if (onRefresh) {
+        setSuccess("🔄 Refreshing notes to get latest Merkle proofs...");
+        await onRefresh();
+        // Wait for notes to be refetched (useNotes hook triggers async fetch)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
       // 1. Get unspent notes
       const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
 
@@ -98,12 +107,13 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       // 3. Create output notes (recipient + change)
       const recipientMpkBigInt = BigInt(recipientMpk);
       const inputTotal = selectedNotes.reduce((sum: bigint, n: { note: { value: bigint } }) => sum + n.note.value, 0n);
+      const noteToken = selectedNotes[0].note.token; // Use actual token from selected note
       const [recipientNote, changeNote] = createTransferOutputs(
         recipientMpkBigInt,
         keypair.masterPublicKey,
         amountNano,
         inputTotal,
-        0n // token type (0 = SUI)
+        noteToken
       );
 
       // 4. Generate ZK proof (30-60 seconds)
@@ -116,7 +126,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
           inputLeafIndices: selectedNotes.map((n) => n.leafIndex),
           inputPathElements: selectedNotes.map((n) => n.pathElements!),
           outputNotes: [recipientNote, changeNote],
-          token: selectedNotes[0].note.token, // Use actual token from the note
+          token: selectedNotes[0].note.token,
         },
         {
           wasmPath: CIRCUIT_URLS.TRANSFER.WASM,
@@ -181,7 +191,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
             disabled={isSubmitting}
           />
           <p className="mt-2 text-[10px] text-gray-600 font-mono break-all">
-            // Example: 13495...632235
+            // Example: 0x13495...632235
           </p>
         </div>
 
@@ -355,6 +365,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
           <li>Select notes (1-2 inputs)</li>
           <li>Create output notes (recipient + change)</li>
           <li>Generate Merkle proofs</li>
+          <li>Calculate nullifiers (prevent double-spending)</li>
           <li>Generate ZK proof (30-60s)</li>
           <li>Submit private transaction</li>
         </ol>

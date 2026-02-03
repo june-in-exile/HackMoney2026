@@ -3,17 +3,21 @@ set -e
 
 echo "=== Updating Unshield Verification Key ==="
 
-# Load environment variables from .env file
+# Determine .env file path
+ENV_FILE=""
 if [ -f "../../.env" ]; then
-    echo "Loading environment variables from .env..."
-    export $(cat ../../.env | grep -v '^#' | xargs)
+    ENV_FILE="../../.env"
 elif [ -f "../.env" ]; then
-    echo "Loading environment variables from .env..."
-    export $(cat ../.env | grep -v '^#' | xargs)
+    ENV_FILE="../.env"
 else
     echo "Error: No .env file found"
     exit 1
 fi
+
+echo "Using .env file: $ENV_FILE"
+
+# Load environment variables from .env file
+export $(cat "$ENV_FILE" | grep -v '^#' | xargs)
 
 # Validate required environment variables
 if [ -z "$PACKAGE_ID" ]; then
@@ -85,11 +89,29 @@ sui client call \
 echo ""
 echo "✅ Unshield VK updated successfully!"
 echo ""
-echo "Next steps:"
-echo "1. Update .env file:"
-echo "   UNSHIELD_VK=\"$NEW_VK\""
-echo ""
-echo "2. Update frontend circuit files:"
-echo "   cp circuits/build/unshield_js/unshield.wasm frontend/public/circuits/unshield_js/"
-echo "   cp circuits/build/unshield_final.zkey frontend/public/circuits/"
-echo "   cp circuits/build/unshield_vk.json frontend/public/circuits/"
+
+# Update .env file
+echo "Updating .env file with new verification key..."
+
+# Function to update or append env variable
+update_env_var() {
+    local key=$1
+    local value=$2
+    local file=$3
+
+    if grep -q "^${key}=" "$file"; then
+        # Update existing variable (macOS compatible)
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
+        else
+            sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+        fi
+    else
+        # Append new variable
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+update_env_var "UNSHIELD_VK" "$NEW_VK" "$ENV_FILE"
+
+echo "✓ Updated UNSHIELD_VK in $ENV_FILE"

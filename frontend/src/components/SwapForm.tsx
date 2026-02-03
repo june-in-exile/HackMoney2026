@@ -12,6 +12,7 @@ import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   generateSwapProof,
+  convertSwapProofToSui,
   calculateMinAmountOut,
   estimateSwapOutput,
   buildSwapTransaction,
@@ -170,7 +171,8 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
 
       // Generate ZK proof
       // const swapInput: SwapInput = { ... };
-      // const proof = await generateSwapProof(swapInput);
+      // const { proof, publicSignals } = await generateSwapProof(swapInput);
+      // const suiProof = convertSwapProofToSui(proof, publicSignals);
 
       // Build transaction
       // const tx = buildSwapTransaction(
@@ -179,7 +181,7 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
       //   TOKENS[tokenOut].poolId,
       //   TOKENS[tokenIn].type,
       //   TOKENS[tokenOut].type,
-      //   proof,
+      //   suiProof,
       //   amountInBigInt,
       //   minAmountOut,
       //   encryptedOutputNote,
@@ -413,6 +415,7 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
           <li>Select input notes from pool</li>
           <li>Fetch price from Cetus DEX</li>
           <li>Generate Merkle proofs</li>
+          <li>Calculate nullifiers (prevent double-spending)</li> 
           <li>Generate ZK proof (30-60s)</li>
           <li>Execute private swap</li>
           <li>Shield output tokens to pool</li>

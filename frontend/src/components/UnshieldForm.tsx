@@ -12,8 +12,8 @@ import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
   generateUnshieldProof,
-  convertProofToSui,
-  type SpendInput,
+  convertUnshieldProofToSui,
+  type UnshieldInput,
 } from "@octopus/sdk";
 
 interface UnshieldFormProps {
@@ -130,8 +130,8 @@ export function UnshieldForm({
         throw new Error("Merkle proof not available for this note. Please refresh and try again.");
       }
 
-      // Build SpendInput for proof generation using already-loaded Merkle proof
-      const spendInput: SpendInput = {
+      // Build UnshieldInput for proof generation using already-loaded Merkle proof
+      const unshieldInput: UnshieldInput = {
         note: noteToSpend.note,
         leafIndex: noteToSpend.leafIndex,
         pathElements: noteToSpend.pathElements,
@@ -139,10 +139,10 @@ export function UnshieldForm({
       };
 
       // Generate ZK proof (this takes 10-30 seconds)
-      const { proof, publicSignals } = await generateUnshieldProof(spendInput);
+      const { proof, publicSignals } = await generateUnshieldProof(unshieldInput);
 
       // Convert to Sui format
-      const suiProof = convertProofToSui(proof, publicSignals);
+      const suiProof = convertUnshieldProofToSui(proof, publicSignals);
 
       // Use real proof bytes
       const proofBytes = suiProof.proofBytes;          // 128 bytes
@@ -393,6 +393,7 @@ export function UnshieldForm({
         <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
           <li>Select note to spend</li>
           <li>Generate Merkle proof</li>
+          <li>Calculate nullifier (prevent double-spending)</li>
           <li>Generate ZK proof (10-30s)</li>
           <li>Submit withdrawal transaction</li>
           <li>Tokens sent to recipient</li>

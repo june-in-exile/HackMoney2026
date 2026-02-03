@@ -422,20 +422,15 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
         // Build Merkle tree
         if (allCommitments.length > 0) {
-          console.log('[Worker] Building Merkle tree with', allCommitments.length, 'commitments');
-          console.log('[Worker] Commitments:', allCommitments.map(c => ({ leafIndex: c.leafIndex, commitment: c.commitment.toString().slice(0, 20) + '...' })));
-
           const tree = new ClientMerkleTree();
           for (const { commitment, leafIndex } of allCommitments) {
             tree.insert(leafIndex, commitment);
           }
 
           const treeRoot = tree.getRoot();
-          console.log('[Worker] Tree root:', treeRoot.toString());
 
           // Generate proofs for owned notes
           for (const ownedNote of ownedNotes) {
-            console.log(`[Worker] Generating proof for note at leafIndex ${ownedNote.leafIndex}`);
             const pathElements = tree.getMerkleProof(ownedNote.leafIndex);
             ownedNote.pathElements = pathElements.map((p) => p.toString());
 

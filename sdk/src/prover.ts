@@ -6,13 +6,15 @@
 
 import * as snarkjs from "snarkjs";
 import {
-  type SpendInput,
+  type UnshieldInput,
   type UnshieldCircuitInput,
-  type SuiProof,
-  type SuiVerificationKey,
+  type SuiUnshieldProof,
   type TransferInput,
   type TransferCircuitInput,
   type SuiTransferProof,
+  type SwapInput,
+  type SwapCircuitInput,
+  type SuiSwapProof,
   type Note,
   MERKLE_TREE_DEPTH,
 } from "./types.js";
@@ -21,6 +23,12 @@ import {
   computeMerkleRoot,
   poseidonHash,
 } from "./crypto.js";
+import {
+  compressG1,
+  compressG2,
+  serializeProof,
+  serializePublicInputs,
+} from "./utils/proof-compression.js";
 
 // Lazy-loaded Node.js modules (only used in Node.js environment)
 let fs: any;
@@ -30,35 +38,8 @@ let url: any;
 /** Check if running in Node.js environment */
 function isNodeEnvironment(): boolean {
   return typeof process !== 'undefined' &&
-         process.versions != null &&
-         process.versions.node != null;
-}
-
-/** Get default paths to circuit artifacts */
-function getDefaultPaths() {
-  if (isNodeEnvironment()) {
-    // Node.js: Load from filesystem
-    if (!fs) {
-      fs = require('fs');
-      path = require('path');
-      url = require('url');
-    }
-
-    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-
-    return {
-      wasmPath: path.resolve(__dirname, "../../circuits/build/unshield_js/unshield.wasm"),
-      zkeyPath: path.resolve(__dirname, "../../circuits/build/unshield_final.zkey"),
-      vkPath: path.resolve(__dirname, "../../circuits/build/unshield_vk.json"),
-    };
-  } else {
-    // Browser: Load from public directory via fetch
-    return {
-      wasmPath: "/circuits/unshield_js/unshield.wasm",
-      zkeyPath: "/circuits/unshield_final.zkey",
-      vkPath: "/circuits/unshield_vk.json",
-    };
-  }
+    process.versions != null &&
+    process.versions.node != null;
 }
 
 /** Load file in Node.js environment */
@@ -87,11 +68,40 @@ export interface ProverConfig {
   vkPath?: string;
 }
 
+// ============ Unshield Proof Functions ============
+
+/** Get default paths to unshield circuit artifacts */
+function getUnshieldCircuitPaths() {
+  if (isNodeEnvironment()) {
+    // Node.js: Load from filesystem
+    if (!fs) {
+      fs = require('fs');
+      path = require('path');
+      url = require('url');
+    }
+
+    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+
+    return {
+      wasmPath: path.resolve(__dirname, "../../circuits/build/unshield_js/unshield.wasm"),
+      zkeyPath: path.resolve(__dirname, "../../circuits/build/unshield_final.zkey"),
+      vkPath: path.resolve(__dirname, "../../circuits/build/unshield_vk.json"),
+    };
+  } else {
+    // Browser: Load from public directory via fetch
+    return {
+      wasmPath: "/circuits/unshield_js/unshield.wasm",
+      zkeyPath: "/circuits/unshield_final.zkey",
+      vkPath: "/circuits/unshield_vk.json",
+    };
+  }
+}
+
 /**
  * Build circuit input for unshield proof
  */
-export function buildUnshieldInput(spendInput: SpendInput): UnshieldCircuitInput {
-  const { note, leafIndex, pathElements, keypair } = spendInput;
+export function buildUnshieldInput(unshieldInput: UnshieldInput): UnshieldCircuitInput {
+  const { note, leafIndex, pathElements, keypair } = unshieldInput;
 
   // Verify path elements length
   if (pathElements.length !== MERKLE_TREE_DEPTH) {
@@ -126,15 +136,15 @@ export function buildUnshieldInput(spendInput: SpendInput): UnshieldCircuitInput
  * Generate unshield proof using snarkjs
  */
 export async function generateUnshieldProof(
-  spendInput: SpendInput,
+  unshieldInput: UnshieldInput,
   config: ProverConfig = {}
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
-  const defaults = getDefaultPaths();
-  const wasmPath = config.wasmPath ?? defaults.wasmPath;
-  const zkeyPath = config.zkeyPath ?? defaults.zkeyPath;
+  const paths = getUnshieldCircuitPaths();
+  const wasmPath = config.wasmPath ?? paths.wasmPath;
+  const zkeyPath = config.zkeyPath ?? paths.zkeyPath;
 
   // Build circuit input
-  const input = buildUnshieldInput(spendInput);
+  const input = buildUnshieldInput(unshieldInput);
 
   // Generate proof (snarkjs supports both Node.js and browser)
   if (isNodeEnvironment()) {
@@ -175,250 +185,46 @@ export async function generateUnshieldProof(
 }
 
 /**
- * Verify proof locally using snarkjs
- */
-export async function verifyProofLocal(
-  proof: snarkjs.Groth16Proof,
-  publicSignals: string[],
-  config: ProverConfig = {}
-): Promise<boolean> {
-  const defaults = getDefaultPaths();
-  const vkPath = config.vkPath ?? defaults.vkPath;
-
-  let vk: any;
-
-  if (isNodeEnvironment()) {
-    // Node.js: Load from filesystem
-    if (!fs.existsSync(vkPath)) {
-      throw new Error(`Verification key not found: ${vkPath}`);
-    }
-    vk = JSON.parse(fs.readFileSync(vkPath, "utf-8"));
-  } else {
-    // Browser: Load via fetch
-    const response = await fetch(vkPath);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch verification key: ${response.status}`);
-    }
-    vk = await response.json();
-  }
-
-  return await snarkjs.groth16.verify(vk, publicSignals, proof);
-}
-
-/**
  * Convert snarkjs proof to Sui-compatible format (Arkworks compressed)
+ *
+ * Uses shared compression utilities for consistent serialization.
  */
-export function convertProofToSui(
+export function convertUnshieldProofToSui(
   proof: snarkjs.Groth16Proof,
   publicSignals: string[]
-): SuiProof {
-  // Compress G1 point: x-coordinate with sign bit
-  const compressG1 = (point: string[]): Uint8Array => {
-    const x = BigInt(point[0]);
-    const y = BigInt(point[1]);
-
-    const buf = bigIntToLE32(x);
-
-    // Set sign bit if y > p/2
-    const FIELD_MODULUS = BigInt(
-      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
-    );
-    if (y > FIELD_MODULUS / 2n) {
-      buf[31] |= 0x80;
-    }
-
-    return buf;
-  };
-
-  // Compress G2 point: 64 bytes (two Fq elements)
-  const compressG2 = (point: string[][]): Uint8Array => {
-    const x0 = BigInt(point[0][0]);
-    const x1 = BigInt(point[0][1]);
-    const y0 = BigInt(point[1][0]);
-    const y1 = BigInt(point[1][1]);
-
-    const buf = new Uint8Array(64);
-
-    // Write x0 (c0) in little-endian
-    const x0Bytes = bigIntToLE32(x0);
-    buf.set(x0Bytes, 0);
-
-    // Write x1 (c1) in little-endian
-    const x1Bytes = bigIntToLE32(x1);
-    buf.set(x1Bytes, 32);
-
-    // Determine sign
-    const FIELD_MODULUS = BigInt(
-      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
-    );
-    const negY0 = y0 === 0n ? 0n : FIELD_MODULUS - y0;
-    const negY1 = y1 === 0n ? 0n : FIELD_MODULUS - y1;
-
-    let yIsLarger = false;
-    if (y1 > negY1) {
-      yIsLarger = true;
-    } else if (y1 === negY1 && y0 > negY0) {
-      yIsLarger = true;
-    }
-
-    if (yIsLarger) {
-      buf[63] |= 0x80;
-    }
-
-    return buf;
-  };
-
-  // Proof: A (G1) || B (G2) || C (G1) = 32 + 64 + 32 = 128 bytes
-  const piA = compressG1(proof.pi_a as string[]);
-  const piB = compressG2(proof.pi_b as string[][]);
-  const piC = compressG1(proof.pi_c as string[]);
-
-  const proofBytes = new Uint8Array(128);
-  proofBytes.set(piA, 0);
-  proofBytes.set(piB, 32);
-  proofBytes.set(piC, 96);
-
-  // Public inputs: 3 × 32 bytes = 96 bytes (LE format per Sui docs)
-  // Sui requires little-endian format for scalar field elements
-  const publicInputsBytes = new Uint8Array(96);
-  for (let i = 0; i < 3; i++) {
-    const inputBytes = bigIntToLE32(BigInt(publicSignals[i]));  // Changed to LE!
-    publicInputsBytes.set(inputBytes, i * 32);
-  }
+): SuiUnshieldProof {
+  const proofBytes = serializeProof(proof as any);
+  const publicInputsBytes = serializePublicInputs(publicSignals);
 
   return { proofBytes, publicInputsBytes };
 }
 
-/**
- * Load and convert verification key to Sui format
- */
-export async function loadVerificationKey(vkPath?: string): Promise<SuiVerificationKey> {
-  const defaults = getDefaultPaths();
-  const path_ = vkPath ?? defaults.vkPath;
+// ============ Transfer Proof Functions ============
 
-  let vk: any;
-
+/** Get default paths to transfer circuit artifacts */
+function getTransferCircuitPaths() {
   if (isNodeEnvironment()) {
     // Node.js: Load from filesystem
-    if (!fs.existsSync(path_)) {
-      throw new Error(`Verification key not found: ${path_}`);
+    if (!fs) {
+      fs = require('fs');
+      path = require('path');
+      url = require('url');
     }
-    vk = JSON.parse(fs.readFileSync(path_, "utf-8"));
+
+    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+
+    return {
+      wasmPath: path.resolve(__dirname, "../../circuits/build/transfer_js/transfer.wasm"),
+      zkeyPath: path.resolve(__dirname, "../../circuits/build/transfer_final.zkey"),
+    };
   } else {
-    // Browser: Load via fetch
-    const response = await fetch(path_);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch verification key: ${response.status}`);
-    }
-    vk = await response.json();
+    // Browser: Load from public directory via fetch
+    return {
+      wasmPath: "/circuits/transfer_js/transfer.wasm",
+      zkeyPath: "/circuits/transfer_final.zkey",
+    };
   }
-
-  // Compress G1 point
-  const compressG1 = (point: string[]): Uint8Array => {
-    const x = BigInt(point[0]);
-    const y = BigInt(point[1]);
-    const buf = bigIntToLE32(x);
-    const FIELD_MODULUS = BigInt(
-      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
-    );
-    if (y > FIELD_MODULUS / 2n) {
-      buf[31] |= 0x80;
-    }
-    return buf;
-  };
-
-  // Compress G2 point
-  const compressG2 = (point: string[][]): Uint8Array => {
-    const x0 = BigInt(point[0][0]);
-    const x1 = BigInt(point[0][1]);
-    const y0 = BigInt(point[1][0]);
-    const y1 = BigInt(point[1][1]);
-
-    const buf = new Uint8Array(64);
-    const x0Bytes = bigIntToLE32(x0);
-    buf.set(x0Bytes, 0);
-    const x1Bytes = bigIntToLE32(x1);
-    buf.set(x1Bytes, 32);
-
-    const FIELD_MODULUS = BigInt(
-      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
-    );
-    const negY0 = y0 === 0n ? 0n : FIELD_MODULUS - y0;
-    const negY1 = y1 === 0n ? 0n : FIELD_MODULUS - y1;
-
-    let yIsLarger = false;
-    if (y1 > negY1) {
-      yIsLarger = true;
-    } else if (y1 === negY1 && y0 > negY0) {
-      yIsLarger = true;
-    }
-
-    if (yIsLarger) {
-      buf[63] |= 0x80;
-    }
-
-    return buf;
-  };
-
-  // Build VK bytes: alpha || beta || gamma || delta || len(IC) || IC points
-  const alphaG1 = compressG1(vk.vk_alpha_1);
-  const betaG2 = compressG2(vk.vk_beta_2);
-  const gammaG2 = compressG2(vk.vk_gamma_2);
-  const deltaG2 = compressG2(vk.vk_delta_2);
-
-  const icPoints = (vk.IC as string[][]).map((p) => compressG1(p));
-
-  // IC length as 8-byte LE
-  const icLenBuf = new Uint8Array(8);
-  new DataView(icLenBuf.buffer).setUint32(0, icPoints.length, true);
-
-  // Concatenate all parts
-  const totalLen = 32 + 64 + 64 + 64 + 8 + icPoints.length * 32;
-  const vkBytes = new Uint8Array(totalLen);
-
-  let offset = 0;
-  vkBytes.set(alphaG1, offset);
-  offset += 32;
-  vkBytes.set(betaG2, offset);
-  offset += 64;
-  vkBytes.set(gammaG2, offset);
-  offset += 64;
-  vkBytes.set(deltaG2, offset);
-  offset += 64;
-  vkBytes.set(icLenBuf, offset);
-  offset += 8;
-  for (const ic of icPoints) {
-    vkBytes.set(ic, offset);
-    offset += 32;
-  }
-
-  return { vkBytes };
 }
-
-/**
- * Convert BigInt to 32-byte little-endian Uint8Array
- */
-function bigIntToLE32(n: bigint): Uint8Array {
-  const buf = new Uint8Array(32);
-  let val = n;
-  for (let i = 0; i < 32; i++) {
-    buf[i] = Number(val & 0xffn);
-    val >>= 8n;
-  }
-  return buf;
-}
-
-function bigIntToBE32(n: bigint): Uint8Array {
-  const buf = new Uint8Array(32);
-  let val = n;
-  for (let i = 31; i >= 0; i--) {
-    buf[i] = Number(val & 0xffn);
-    val >>= 8n;
-  }
-  return buf;
-}
-
-// ============ Transfer Proof Functions ============
 
 /**
  * Build circuit input for transfer proof (2-input, 2-output)
@@ -550,13 +356,9 @@ export async function generateTransferProof(
   transferInput: TransferInput,
   config: ProverConfig = {}
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
-  const wasmPath = config.wasmPath ?? (isNodeEnvironment()
-    ? path?.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../../circuits/build/transfer_js/transfer.wasm")
-    : "/circuits/transfer_js/transfer.wasm");
-
-  const zkeyPath = config.zkeyPath ?? (isNodeEnvironment()
-    ? path?.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../../circuits/build/transfer_final.zkey")
-    : "/circuits/transfer_final.zkey");
+  const paths = getTransferCircuitPaths();
+  const wasmPath = config.wasmPath ?? paths.wasmPath;
+  const zkeyPath = config.zkeyPath ?? paths.zkeyPath;
 
   // Build circuit input
   const input = buildTransferInput(transferInput);
@@ -579,17 +381,10 @@ export async function generateTransferProof(
 
     return { proof, publicSignals };
   } else {
-    // Browser: Load files via fetch, then use snarkjs with buffers
-    console.log(`Loading transfer circuit artifacts from ${wasmPath} and ${zkeyPath}...`);
-
     const [wasmBuffer, zkeyBuffer] = await Promise.all([
       loadFileBrowser(wasmPath),
       loadFileBrowser(zkeyPath),
     ]);
-
-    console.log(
-      `Loaded transfer WASM: ${wasmBuffer.byteLength} bytes, zkey: ${zkeyBuffer.byteLength} bytes`
-    );
 
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
       input as unknown as snarkjs.CircuitSignals,
@@ -603,79 +398,229 @@ export async function generateTransferProof(
 
 /**
  * Convert transfer proof to Sui-compatible format (Arkworks compressed)
+ *
+ * Uses shared compression utilities for consistent serialization.
+ * Transfer proofs have 5 public inputs (vs 3 for unshield).
  */
 export function convertTransferProofToSui(
   proof: snarkjs.Groth16Proof,
   publicSignals: string[]
 ): SuiTransferProof {
-  // Reuse compression functions from convertProofToSui
-  const compressG1 = (point: string[]): Uint8Array => {
-    const x = BigInt(point[0]);
-    const y = BigInt(point[1]);
-    const buf = bigIntToLE32(x);
-    const FIELD_MODULUS = BigInt(
-      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
-    );
-    if (y > FIELD_MODULUS / 2n) {
-      buf[31] |= 0x80;
-    }
-    return buf;
-  };
-
-  const compressG2 = (point: string[][]): Uint8Array => {
-    const x0 = BigInt(point[0][0]);
-    const x1 = BigInt(point[0][1]);
-    const y0 = BigInt(point[1][0]);
-    const y1 = BigInt(point[1][1]);
-
-    const buf = new Uint8Array(64);
-    const x0Bytes = bigIntToLE32(x0);
-    buf.set(x0Bytes, 0);
-    const x1Bytes = bigIntToLE32(x1);
-    buf.set(x1Bytes, 32);
-
-    const FIELD_MODULUS = BigInt(
-      "21888242871839275222246405745257275088696311157297823662689037894645226208583"
-    );
-    const negY0 = y0 === 0n ? 0n : FIELD_MODULUS - y0;
-    const negY1 = y1 === 0n ? 0n : FIELD_MODULUS - y1;
-
-    let yIsLarger = false;
-    if (y1 > negY1) {
-      yIsLarger = true;
-    } else if (y1 === negY1 && y0 > negY0) {
-      yIsLarger = true;
-    }
-
-    if (yIsLarger) {
-      buf[63] |= 0x80;
-    }
-
-    return buf;
-  };
-
-  // Proof: A (G1) || B (G2) || C (G1) = 32 + 64 + 32 = 128 bytes
-  const piA = compressG1(proof.pi_a as string[]);
-  const piB = compressG2(proof.pi_b as string[][]);
-  const piC = compressG1(proof.pi_c as string[]);
-
-  const proofBytes = new Uint8Array(128);
-  proofBytes.set(piA, 0);
-  proofBytes.set(piB, 32);
-  proofBytes.set(piC, 96);
-
-  // Public inputs: 5 × 32 bytes = 160 bytes (BE format for Move contract)
-  // Order: merkle_root, nullifier1, nullifier2, commitment1, commitment2
+  // Validate public signals count for transfer circuit
   if (publicSignals.length !== 5) {
-    throw new Error(`Expected 5 public signals, got ${publicSignals.length}`);
+    throw new Error(`Expected 5 public signals for transfer, got ${publicSignals.length}`);
   }
 
-  // Sui requires little-endian format for public inputs per official docs
-  const publicInputsBytes = new Uint8Array(160);
-  for (let i = 0; i < 5; i++) {
-    const inputBytes = bigIntToLE32(BigInt(publicSignals[i]));  // Changed to LE!
-    publicInputsBytes.set(inputBytes, i * 32);
+  const proofBytes = serializeProof(proof as any);
+  const publicInputsBytes = serializePublicInputs(publicSignals);
+
+  return { proofBytes, publicInputsBytes };
+}
+
+
+// ============ Swap Proof Functions ============
+
+/**
+ * Get default paths to swap circuit artifacts
+ */
+function getSwapCircuitPaths() {
+  if (isNodeEnvironment()) {
+    // Node.js: Load from filesystem
+    if (!fs) {
+      fs = require('fs');
+      path = require('path');
+      url = require('url');
+    }
+
+    const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+
+    return {
+      wasmPath: path.resolve(__dirname, "../../circuits/build/swap_js/swap.wasm"),
+      zkeyPath: path.resolve(__dirname, "../../circuits/build/swap_final.zkey"),
+    };
+  } else {
+    // Browser: Load from public directory via fetch
+    return {
+      wasmPath: "/circuits/swap_js/swap.wasm",
+      zkeyPath: "/circuits/swap_final.zkey",
+    };
   }
+}
+
+/**
+ * Build circuit input for swap proof
+ */
+export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
+  const {
+    keypair,
+    inputNotes,
+    inputLeafIndices,
+    inputPathElements,
+    swapParams,
+    outputNPK,
+    outputRandom,
+    outputValue,
+    changeNPK,
+    changeRandom,
+    changeValue,
+  } = swapInput;
+
+  // Ensure we have exactly 2 input notes (pad with dummy if needed)
+  const notes = [...inputNotes];
+  const leafIndices = [...inputLeafIndices];
+  const pathElements = [...inputPathElements];
+
+  while (notes.length < 2) {
+    // Create dummy note with zero value
+    const dummyNote: Note = {
+      npk: 0n,
+      token: swapParams.tokenIn,
+      value: 0n,
+      random: 0n,
+      commitment: poseidonHash([0n, swapParams.tokenIn, 0n]),
+    };
+    notes.push(dummyNote);
+    leafIndices.push(0);
+    pathElements.push(new Array(MERKLE_TREE_DEPTH).fill(0n));
+  }
+
+  // Verify path elements length
+  if (pathElements[0].length !== MERKLE_TREE_DEPTH) {
+    throw new Error(
+      `Invalid path elements length: ${pathElements[0].length}, expected ${MERKLE_TREE_DEPTH}`
+    );
+  }
+
+  // Compute nullifiers for input notes
+  const nullifier1 = poseidonHash([keypair.nullifyingKey, BigInt(leafIndices[0])]);
+  const nullifier2 = poseidonHash([keypair.nullifyingKey, BigInt(leafIndices[1])]);
+
+  // Compute output commitment = Poseidon(NPK, token_out, output_value)
+  const outputCommitment = poseidonHash([outputNPK, swapParams.tokenOut, outputValue]);
+
+  // Compute change commitment = Poseidon(NPK, token_in, change_value)
+  const changeCommitment = poseidonHash([changeNPK, swapParams.tokenIn, changeValue]);
+
+  // Compute swap data hash = Poseidon(token_in, token_out, amount_in, min_amount_out, dex_pool_id)
+  const swapDataHash = poseidonHash([
+    swapParams.tokenIn,
+    swapParams.tokenOut,
+    swapParams.amountIn,
+    swapParams.minAmountOut,
+    swapParams.dexPoolId,
+  ]);
+
+  // Compute Merkle root from first input note
+  let root = notes[0].commitment;
+  const indices0 = BigInt(leafIndices[0]);
+  for (let i = 0; i < MERKLE_TREE_DEPTH; i++) {
+    const sibling = pathElements[0][i];
+    // Check if index bit is 0 or 1
+    const isLeft = (indices0 >> BigInt(i)) & 1n;
+    if (isLeft === 0n) {
+      root = poseidonHash([root, sibling]);
+    } else {
+      root = poseidonHash([sibling, root]);
+    }
+  }
+
+  return {
+    // Private inputs - Keypair
+    spending_key: keypair.spendingKey.toString(),
+    nullifying_key: keypair.nullifyingKey.toString(),
+
+    // Private inputs - Input notes
+    input_npks: notes.map(n => n.npk.toString()),
+    input_values: notes.map(n => n.value.toString()),
+    input_randoms: notes.map(n => n.random.toString()),
+    input_leaf_indices: leafIndices.map(i => i.toString()),
+    input_path_elements: pathElements.map(path =>
+      path.map(element => element.toString())
+    ),
+
+    // Private inputs - Swap parameters
+    token_in: swapParams.tokenIn.toString(),
+    token_out: swapParams.tokenOut.toString(),
+    amount_in: swapParams.amountIn.toString(),
+    min_amount_out: swapParams.minAmountOut.toString(),
+    dex_pool_id: swapParams.dexPoolId.toString(),
+
+    // Private inputs - Output note
+    output_npk: outputNPK.toString(),
+    output_value: outputValue.toString(),
+    output_random: outputRandom.toString(),
+
+    // Private inputs - Change note
+    change_npk: changeNPK.toString(),
+    change_value: changeValue.toString(),
+    change_random: changeRandom.toString(),
+
+    // Public inputs
+    merkle_root: root.toString(),
+    input_nullifiers: [nullifier1.toString(), nullifier2.toString()],
+    output_commitment: outputCommitment.toString(),
+    change_commitment: changeCommitment.toString(),
+    swap_data_hash: swapDataHash.toString(),
+  };
+}
+
+/**
+ * Generate a swap proof using the swap circuit
+ *
+ * Returns raw proof and public signals. Use convertSwapProofToSui() to convert to Sui format.
+ * This matches the pattern used in prover.ts for consistency.
+ */
+export async function generateSwapProof(
+  swapInput: SwapInput,
+  config?: { wasmPath?: string; zkeyPath?: string }
+): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
+  const paths = getSwapCircuitPaths();
+  const wasmPath = config?.wasmPath ?? paths.wasmPath;
+  const zkeyPath = config?.zkeyPath ?? paths.zkeyPath;
+
+  // Build circuit input
+  const circuitInput = buildSwapInput(swapInput);
+
+  console.log("Generating swap proof...");
+  console.log("Circuit input:", {
+    merkle_root: circuitInput.merkle_root,
+    input_nullifiers: circuitInput.input_nullifiers,
+    output_commitment: circuitInput.output_commitment,
+    change_commitment: circuitInput.change_commitment,
+    swap_data_hash: circuitInput.swap_data_hash,
+  });
+
+  // Generate proof using snarkjs
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    circuitInput as any,
+    wasmPath,
+    zkeyPath
+  );
+
+  console.log("Proof generated successfully");
+  console.log("Public signals:", publicSignals);
+
+  return { proof, publicSignals };
+}
+
+/**
+ * Convert swap proof to Sui-compatible format (Arkworks compressed)
+ *
+ * Uses shared compression utilities for consistent serialization.
+ * This matches the pattern used in prover.ts for unshield and transfer proofs.
+ */
+export function convertSwapProofToSui(
+  proof: snarkjs.Groth16Proof,
+  publicSignals: string[]
+): SuiSwapProof {
+  // Validate public signals count for swap circuit
+  // Expected: merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash
+  if (publicSignals.length !== 6) {
+    throw new Error(`Expected 6 public signals for swap, got ${publicSignals.length}`);
+  }
+
+  const proofBytes = serializeProof(proof as any);
+  const publicInputsBytes = serializePublicInputs(publicSignals);
 
   return { proofBytes, publicInputsBytes };
 }

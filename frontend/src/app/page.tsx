@@ -281,6 +281,7 @@ export default function Home() {
                       loading={isLoadingNotes}
                       error={notesError}
                       onSuccess={handleTransferSuccess}
+                      onRefresh={refreshNotes}
                     />
                   )}
                   {activeTab === "swap" && (

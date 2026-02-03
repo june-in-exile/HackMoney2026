@@ -47,30 +47,6 @@ export interface Note {
 }
 
 /**
- * Input for spending a note (unshield)
- */
-export interface SpendInput {
-  /** The note being spent */
-  note: Note;
-  /** Position in the Merkle tree */
-  leafIndex: number;
-  /** Merkle proof path elements */
-  pathElements: bigint[];
-  /** The keypair that owns this note */
-  keypair: OctopusKeypair;
-}
-
-/**
- * ZK proof data in Sui-compatible format
- */
-export interface SuiProof {
-  /** Proof points (128 bytes: A || B || C) */
-  proofBytes: Uint8Array;
-  /** Public inputs (96 bytes: root || nullifier || commitment) */
-  publicInputsBytes: Uint8Array;
-}
-
-/**
  * Verification key in Sui-compatible format
  */
 export interface SuiVerificationKey {
@@ -78,30 +54,20 @@ export interface SuiVerificationKey {
   vkBytes: Uint8Array;
 }
 
-/**
- * Shield transaction parameters
- */
-export interface ShieldParams {
-  /** Amount to shield */
-  amount: bigint;
-  /** Token type (coin type hash) */
-  token: bigint;
-  /** Recipient's master public key */
-  recipientMpk: bigint;
-  /** Random blinding factor (generated if not provided) */
-  random?: bigint;
-}
+// ============ Unshield Types ============
 
 /**
- * Unshield transaction parameters
+ * Input for unshielding a note
  */
-export interface UnshieldParams {
-  /** The note to spend */
-  spendInput: SpendInput;
-  /** Amount to withdraw */
-  amount: bigint;
-  /** Recipient Sui address */
-  recipient: string;
+export interface UnshieldInput {
+  /** The note being unshield */
+  note: Note;
+  /** Position in the Merkle tree */
+  leafIndex: number;
+  /** Merkle proof path elements */
+  pathElements: bigint[];
+  /** The keypair that owns this note */
+  keypair: OctopusKeypair;
 }
 
 /**
@@ -123,16 +89,16 @@ export interface UnshieldCircuitInput {
 }
 
 /**
- * Pool state snapshot for client-side operations
+ * ZK proof data in Sui-compatible format
  */
-export interface PoolState {
-  /** Current Merkle root */
-  merkleRoot: bigint;
-  /** Number of notes in the tree */
-  noteCount: number;
-  /** Historical roots for proof validity */
-  historicalRoots: bigint[];
+export interface SuiUnshieldProof {
+  /** Proof points (128 bytes: A || B || C) */
+  proofBytes: Uint8Array;
+  /** Public inputs (96 bytes: root || nullifier || commitment) */
+  publicInputsBytes: Uint8Array;
 }
+
+// ============ Transfer Types ============
 
 /**
  * Input for generating a transfer proof (2-input, 2-output)
@@ -181,5 +147,103 @@ export interface SuiTransferProof {
   /** Proof points (128 bytes: A || B || C) */
   proofBytes: Uint8Array;
   /** Public inputs (160 bytes: root || null1 || null2 || comm1 || comm2) */
+  publicInputsBytes: Uint8Array;
+}
+
+// ============ Swap Types ============
+
+/**
+ * Swap transaction parameters
+ */
+export interface SwapParams {
+  /** Input token type (e.g., SUI) */
+  tokenIn: bigint;
+  /** Output token type (e.g., USDC) */
+  tokenOut: bigint;
+  /** Exact amount to swap */
+  amountIn: bigint;
+  /** Minimum output amount (slippage protection) */
+  minAmountOut: bigint;
+  /** DEX pool identifier hash */
+  dexPoolId: bigint;
+  /** Slippage tolerance in basis points (e.g., 50 = 0.5%) */
+  slippageBps: number;
+}
+
+/**
+ * Input for generating a swap proof
+ */
+export interface SwapInput {
+  /** Sender's keypair */
+  keypair: OctopusKeypair;
+  /** Input notes to spend (same token type as tokenIn) */
+  inputNotes: Note[];
+  /** Leaf indices for input notes */
+  inputLeafIndices: number[];
+  /** Merkle proof paths for input notes */
+  inputPathElements: bigint[][];
+  /** Swap parameters */
+  swapParams: SwapParams;
+  /** Output note recipient's NPK */
+  outputNPK: bigint;
+  /** Random blinding factor for output note */
+  outputRandom: bigint;
+  /** Expected output amount from DEX */
+  outputValue: bigint;
+  /** Change note recipient's NPK (usually sender's own NPK) */
+  changeNPK: bigint;
+  /** Random blinding factor for change note */
+  changeRandom: bigint;
+  /** Change amount (excess input) */
+  changeValue: bigint;
+}
+
+/**
+ * Circuit input for swap proof generation
+ */
+export interface SwapCircuitInput {
+  // Private inputs - Keypair
+  spending_key: string;
+  nullifying_key: string;
+
+  // Private inputs - Input notes
+  input_npks: string[];
+  input_values: string[];
+  input_randoms: string[];
+  input_leaf_indices: string[];
+  input_path_elements: string[][];
+
+  // Private inputs - Swap parameters
+  token_in: string;
+  token_out: string;
+  amount_in: string;
+  min_amount_out: string;
+  dex_pool_id: string;
+
+  // Private inputs - Output note
+  output_npk: string;
+  output_value: string;
+  output_random: string;
+
+  // Private inputs - Change note
+  change_npk: string;
+  change_value: string;
+  change_random: string;
+
+  // Public inputs
+  merkle_root: string;
+  input_nullifiers: string[];
+  output_commitment: string;
+  change_commitment: string;
+  swap_data_hash: string;
+}
+
+/**
+ * Swap proof in Sui-compatible format
+ */
+export interface SuiSwapProof {
+  /** Proof points (128 bytes: A || B || C) */
+  proofBytes: Uint8Array;
+  /** Public inputs (192 bytes: root || nullifiers[2] || output_commitment || change_commitment || swap_data_hash) */
   publicInputsBytes: Uint8Array;
 }

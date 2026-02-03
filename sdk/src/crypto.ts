@@ -15,6 +15,7 @@ import {
   type OctopusKeypair,
   type Note,
 } from "./types.js";
+import { bigIntToBE32, bytesToBigIntBE } from "./utils/bytes.js";
 
 let poseidonInstance: Poseidon | null = null;
 
@@ -196,7 +197,7 @@ function deriveViewingKeypair(spendingKey: bigint): {
   publicKey: Uint8Array;
 } {
   // Hash spending key to get viewing private key seed
-  const seed = sha256(bigIntToBytes(spendingKey));
+  const seed = sha256(bigIntToBE32(spendingKey));
 
   // Ensure seed is a valid X25519 scalar by taking modulo
   // X25519 uses Curve25519 which has order 2^252 + ...
@@ -242,7 +243,7 @@ export function deriveViewingPublicKey(spendingKey: bigint): Uint8Array {
  */
 export function mpkToViewingPublicKeyUnsafe(mpk: bigint): Uint8Array {
   // Hash MPK to create a deterministic seed
-  const seed = sha256(bigIntToBytes(mpk));
+  const seed = sha256(bigIntToBE32(mpk));
 
   // Treat seed as X25519 private scalar
   const privateKey = new Uint8Array(32);
@@ -291,10 +292,10 @@ export function encryptNote(
 
   // 4. Serialize note data (npk || token || value || random, each 32 bytes)
   const noteData = new Uint8Array(128);
-  noteData.set(bigIntToBytes(note.npk), 0);
-  noteData.set(bigIntToBytes(note.token), 32);
-  noteData.set(bigIntToBytes(note.value), 64);
-  noteData.set(bigIntToBytes(note.random), 96);
+  noteData.set(bigIntToBE32(note.npk), 0);
+  noteData.set(bigIntToBE32(note.token), 32);
+  noteData.set(bigIntToBE32(note.value), 64);
+  noteData.set(bigIntToBE32(note.random), 96);
 
   // 5. Generate nonce (12 bytes for ChaCha20-Poly1305)
   const nonce = crypto.getRandomValues(new Uint8Array(12));
@@ -312,29 +313,8 @@ export function encryptNote(
   return output;
 }
 
-/**
- * Convert BigInt to 32-byte big-endian Uint8Array
- */
-export function bigIntToBytes(n: bigint): Uint8Array {
-  const bytes = new Uint8Array(32);
-  let val = n;
-  for (let i = 31; i >= 0; i--) {
-    bytes[i] = Number(val & 0xffn);
-    val >>= 8n;
-  }
-  return bytes;
-}
+// Byte conversion functions moved to utils/bytes.ts
 
-/**
- * Convert 32-byte Uint8Array to BigInt (big-endian)
- */
-export function bytesToBigInt(bytes: Uint8Array): bigint {
-  let result = 0n;
-  for (let i = 0; i < bytes.length; i++) {
-    result = (result << 8n) | BigInt(bytes[i]);
-  }
-  return result;
-}
 
 /**
  * Decrypt and verify note ownership using ECDH + ChaCha20-Poly1305
@@ -388,10 +368,10 @@ export function decryptNote(
     const noteData = cipher.decrypt(ciphertext);
 
     // 6. Parse decrypted data
-    const npk = bytesToBigInt(noteData.slice(0, 32));
-    const token = bytesToBigInt(noteData.slice(32, 64));
-    const value = bytesToBigInt(noteData.slice(64, 96));
-    const random = bytesToBigInt(noteData.slice(96, 128));
+    const npk = bytesToBigIntBE(noteData.slice(0, 32));
+    const token = bytesToBigIntBE(noteData.slice(32, 64));
+    const value = bytesToBigIntBE(noteData.slice(64, 96));
+    const random = bytesToBigIntBE(noteData.slice(96, 128));
 
     // 7. Verify ownership by recomputing NPK
     // If this note belongs to us, NPK should equal Poseidon(myMpk, random)

@@ -6,6 +6,7 @@
 
 import { SuiClient } from "@mysten/sui/client";
 
+
 /**
  * Cetus pool configuration
  */
@@ -229,19 +230,9 @@ export async function getCetusPrice(
   return price;
 }
 
-/**
- * Calculate minimum output amount with slippage protection
- *
- * @param expectedOutput - Expected output amount
- * @param slippageBps - Slippage tolerance in basis points (e.g., 50 = 0.5%)
- * @returns Minimum acceptable output
- */
-export function calculateMinOutput(
-  expectedOutput: bigint,
-  slippageBps: number
-): bigint {
-  return (expectedOutput * BigInt(10000 - slippageBps)) / 10000n;
-}
+// calculateMinOutput moved to utils/math.ts
+// Re-exported from import above for backward compatibility
+
 
 /**
  * Known Cetus testnet pools

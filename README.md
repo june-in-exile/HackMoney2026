@@ -61,9 +61,10 @@ nullifier = Poseidon(nullifying_key, leaf_index) // Prevents double-spend
 ```bash
 cd circuits
 npm install
+cd scripts
 ./compile_unshield.sh   # Unshield circuit
-./compile_transfer.sh   # Transfer circuit ✨
-./compile_swap.sh       # Swap circuit 🚧
+./compile_transfer.sh   # Transfer circuit
+./compile_swap.sh       # Swap circuit
 ```
 
 This generates for each circuit:
@@ -80,47 +81,11 @@ sui move build
 sui move test
 ```
 
-Expected output: **23 tests passing**
+Expected output: **37 tests passing**
 
-### 3. Run SDK Demo
+Reference [contracts/README.md](contracts/README.md) for deployment guides.
 
-```bash
-cd sdk
-npm install
-npm run demo
-```
-
-Demo output:
-
-```
-Octopus SDK Demo
-
-Step 1: Initialize Poseidon Hash
-✓ Poseidon initialized
-
-Step 2: Generate Keypair
-✓ Keypair generated
-
-Step 3: Create Note (Simulating Shield)
-✓ Note created
-
-Step 4: Build Merkle Proof
-✓ Merkle proof built
-
-Step 5: Compute Nullifier
-✓ Nullifier computed
-
-Step 6: Generate ZK Proof (Groth16)
-✓ Proof generated in 425ms
-
-Step 7: Verify Proof Locally
-✓ Proof verified successfully!
-
-Step 8: Convert to Sui Format
-✓ Ready for Sui transaction!
-```
-
-### 4. Run Frontend (Web UI)
+### 3. Run Frontend (Web UI)
 
 ```bash
 cd frontend
@@ -139,99 +104,6 @@ Open <http://localhost:3000> to access the web interface.
 - **Private transfers**: Send tokens to other users (2-input, 2-output) ✨
 - **Swap UI**: Token exchange interface (awaiting DEX integration) 🚧
 
-## SDK Usage
-
-### Basic Operations
-
-```typescript
-import {
-  initPoseidon,
-  generateKeypair,
-  createNote,
-  generateUnshieldProof,
-  convertProofToSui,
-  OctopusClient,
-} from "@octopus/sdk";
-
-// Initialize cryptographic primitives
-await initPoseidon();
-
-// Generate a keypair
-const keypair = generateKeypair();
-
-// Create a shielded note
-const note = createNote(
-  keypair.masterPublicKey,
-  tokenId,
-  amount
-);
-
-// Generate ZK proof for unshield
-const { proof, publicSignals } = await generateUnshieldProof({
-  note,
-  leafIndex: 0,
-  pathElements,
-  keypair,
-});
-
-// Convert to Sui format
-const suiProof = convertProofToSui(proof, publicSignals);
-
-// Execute on Sui
-const client = new OctopusClient({
-  rpcUrl: "https://fullnode.testnet.sui.io:443",
-  packageId: "0x6458f0cc338813b938f7f75cdf56ae8ffdd4872b6e32f4229ef9e68c43032649",
-  poolId: "0x0d8d139a2be9185395af1ff49bc1fca9e32e2bdd61cf010618e19d00f9217b48",
-});
-
-await client.unshield(coinType, suiProof, amount, recipient, signer);
-```
-
-### Private Transfers ✨ **NEW**
-
-```typescript
-import { generateTransferProof, selectNotesForTransfer } from "@octopus/sdk";
-
-// Select notes to spend (smart UTXO selection)
-const { selectedNotes, totalValue } = selectNotesForTransfer(
-  myNotes,
-  transferAmount
-);
-
-// Generate ZK proof for private transfer
-const { proof, publicSignals } = await generateTransferProof({
-  inputNotes: selectedNotes,
-  recipientMpk: recipientMasterPublicKey,
-  recipientAmount: transferAmount,
-  changeAmount: totalValue - transferAmount,
-  keypair,
-  merkleProofs,
-});
-
-// Execute on-chain
-await client.transfer(coinType, proof, publicSignals, encryptedNotes, signer);
-```
-
-### Private Swaps 🚧 **In Progress**
-
-```typescript
-import { generateSwapProof } from "@octopus/sdk";
-
-// Generate swap proof
-const { proof, publicSignals } = await generateSwapProof({
-  inputNotes,
-  tokenIn: "SUI",
-  tokenOut: "USDC",
-  amountIn: 100,
-  minAmountOut: 95, // Slippage protection
-  keypair,
-  merkleProofs,
-});
-
-// Execute swap (awaiting Cetus integration)
-await client.swap(tokenIn, tokenOut, proof, publicSignals, signer);
-```
-
 ## Circuit Details
 
 ### Unshield Circuit (`unshield.circom`)
@@ -244,12 +116,13 @@ await client.swap(tokenIn, tokenOut, proof, publicSignals, signer);
 | Merkle Depth | 16 levels |
 
 The circuit proves:
+
 1. Knowledge of spending_key and nullifying_key (ownership)
 2. Correct commitment computation
 3. Commitment exists in Merkle tree
 4. Correct nullifier derivation (prevents double-spend)
 
-### Transfer Circuit (`transfer.circom`) ✨ **NEW**
+### Transfer Circuit (`transfer.circom`)
 
 | Property | Value |
 |----------|-------|
@@ -259,6 +132,7 @@ The circuit proves:
 | Transaction Model | 2-input, 2-output UTXO |
 
 The circuit proves:
+
 1. Ownership of 2 input notes (or 1 note + 1 dummy)
 2. Input notes exist in Merkle tree
 3. Correct nullifier derivation for spent notes
@@ -275,6 +149,7 @@ The circuit proves:
 | Status | Circuit complete, awaiting Cetus DEX integration |
 
 The circuit proves:
+
 1. Ownership and validity of input notes
 2. Correct swap execution with slippage protection
 3. Valid output notes (swapped tokens + change)
@@ -332,25 +207,6 @@ The circuit proves:
 | **Milestone 4: Compliance Features** | ⏳ Planned | 0% |
 
 See [docs/](docs/) for detailed milestone documentation.
-
-## Deployment Information
-
-### Octopus Privacy Pool (SUI) - Sui Testnet
-
-- **Package ID**: `0x6458f0cc338813b938f7f75cdf56ae8ffdd4872b6e32f4229ef9e68c43032649`
-- **Pool ID**: `0x0d8d139a2be9185395af1ff49bc1fca9e32e2bdd61cf010618e19d00f9217b48`
-- **Network**: Sui Testnet
-- **Deployed Circuits**: Unshield, Transfer, Swap (all verification keys on-chain)
-- **Hash Function**: Poseidon BN254 (circuit-compatible)
-
-## Acknowledgments
-
-This project was inspired by privacy protocol architectures, particularly [Railgun](https://railgun.org/).
-
-- [Sui](https://sui.io/) - Native Groth16 verification support
-- [circomlib](https://github.com/iden3/circomlib) - Poseidon hash implementation
-- [snarkjs](https://github.com/iden3/snarkjs) - Groth16 proof generation
-- [Cetus Protocol](https://www.cetus.zone/) - DEX integration (in progress)
 
 ## License
 

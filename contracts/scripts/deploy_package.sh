@@ -6,6 +6,20 @@ echo "=== Deploying Octopus Privacy Pool Package ==="
 # Change to contracts directory (parent of scripts/)
 cd "$(dirname "$0")/.."
 
+# Determine .env file path
+ENV_FILE=""
+if [ -f "../.env" ]; then
+    ENV_FILE="../.env"
+elif [ -f "../../.env" ]; then
+    ENV_FILE="../../.env"
+else
+    echo "Warning: No .env file found. You'll need to manually update PACKAGE_ID later."
+fi
+
+if [ -n "$ENV_FILE" ]; then
+    echo "Using .env file: $ENV_FILE"
+fi
+
 echo ""
 echo "Step 1: Building Move package..."
 sui move build
@@ -30,18 +44,44 @@ fi
 
 echo "✅ Package published successfully!"
 echo "Package ID: $PACKAGE_ID"
-
 echo ""
+
+# Update .env file if it exists
+if [ -n "$ENV_FILE" ]; then
+    echo "Updating .env file with package ID..."
+
+    # Function to update or append env variable
+    update_env_var() {
+        local key=$1
+        local value=$2
+        local file=$3
+
+        if grep -q "^${key}=" "$file"; then
+            # Update existing variable (macOS compatible)
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
+            else
+                sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+            fi
+        else
+            # Append new variable
+            echo "${key}=${value}" >> "$file"
+        fi
+    }
+
+    update_env_var "PACKAGE_ID" "$PACKAGE_ID" "$ENV_FILE"
+
+    echo "✓ Updated PACKAGE_ID in $ENV_FILE"
+    echo ""
+fi
+
 echo "=== Deployment Complete ==="
 echo "Package ID: $PACKAGE_ID"
 echo "Network: testnet"
 echo ""
 echo "=== Next Steps ==="
-echo "1. Update .env file:"
-echo "   PACKAGE_ID=\"$PACKAGE_ID\""
+echo "1. Update frontend/src/lib/constants.ts:"
+echo "   export const PACKAGE_ID = \"$PACKAGE_ID\";"
 echo ""
 echo "2. Create a privacy pool by running:"
-echo "   ./scripts/create_pool.sh"
-echo ""
-echo "3. Verify deployment on Sui explorer:"
-echo "   https://testnet.suivision.xyz/package/$PACKAGE_ID"
+echo "   ./create_pool.sh"

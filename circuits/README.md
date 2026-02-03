@@ -4,9 +4,9 @@ This directory contains the Zero-Knowledge Succinct Non-Interactive Argument of 
 
 ## Circuits Overview
 
--   `unshield.circom`: A basic unshield circuit. Proves knowledge of an input note's private keys and its existence in a Merkle tree, allowing a user to "unshield" funds.
--   `transfer.circom`: A private transfer circuit. Allows a user to transfer funds privately between two notes (which can belong to the same or different users), preserving balance conservation. Supports 2-input, 2-output transfers.
--   `swap.circom`: A private swap circuit. Enables users to perform private token swaps through an external DEX (e.g., Cetus), proving ownership of input notes and correct swap parameters.
+- `unshield.circom`: A basic unshield circuit. Proves knowledge of an input note's private keys and its existence in a Merkle tree, allowing a user to "unshield" funds.
+- `transfer.circom`: A private transfer circuit. Allows a user to transfer funds privately between two notes (which can belong to the same or different users), preserving balance conservation. Supports 2-input, 2-output transfers.
+- `swap.circom`: A private swap circuit. Enables users to perform private token swaps through an external DEX (e.g., Cetus), proving ownership of input notes and correct swap parameters.
 
 ## Scripts Usage
 
@@ -31,7 +31,6 @@ The following scripts, located in the `circuits/scripts/` directory, are used fo
 
 | Script                                 | Purpose                                                                | When to Use                                                                                      |
 | -------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `scripts/arkworksConverter.js`         | Converts `unshield` outputs to Sui's Arkworks format.                  | After generating a proof for the unshield circuit to prepare it for on-chain verification.     |
+| `scripts/arkworksConverterUnshield.js`         | Converts `unshield` outputs to Sui's Arkworks format.                  | After generating a proof for the unshield circuit to prepare it for on-chain verification.     |
 | `scripts/arkworksConverterSwap.js`     | Converts the `swap` verification key to Sui's Arkworks format.         | After compiling the swap circuit to prepare its verification key for the smart contract.         |
 | `scripts/arkworksConverterTransfer.js` | Converts `transfer` outputs to Sui's Arkworks format.                  | After generating a proof for the transfer circuit to prepare it for on-chain verification.     |
-
