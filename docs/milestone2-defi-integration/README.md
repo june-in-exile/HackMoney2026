@@ -39,20 +39,6 @@ This milestone adds private token swap functionality to Octopus, enabling users 
    - Slippage tolerance settings
    - Real-time price estimation
 
-### ⚠️ Current Limitations
-
-**Mock Swap Implementation:**
-
-The current `swap()` function uses a **1:1 test exchange rate**. This allows testing the full ZK proof flow without requiring real DEX integration.
-
-**For Production Use:**
-
-- Requires Cetus CLMM integration for real market prices
-- Needs multi-pool deployment (SUI pool + USDC pool)
-- Price oracle integration for accurate output estimation
-
----
-
 ## How to Use (Frontend)
 
 1. **Navigate to the app** and connect your Sui wallet
@@ -70,7 +56,7 @@ The current `swap()` function uses a **1:1 test exchange rate**. This allows tes
 
 ## Architecture
 
-```
+``` txt
 User (private notes in pool_in)
     ↓
 Submit ZK Proof (proves ownership + swap parameters)
@@ -156,54 +142,6 @@ public entry fun swap_production<TokenIn, TokenOut>(
 
 ⚠️ **Status:** Scaffolded, awaiting Cetus module integration
 
-### SDK Functions
-
-```typescript
-// Generate ZK proof for swap
-async function generateSwapProof(
-  input: SwapInput,
-  paths: { wasmPath: string; zkeyPath: string }
-): Promise<SwapProof>
-
-// Build Sui transaction
-function buildSwapTransaction<TokenIn, TokenOut>(
-  packageId: string,
-  poolInId: string,
-  poolOutId: string,
-  coinTypeIn: TokenIn,
-  coinTypeOut: TokenOut,
-  proof: SuiSwapProof,
-  amountIn: bigint,
-  minAmountOut: bigint,
-  encryptedOutputNote: Uint8Array,
-  encryptedChangeNote: Uint8Array
-): Transaction
-
-// Calculate minimum output with slippage
-function calculateMinAmountOut(
-  amountOut: bigint,
-  slippageBps: number
-): bigint
-```
-
----
-
-## Testing
-
-### Unit Tests ([contracts/sources/swap_tests.move](../../contracts/sources/swap_tests.move))
-
-**7 Test Cases:**
-
-- ✅ `test_swap_pools_creation` - Pool creation
-- ✅ `test_swap_double_spend_fails` - Double-spend prevention
-- ✅ `test_swap_invalid_public_inputs_length_fails` - Input validation
-- ⚠️ `test_swap_sui_to_usdc_success` - Full swap flow (needs real proof)
-- ⚠️ `test_swap_insufficient_balance_fails` - Balance check (needs real proof)
-- ⚠️ `test_swap_with_zero_change` - Zero change (needs real proof)
-- ⚠️ `test_swap_reverse_direction_usdc_to_sui` - Reverse swap (needs real proof)
-
-**Status:** 2/7 passing (error cases work). Success cases require real ZK proof generation.
-
 ---
 
 ## Production Readiness
@@ -241,68 +179,3 @@ function calculateMinAmountOut(
    - Scan blockchain for user's encrypted notes
    - Build Merkle proofs for input notes
    - Select optimal notes to cover swap amount
-
----
-
-## Next Steps
-
-**Immediate (< 1 week):**
-
-1. Complete Cetus module integration in pool.move
-2. Deploy multi-token privacy pools (SUI, USDC)
-3. Implement real price fetching from Cetus
-4. Test with real Cetus testnet pools
-
-**Short-term (1-2 weeks):**
-
-1. Add support for multiple token pairs
-2. Optimize circuit constraints (if needed)
-3. Security audit of swap implementation
-4. End-to-end testing with real users
-
-**Long-term (1-2 months):**
-
-1. Multi-hop swaps (SUI → USDT → USDC)
-2. Liquidity aggregation (multiple DEXs)
-3. MEV protection strategies
-4. Mainnet deployment
-
----
-
-## Resources
-
-**Cetus Protocol:**
-
-- [Developer Docs](https://cetus-1.gitbook.io/cetus-developer-docs)
-- [CLMM SDK](https://github.com/CetusProtocol/cetus-clmm-sui-sdk)
-- [Testnet App](https://app.cetus.zone/swap?network=testnet)
-- Package Address: `0x5372d555ac734e272659136c2a0cd3227f9b92de67c80dc11250307268af2db8`
-
-**Alternative DEXs:**
-
-- [Turbos Finance](https://docs.turbos.finance/) - Similar CLMM architecture
-- [Kriya DEX](https://docs.kriya.finance/) - Hybrid AMM/orderbook
-
----
-
-## Security Considerations
-
-**Implemented:**
-
-- ✅ ZK proof verification (prevents unauthorized swaps)
-- ✅ Double-spend prevention (nullifier tracking)
-- ✅ Balance conservation (circuit enforced)
-- ✅ Slippage protection (min_amount_out)
-- ✅ Atomic execution (all or nothing)
-
-**To Consider:**
-
-- ⚠️ Front-running protection (private mempool or commit-reveal)
-- ⚠️ MEV extraction (sandwich attacks on swaps)
-- ⚠️ Pool liquidity requirements (minimum TVL for privacy)
-
----
-
-**Status:** Swap infrastructure complete. Frontend integrated. Awaiting Cetus DEX integration for production use.
-
-**Contact:** For questions about this milestone, see [milestones/02-defi-integration.md](../../milestones/02-defi-integration.md)
