@@ -24,8 +24,6 @@ import {
   poseidonHash,
 } from "./crypto.js";
 import {
-  compressG1,
-  compressG2,
   serializeProof,
   serializePublicInputs,
 } from "./utils/proof-compression.js";
@@ -164,15 +162,10 @@ export async function generateUnshieldProof(
 
     return { proof, publicSignals };
   } else {
-    // Browser: Load files via fetch, then use snarkjs with buffers
-    console.log(`Loading circuit artifacts from ${wasmPath} and ${zkeyPath}...`);
-
     const [wasmBuffer, zkeyBuffer] = await Promise.all([
       loadFileBrowser(wasmPath),
       loadFileBrowser(zkeyPath),
     ]);
-
-    console.log(`Loaded WASM: ${wasmBuffer.byteLength} bytes, zkey: ${zkeyBuffer.byteLength} bytes`);
 
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
       input as unknown as snarkjs.CircuitSignals,
@@ -581,24 +574,12 @@ export async function generateSwapProof(
   // Build circuit input
   const circuitInput = buildSwapInput(swapInput);
 
-  console.log("Generating swap proof...");
-  console.log("Circuit input:", {
-    merkle_root: circuitInput.merkle_root,
-    input_nullifiers: circuitInput.input_nullifiers,
-    output_commitment: circuitInput.output_commitment,
-    change_commitment: circuitInput.change_commitment,
-    swap_data_hash: circuitInput.swap_data_hash,
-  });
-
   // Generate proof using snarkjs
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
     circuitInput as any,
     wasmPath,
     zkeyPath
   );
-
-  console.log("Proof generated successfully");
-  console.log("Public signals:", publicSignals);
 
   return { proof, publicSignals };
 }

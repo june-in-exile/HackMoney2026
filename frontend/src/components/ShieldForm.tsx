@@ -13,7 +13,7 @@ import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   createNote,
   encryptNote,
-  bigIntToBytes,
+  bigIntToLE32,
   poseidonHash,
   deriveViewingPublicKey
 } from "@octopus/sdk";
@@ -122,8 +122,8 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       const viewingPk = deriveViewingPublicKey(keypair.spendingKey);
       const encryptedNoteData = encryptNote(note, viewingPk);
 
-      // Convert commitment to bytes (32 bytes, big-endian)
-      const commitmentBytes = bigIntToBytes(note.commitment);
+      // Convert commitment to bytes (32 bytes, little-endian for Move contract)
+      const commitmentBytes = bigIntToLE32(note.commitment);
 
       // Build shield transaction
       const tx = new Transaction();

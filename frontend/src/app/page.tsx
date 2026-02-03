@@ -191,9 +191,6 @@ export default function Home() {
           // Not connected state
           <div className="mx-auto max-w-xl">
             <div className="card-glow text-center py-12">
-              <div className="mb-6 w-20 h-20 mx-auto border-4 border-cyber-blue bg-cyber-blue/10 flex items-center justify-center clip-corner filter drop-shadow-[0_0_20px_rgba(0,217,255,0.5)]">
-                <span className="text-cyber-blue text-4xl font-black">◐</span>
-              </div>
               <h2 className="mb-3 text-2xl font-black uppercase tracking-wider text-cyber-blue text-cyber">
                 WALLET CONNECTION REQUIRED
               </h2>

@@ -5,7 +5,7 @@ import { useSuiClient } from "@mysten/dapp-kit";
 import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
-import { bigIntToBytes } from "@octopus/sdk";
+import { bigIntToBE32 } from "@octopus/sdk";
 import { getWorkerManager } from "@/lib/workerManager";
 
 /**
@@ -109,6 +109,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
           setNotes(ownedNotes);
         }
       } catch (err) {
+        console.error('[useNotes] scanNotes failed:', err);
         if (!isCancelled) {
           setError(err instanceof Error ? err.message : "Failed to scan notes");
         }
@@ -144,7 +145,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
           const nullifierRegistryId = fields.nullifiers.fields.id.id;
 
           // Convert nullifier to byte array (big-endian 32 bytes)
-          const nullifierBytes = Array.from(bigIntToBytes(nullifier));
+          const nullifierBytes = Array.from(bigIntToBE32(nullifier));
 
           // Query dynamic field directly from Table
           const dynamicField = await client.getDynamicFieldObject({

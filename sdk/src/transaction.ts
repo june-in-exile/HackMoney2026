@@ -6,8 +6,7 @@
 
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
-import { type SuiUnshieldProof, type SuiTransferProof } from "./types.js";
-import { type SuiSwapProof } from "./types.js";
+import { type SuiUnshieldProof, type SuiTransferProof, type SuiSwapProof } from "./types.js";
 
 /**
  * Sui client configuration

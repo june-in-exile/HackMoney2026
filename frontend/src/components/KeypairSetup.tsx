@@ -95,7 +95,6 @@ export function KeypairSetup({
                       >
                         <button
                           onClick={() => {
-                            console.log('[KeypairSetup] Selecting keypair:', kp.masterPublicKey.slice(0, 16) + '...');
                             onSelect(kp.masterPublicKey);
                             setShowSavedKeypairs(false);
                           }}

@@ -136,8 +136,6 @@ export function useLocalKeypair(walletAddress: string | undefined) {
   // Select an existing keypair
   const selectKeypair = useCallback(
     (masterPublicKey: string) => {
-      console.log('[selectKeypair] Called with MPK:', masterPublicKey.slice(0, 16) + '...');
-
       if (!walletAddress) {
         console.warn('[selectKeypair] No wallet address, returning early');
         return;
@@ -148,7 +146,6 @@ export function useLocalKeypair(walletAddress: string | undefined) {
       const selected = saved.find((kp) => kp.masterPublicKey === masterPublicKey);
 
       if (selected) {
-        console.log('[selectKeypair] Found saved keypair, setting state');
         const keypairObj: OctopusKeypair = {
           spendingKey: hexToBigInt(selected.spendingKey),
           nullifyingKey: hexToBigInt(selected.nullifyingKey),
@@ -157,7 +154,6 @@ export function useLocalKeypair(walletAddress: string | undefined) {
 
         setKeypair(keypairObj);
         setActiveKeypair(identifier, selected);
-        console.log('[selectKeypair] Keypair state updated');
       } else {
         console.warn('[selectKeypair] Keypair not found in saved list');
         console.warn('[selectKeypair] Looking for:', masterPublicKey);

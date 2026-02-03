@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ConnectButton } from "./ConnectButton";
 
 export function Header() {
@@ -9,15 +10,22 @@ export function Header() {
       <div className="absolute inset-0 bg-gradient-to-b from-cyber-blue/5 via-cyber-purple/3 to-transparent pointer-events-none" />
 
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 border-2 border-cyber-blue bg-cyber-blue/10 flex items-center justify-center clip-corner relative">
-            <span className="text-cyber-blue font-black text-xl">◉</span>
-            <div className="absolute -inset-1 bg-cyber-purple/20 blur-lg -z-10" />
-          </div>
+        <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-cyber-blue tracking-tighter uppercase">
               OCTOPUS
             </h1>
+          </div>
+          <div className="w-3 h-7.5 relative">
+            <Image
+              src="/images/sui.png"
+              alt="Sui Logo"
+              width={32}
+              height={45}
+              className="object-contain"
+            />
+          </div>
+          <div>
             <span className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase border border-cyber-blue/50 text-cyber-blue/80 clip-corner font-mono">
               TESTNET
             </span>

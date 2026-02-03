@@ -103,6 +103,22 @@ function computeNullifier(nullifyingKey: bigint, leafIndex: number): string {
 }
 
 // ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Wrap a promise with a timeout
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operationName} timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
+}
+
+// ============================================================================
 // Merkle Tree Implementation
 // ============================================================================
 
@@ -237,40 +253,51 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           leafIndex: number;
         }> = [];
 
-        // Query ShieldEvents using GraphQL
-        const shieldQuery = await client.query({
-          query: graphql(`
-            query ShieldEvents($eventType: String!, $first: Int) {
-              events(first: $first, filter: { type: $eventType }) {
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-                nodes {
-                  transactionModule {
-                    package { address }
+        // Query ShieldEvents using GraphQL with timeout
+        const shieldQueryStart = Date.now();
+        const shieldQuery = await withTimeout(
+          client.query({
+            query: graphql(`
+              query ShieldEvents($eventType: String!, $first: Int) {
+                events(first: $first, filter: { type: $eventType }) {
+                  pageInfo {
+                    hasNextPage
+                    endCursor
                   }
-                  contents {
-                    json
-                  }
-                  transaction {
-                    digest
+                  nodes {
+                    transactionModule {
+                      package { address }
+                    }
+                    contents {
+                      json
+                    }
+                    transaction {
+                      digest
+                    }
                   }
                 }
               }
-            }
-          `),
-          variables: {
-            eventType: `${request.packageId}::pool::ShieldEvent`,
-            first: 10,
-          },
+            `),
+            variables: {
+              eventType: `${request.packageId}::pool::ShieldEvent`,
+              first: 10,
+            },
+          }),
+          30000, // 30 second timeout for GraphQL query
+          'ShieldEvents GraphQL query'
+        ).catch(err => {
+          console.error('[Worker] ShieldEvents query failed:', err.message);
+          throw err;
         });
 
+        const shieldQueryTime = Date.now() - shieldQueryStart;
+        if (shieldQueryTime > 10000) {
+          console.warn(`[Worker] ShieldEvents query took ${shieldQueryTime}ms`);
+        }
+
         // Process Shield events
-        let shieldEventsProcessed = 0;
         let shieldNotesDecrypted = 0;
         for (const node of shieldQuery.data?.events?.nodes || []) {
-          shieldEventsProcessed++;
           const eventData = node.contents?.json as any;
           if (!eventData) continue; // Skip if no event data
 
@@ -328,40 +355,51 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           }
         }
 
-        // Query TransferEvents using GraphQL
-        const transferQuery = await client.query({
-          query: graphql(`
-            query TransferEvents($eventType: String!, $first: Int) {
-              events(first: $first, filter: { type: $eventType }) {
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-                nodes {
-                  transactionModule {
-                    package { address }
+        // Query TransferEvents using GraphQL with timeout
+        const transferQueryStart = Date.now();
+        const transferQuery = await withTimeout(
+          client.query({
+            query: graphql(`
+              query TransferEvents($eventType: String!, $first: Int) {
+                events(first: $first, filter: { type: $eventType }) {
+                  pageInfo {
+                    hasNextPage
+                    endCursor
                   }
-                  contents {
-                    json
-                  }
-                  transaction {
-                    digest
+                  nodes {
+                    transactionModule {
+                      package { address }
+                    }
+                    contents {
+                      json
+                    }
+                    transaction {
+                      digest
+                    }
                   }
                 }
               }
-            }
-          `),
-          variables: {
-            eventType: `${request.packageId}::pool::TransferEvent`,
-            first: 10,
-          },
+            `),
+            variables: {
+              eventType: `${request.packageId}::pool::TransferEvent`,
+              first: 10,
+            },
+          }),
+          30000, // 30 second timeout for GraphQL query
+          'TransferEvents GraphQL query'
+        ).catch(err => {
+          console.error('[Worker] TransferEvents query failed:', err.message);
+          throw err;
         });
 
+        const transferQueryTime = Date.now() - transferQueryStart;
+        if (transferQueryTime > 10000) {
+          console.warn(`[Worker] TransferEvents query took ${transferQueryTime}ms`);
+        }
+
         // Process Transfer events
-        let transferEventsProcessed = 0;
         let transferNotesDecrypted = 0;
         for (const node of transferQuery.data?.events?.nodes || []) {
-          transferEventsProcessed++;
           const eventData = node.contents?.json as any;
           if (!eventData) continue; // Skip if no event data
 
@@ -426,8 +464,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           for (const { commitment, leafIndex } of allCommitments) {
             tree.insert(leafIndex, commitment);
           }
-
-          const treeRoot = tree.getRoot();
 
           // Generate proofs for owned notes
           for (const ownedNote of ownedNotes) {

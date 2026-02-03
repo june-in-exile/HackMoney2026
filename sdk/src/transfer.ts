@@ -1,10 +1,10 @@
 /**
  * Octopus SDK - Wallet Utilities
  *
- * Note selection and UTXO management for private transfers.
+ * Note selection and output notes creation for private transfers.
  */
 
-import type { Note, OctopusKeypair } from "./types.js";
+import type { Note } from "./types.js";
 import { createNote } from "./crypto.js";
 
 /**
@@ -116,99 +116,4 @@ export function createTransferOutputs(
   const changeNote = createNote(senderMpk, token, changeAmount);
 
   return [recipientNote, changeNote];
-}
-
-/**
- * Validate transfer parameters before proof generation
- */
-export function validateTransferParams(
-  recipientMpk: bigint,
-  amount: bigint,
-  selectedNotes: SelectableNote[],
-  token: bigint
-): void {
-  // Check recipient MPK is valid (non-zero)
-  if (recipientMpk === 0n) {
-    throw new Error("Invalid recipient MPK: cannot be zero");
-  }
-
-  // Check amount is positive
-  if (amount <= 0n) {
-    throw new Error("Transfer amount must be greater than 0");
-  }
-
-  // Check we have 1 or 2 notes
-  if (selectedNotes.length < 1 || selectedNotes.length > 2) {
-    throw new Error(`Invalid number of selected notes: ${selectedNotes.length}`);
-  }
-
-  // Check all notes have same token type
-  for (const selectable of selectedNotes) {
-    if (selectable.note.token !== token) {
-      throw new Error(
-        `Note token mismatch. Expected: ${token}, got: ${selectable.note.token}`
-      );
-    }
-  }
-
-  // Check total input value covers amount
-  const inputTotal = selectedNotes.reduce((sum, n) => sum + n.note.value, 0n);
-  if (inputTotal < amount) {
-    throw new Error(
-      `Insufficient input value. Required: ${amount}, Available: ${inputTotal}`
-    );
-  }
-
-  // Check all notes have path elements (required for proof generation)
-  for (let i = 0; i < selectedNotes.length; i++) {
-    if (!selectedNotes[i].pathElements || selectedNotes[i].pathElements!.length === 0) {
-      throw new Error(`Note ${i} missing Merkle path elements`);
-    }
-  }
-}
-
-/**
- * Build transfer input from selected notes and recipient info.
- * Convenience function that combines selection, validation, and output creation.
- *
- * @param keypair - Sender's keypair
- * @param selectedNotes - Selected input notes (1 or 2)
- * @param recipientMpk - Recipient's master public key
- * @param amount - Amount to transfer
- * @param token - Token type
- * @returns TransferInput ready for proof generation
- */
-export function buildTransferFromSelection(
-  keypair: OctopusKeypair,
-  selectedNotes: SelectableNote[],
-  recipientMpk: bigint,
-  amount: bigint,
-  token: bigint
-): {
-  inputNotes: Note[];
-  inputLeafIndices: number[];
-  inputPathElements: bigint[][];
-  outputNotes: Note[];
-} {
-  // Validate
-  validateTransferParams(recipientMpk, amount, selectedNotes, token);
-
-  // Calculate input total
-  const inputTotal = selectedNotes.reduce((sum, n) => sum + n.note.value, 0n);
-
-  // Create output notes
-  const [recipientNote, changeNote] = createTransferOutputs(
-    recipientMpk,
-    keypair.masterPublicKey,
-    amount,
-    inputTotal,
-    token
-  );
-
-  return {
-    inputNotes: selectedNotes.map((s) => s.note),
-    inputLeafIndices: selectedNotes.map((s) => s.leafIndex),
-    inputPathElements: selectedNotes.map((s) => s.pathElements!),
-    outputNotes: [recipientNote, changeNote],
-  };
 }

@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
-import { decryptNote, computeNullifier, bigIntToBytes } from "@octopus/sdk";
+import { decryptNote, computeNullifier, bigIntToBE32 } from "@octopus/sdk";
 import { initPoseidon } from "@/lib/poseidon";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import { PACKAGE_ID, POOL_ID, STORAGE_KEYS } from "@/lib/constants";
@@ -88,7 +88,7 @@ export function useShieldedBalance(
           const fields = poolObject.data.content.fields as any;
           const nullifierRegistryId = fields.nullifiers.fields.id.id;
 
-          const nullifierBytes = Array.from(bigIntToBytes(nullifier));
+          const nullifierBytes = Array.from(bigIntToBE32(nullifier));
 
           const dynamicField = await client.getDynamicFieldObject({
             parentId: nullifierRegistryId,

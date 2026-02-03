@@ -164,29 +164,6 @@ export function computeMerkleRoot(
 }
 
 /**
- * Build a Merkle proof for a single-leaf tree (for testing/demo)
- * When the tree has only one leaf at index 0, all siblings are zero hashes
- */
-export function buildSingleLeafProof(commitment: bigint): {
-  pathElements: bigint[];
-  root: bigint;
-} {
-  const zeros = computeZeroHashes();
-  const pathElements = zeros.slice(0, MERKLE_TREE_DEPTH);
-
-  // Compute root: leaf is always on left at each level
-  let current = commitment;
-  for (let i = 0; i < MERKLE_TREE_DEPTH; i++) {
-    current = poseidonHash([current, pathElements[i]]);
-  }
-
-  return {
-    pathElements,
-    root: current,
-  };
-}
-
-/**
  * Derive X25519 viewing keypair from spending key
  *
  * This creates a separate keypair for encryption/decryption that is

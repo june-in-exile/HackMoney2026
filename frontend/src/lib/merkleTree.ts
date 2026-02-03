@@ -180,27 +180,3 @@ function bytesToBigInt(bytes: number[]): bigint {
   }
   return result;
 }
-
-/**
- * Compute Merkle root from commitments
- */
-export function computeRootFromCommitments(commitments: bigint[]): bigint {
-  if (commitments.length === 0) {
-    return computeZeroHashes()[TREE_DEPTH];
-  }
-
-  const zeros = computeZeroHashes();
-  let currentLevel = commitments.slice();
-
-  for (let level = 0; level < TREE_DEPTH; level++) {
-    const nextLevel: bigint[] = [];
-    for (let i = 0; i < currentLevel.length; i += 2) {
-      const left = currentLevel[i];
-      const right = i + 1 < currentLevel.length ? currentLevel[i + 1] : zeros[level];
-      nextLevel.push(poseidonHash([left, right]));
-    }
-    currentLevel = nextLevel;
-  }
-
-  return currentLevel[0];
-}

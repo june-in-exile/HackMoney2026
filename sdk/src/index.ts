@@ -28,12 +28,27 @@ export {
   computeNullifier,
   computeZeroHashes,
   computeMerkleRoot,
-  buildSingleLeafProof,
   deriveViewingPublicKey,
   mpkToViewingPublicKeyUnsafe,
   encryptNote,
   decryptNote,
 } from "./crypto.js";
+
+// DEX Integration (Cetus price fetching)
+export {
+  getCetusPool,
+  estimateCetusSwap,
+  findCetusPool,
+  getCetusPrice,
+  CETUS_TESTNET_POOLS,
+  type CetusPoolConfig,
+  type SwapEstimation,
+} from "./dex.js";
+
+// Merkle tree utilities
+export {
+  ClientMerkleTree,
+} from "./merkle.js";
 
 // Proof generation
 export {
@@ -54,41 +69,14 @@ export {
   buildSwapTransaction,
   TESTNET_CONFIG,
   type SuiConfig,
-} from "./sui.js";
-
-// Merkle tree utilities
-export {
-  ClientMerkleTree,
-  buildMerkleTreeFromEvents,
-  getMerkleProofForNote,
-  type CommitmentLeaf,
-} from "./merkle.js";
-
-// DeFi operations (Private Swaps)
-export {
-  calculateMinAmountOut,
-  estimateSwapOutput,
-} from "./defi.js";
-
-// DEX Integration (Cetus price fetching)
-export {
-  getCetusPool,
-  estimateCetusSwap,
-  findCetusPool,
-  getCetusPrice,
-  CETUS_TESTNET_POOLS,
-  type CetusPoolConfig,
-  type SwapEstimation,
-} from "./dex.js";
+} from "./transaction.js";
 
 // Wallet utilities (Note selection for transfers)
 export {
   selectNotesForTransfer,
   createTransferOutputs,
-  validateTransferParams,
-  buildTransferFromSelection,
   type SelectableNote,
-} from "./wallet.js";
+} from "./transfer.js";
 
 // Types
 export * from "./types.js";

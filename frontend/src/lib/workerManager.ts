@@ -125,13 +125,13 @@ class NoteScanWorkerManager {
       this.pendingRequests.set(id, { resolve, reject });
       this.worker!.postMessage(request);
 
-      // Timeout after 30s
+      // Timeout after 90s (allows for 2x 30s GraphQL queries + processing time)
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-          reject(new Error("Request timeout"));
+          reject(new Error("Request timeout after 90s"));
         }
-      }, 30000);
+      }, 90000);
     });
   }
 

@@ -1,4 +1,4 @@
-# CLAUDE.md
+# Gemini Context: Octopus Privacy Protocol
 
 This document provides a comprehensive overview of the Octopus project, its architecture, and development workflow to guide AI-assisted development.
 
