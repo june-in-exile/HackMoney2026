@@ -82,17 +82,6 @@ nullifier = Poseidon(nullifying_key, leaf_index)
 - TypeScript target must be ES2020+ for BigInt literal support
 - Next.js 16 uses Turbopack by default; use `--webpack` flag for builds
 
-## Testnet Deployment
-
-**Octopus Privacy Pool (SUI) - Poseidon Hash (2026-01-31):**
-
-- Package ID: `0xa28c94d54c043742f6322070b77ffffd935844c3ab5f3106c21dcd1c50115424`
-- Pool ID (Shared Object): `0xbb0ffb1d57ffae497e62302c944e304cebdff923e84aeaa18f6c424be4b151df`
-- Modules: `pool`, `merkle_tree`, `nullifier`, `note`
-- Network: Sui Testnet
-- Verification Key: Embedded in pool (360 bytes, Arkworks compressed BN254)
-- Hash Function: **Poseidon BN254** (circuit-compatible)
-
 ## Current Implementation
 
 ### ✅ Implemented Features

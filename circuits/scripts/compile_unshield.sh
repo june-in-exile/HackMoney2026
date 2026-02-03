@@ -9,6 +9,8 @@ PTAU_FILE="$BUILD_DIR/pot14_final.ptau"
 
 echo "=== Compiling $CIRCUIT_NAME circuit ==="
 
+cd ..
+
 # Step 1: Compile circom to R1CS, WASM, and SYM
 echo "[1/6] Compiling circom..."
 circom $CIRCUIT_NAME.circom \
@@ -53,7 +55,13 @@ echo "  - $BUILD_DIR/${CIRCUIT_NAME}_final.zkey"
 echo "  - $BUILD_DIR/${CIRCUIT_NAME}_vk.json"
 echo ""
 echo "Next steps:"
-echo "  1. Generate test input: node scripts/generateUnshieldTestInput.js"
-echo "  2. Generate witness: node ${BUILD_DIR}/${CIRCUIT_NAME}_js/generate_witness.js ${BUILD_DIR}/${CIRCUIT_NAME}_input.json ${BUILD_DIR}/${CIRCUIT_NAME}_witness.wtns"
-echo "  3. Generate proof: snarkjs groth16 prove ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ${BUILD_DIR}/${CIRCUIT_NAME}_witness.wtns ${BUILD_DIR}/${CIRCUIT_NAME}_proof.json ${BUILD_DIR}/${CIRCUIT_NAME}_public.json"
-echo "  4. Convert to Sui format: node scripts/arkworksConverter.js"
+echo "  1. Go to parent directory: cd .."
+echo "  2. Generate test input: node scripts/generateUnshieldTestInput.js"
+echo "  3. Generate witness: node ${BUILD_DIR}/${CIRCUIT_NAME}_js/generate_witness.js ${BUILD_DIR}/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm ${BUILD_DIR}/${CIRCUIT_NAME}_input.json ${BUILD_DIR}/${CIRCUIT_NAME}_witness.wtns"
+echo "  4. Generate proof: snarkjs groth16 prove ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ${BUILD_DIR}/${CIRCUIT_NAME}_witness.wtns ${BUILD_DIR}/${CIRCUIT_NAME}_proof.json ${BUILD_DIR}/${CIRCUIT_NAME}_public.json"
+echo "  5. Convert to Sui format: node scripts/arkworksConverter.js"
+echo "  6. Copy artifacts to frontend:"
+echo "     mkdir -p ../frontend/public/circuits/${CIRCUIT_NAME}_js"
+echo "     cp ${BUILD_DIR}/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm ../frontend/public/circuits/${CIRCUIT_NAME}_js/"
+echo "     cp ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ../frontend/public/circuits/"
+echo "     cp ${BUILD_DIR}/${CIRCUIT_NAME}_vk.json ../frontend/public/circuits/"

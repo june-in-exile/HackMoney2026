@@ -1,5 +1,4 @@
 #!/bin/bash
-# Compile swap.circom and generate proving/verification keys for Groth16 ZK-SNARKs
 
 set -e
 
@@ -8,6 +7,8 @@ BUILD_DIR="build"
 PTAU_FILE="$BUILD_DIR/pot15_final.ptau"
 
 echo "=== Compiling $CIRCUIT_NAME circuit ==="
+
+cd ..
 
 # Step 1: Compile circom to R1CS, WASM, and SYM
 echo "[1/6] Compiling circom..."
@@ -56,7 +57,22 @@ echo "Constraint count:"
 snarkjs r1cs info $BUILD_DIR/${CIRCUIT_NAME}.r1cs | grep "# of Constraints"
 echo ""
 echo "Next steps:"
-echo "  1. Test circuit with test inputs"
-echo "  2. Convert verification key to Sui format"
-echo "  3. Update pool.move with swap verification key"
-echo "  4. Deploy swap circuit artifacts to frontend/public/circuits/"
+echo "  1. Go to parent directory: cd .."
+echo "  2. Test the circuit: node scripts/generateSwapTestInput.js"
+echo "  3. Generate witness and proof:"
+echo "     snarkjs groth16 fullprove ${BUILD_DIR}/swap_input.json \\"
+echo "       ${BUILD_DIR}/swap_js/swap.wasm \\"
+echo "       ${BUILD_DIR}/swap_final.zkey \\"
+echo "       ${BUILD_DIR}/swap_proof.json \\"
+echo "       ${BUILD_DIR}/swap_public.json"
+echo "  4. Verify the proof:"
+echo "     snarkjs groth16 verify ${BUILD_DIR}/swap_vk.json \\"
+echo "       ${BUILD_DIR}/swap_public.json \\"
+echo "       ${BUILD_DIR}/swap_proof.json"
+echo "  5. Convert to Sui format:"
+echo "     node scripts/arkworksConverterSwap.js"
+echo "  6. Copy artifacts to frontend:"
+echo "     mkdir -p ../frontend/public/circuits/${CIRCUIT_NAME}_js"
+echo "     cp ${BUILD_DIR}/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm ../frontend/public/circuits/${CIRCUIT_NAME}_js/"
+echo "     cp ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ../frontend/public/circuits/"
+echo "     cp ${BUILD_DIR}/${CIRCUIT_NAME}_vk.json ../frontend/public/circuits/"

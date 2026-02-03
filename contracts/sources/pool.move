@@ -33,6 +33,14 @@ module octopus::pool {
 
     // ============ Structs ============
 
+    /// Admin capability for managing pool verification keys.
+    /// Allows updating VKs when circuit changes are made during development.
+    public struct PoolAdminCap has key, store {
+        id: UID,
+        /// ID of the pool this admin cap controls
+        pool_id: ID,
+    }
+
     /// Main privacy pool holding shielded tokens of type T.
     /// Each token type has its own pool instance.
     public struct PrivacyPool<phantom T> has key, store {
@@ -139,6 +147,7 @@ module octopus::pool {
 
     /// Create and share a privacy pool as a shared object.
     /// This is the typical way to deploy a pool for public use.
+    /// Returns an AdminCap to the caller for managing verification keys.
     public fun create_shared_pool<T>(
         vk_bytes: vector<u8>,
         transfer_vk_bytes: vector<u8>,
@@ -146,8 +155,57 @@ module octopus::pool {
         ctx: &mut TxContext,
     ) {
         let pool = create_pool<T>(vk_bytes, transfer_vk_bytes, swap_vk_bytes, ctx);
+        let pool_id = object::id(&pool);
+
+        // Create admin capability for pool management
+        let admin_cap = PoolAdminCap {
+            id: object::new(ctx),
+            pool_id,
+        };
+
         transfer::share_object(pool);
+        transfer::transfer(admin_cap, tx_context::sender(ctx));
     }
+
+    // ============ Admin Functions ============
+
+    /// Update the unshield verification key.
+    /// Only callable by the admin cap holder.
+    /// Used when the unshield circuit is updated during development.
+    public fun update_unshield_vk<T>(
+        pool: &mut PrivacyPool<T>,
+        admin_cap: &PoolAdminCap,
+        new_vk_bytes: vector<u8>,
+    ) {
+        assert!(admin_cap.pool_id == object::id(pool), E_INVALID_PROOF);
+        pool.vk_bytes = new_vk_bytes;
+    }
+
+    /// Update the transfer verification key.
+    /// Only callable by the admin cap holder.
+    /// Used when the transfer circuit is updated during development.
+    public fun update_transfer_vk<T>(
+        pool: &mut PrivacyPool<T>,
+        admin_cap: &PoolAdminCap,
+        new_vk_bytes: vector<u8>,
+    ) {
+        assert!(admin_cap.pool_id == object::id(pool), E_INVALID_PROOF);
+        pool.transfer_vk_bytes = new_vk_bytes;
+    }
+
+    /// Update the swap verification key.
+    /// Only callable by the admin cap holder.
+    /// Used when the swap circuit is updated during development.
+    public fun update_swap_vk<T>(
+        pool: &mut PrivacyPool<T>,
+        admin_cap: &PoolAdminCap,
+        new_vk_bytes: vector<u8>,
+    ) {
+        assert!(admin_cap.pool_id == object::id(pool), E_INVALID_PROOF);
+        pool.swap_vk_bytes = new_vk_bytes;
+    }
+
+    // ============ Core Pool Functions ============
 
     /// Shield tokens into the privacy pool.
     ///

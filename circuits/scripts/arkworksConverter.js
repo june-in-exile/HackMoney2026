@@ -138,9 +138,9 @@ console.log(publicInputsBytes.toString("hex"));
 console.log(`\nPublic inputs length: ${publicInputsBytes.length} bytes (${publicInputs.length} inputs)`);
 
 // === Write outputs ===
-fs.writeFileSync(path.join(baseDir, "build/unshield_vk_bytes.hex"), vkBytes.toString("hex"));
-fs.writeFileSync(path.join(baseDir, "build/unshield_proof_bytes.hex"), proofBytes.toString("hex"));
-fs.writeFileSync(path.join(baseDir, "build/unshield_public_inputs_bytes.hex"), publicInputsBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "../build/unshield_vk_bytes.hex"), vkBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "../build/unshield_proof_bytes.hex"), proofBytes.toString("hex"));
+fs.writeFileSync(path.join(baseDir, "../build/unshield_public_inputs_bytes.hex"), publicInputsBytes.toString("hex"));
 
 console.log("\n=== Files written to build/ ===");
 console.log("- unshield_vk_bytes.hex");

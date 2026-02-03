@@ -60,15 +60,21 @@ template Transfer(levels) {
     // 1. Verify NPK = Poseidon(MPK, random)
     // 2. Compute commitment = Poseidon(NPK, token, value)
     // 3. Verify nullifier = Poseidon(nullifying_key, leaf_index)
-    // 4. Verify commitment exists in Merkle tree
+    // 4. Verify commitment exists in Merkle tree (skip for dummy notes with value=0)
 
     component inputNpkHashers[2];
     component inputCommitmentHashers[2];
     component inputNullifierHashers[2];
     component inputMerkleProofs[2];
-    component isValueZero[2];
+    component isValueZero[2];  // Detect dummy notes (value == 0)
+    signal enabled[2];         // 1 for real notes, 0 for dummy notes
 
     for (var i = 0; i < 2; i++) {
+        // Check if this input is a dummy note (value == 0)
+        isValueZero[i] = IsZero();
+        isValueZero[i].in <== input_values[i];
+        enabled[i] <== 1 - isValueZero[i].out;
+
         // Verify NPK ownership: NPK = Poseidon(MPK, random)
         inputNpkHashers[i] = Poseidon(2);
         inputNpkHashers[i].inputs[0] <== mpk;
@@ -95,8 +101,13 @@ template Transfer(levels) {
             inputMerkleProofs[i].path_elements[j] <== input_path_elements[i][j];
         }
 
-        // Both inputs must be in the same tree (same root)
-        merkle_root === inputMerkleProofs[i].root;
+        // Conditionally verify Merkle root:
+        // - For real notes (value != 0): MUST match merkle_root
+        // - For dummy notes (value == 0): root check is bypassed
+        // Constraint: enabled[i] * (merkle_root - computed_root) === 0
+        //   When enabled[i]=1 (real note): merkle_root must equal computed_root
+        //   When enabled[i]=0 (dummy note): constraint is always satisfied
+        enabled[i] * (merkle_root - inputMerkleProofs[i].root) === 0;
     }
 
     // ============ Step 3: Verify Output Commitments ============
