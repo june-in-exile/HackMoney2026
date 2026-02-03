@@ -214,41 +214,43 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
     parseFloat(amountOut) > 0;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-        Private Swap
-      </h2>
-
+    <form onSubmit={handleSubmit} className="space-y-5">
       {!DEMO_MODE && (
-        <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            [!] Swap functionality requires production Cetus integration. Currently in development.
-          </p>
+        <div className="p-3 border border-yellow-600/30 bg-yellow-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-500 text-sm">!</span>
+            <p className="text-xs text-yellow-400 font-mono leading-relaxed">
+              Swap functionality requires production Cetus integration. Currently in development.
+            </p>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
         {/* Token In */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
             From
           </label>
           <div className="flex gap-2">
             <select
               value={tokenIn}
               onChange={(e) => setTokenIn(e.target.value as "SUI" | "USDC")}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="input w-24"
+              disabled={isSubmitting}
             >
               <option value="SUI">SUI</option>
               <option value="USDC">USDC</option>
             </select>
             <input
               type="number"
-              step="0.000001"
+              step="0.001"
+              min="0"
               value={amountIn}
               onChange={(e) => setAmountIn(e.target.value)}
               placeholder="0.0"
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="input flex-1"
+              disabled={isSubmitting}
             />
           </div>
         </div>
@@ -258,9 +260,10 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
           <button
             type="button"
             onClick={handleSwitchTokens}
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className="p-2 clip-corner border border-cyber-blue/30 hover:bg-cyber-blue/10 transition"
+            disabled={isSubmitting}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-cyber-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
             </svg>
           </button>
@@ -268,14 +271,15 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
 
         {/* Token Out */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            To (estimated)
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
+            To (Estimated)
           </label>
           <div className="flex gap-2">
             <select
               value={tokenOut}
               onChange={(e) => setTokenOut(e.target.value as "SUI" | "USDC")}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="input w-24"
+              disabled={isSubmitting}
             >
               <option value="SUI">SUI</option>
               <option value="USDC">USDC</option>
@@ -284,14 +288,33 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
               type="text"
               value={isEstimating ? "Estimating..." : amountOut}
               readOnly
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="input flex-1 bg-black/30"
             />
           </div>
+          {isEstimating && (
+            <p className="mt-2 text-[10px] text-gray-500 font-mono flex items-center gap-2">
+              <svg
+                className="h-3 w-3 animate-spin text-cyber-blue"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              FETCHING PRICE...
+            </p>
+          )}
         </div>
 
         {/* Slippage Settings */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
             Slippage Tolerance
           </label>
           <div className="flex gap-2">
@@ -300,11 +323,12 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
                 key={bps}
                 type="button"
                 onClick={() => setSlippage(bps)}
+                disabled={isSubmitting}
                 className={cn(
-                  "px-3 py-1 rounded-md text-sm font-medium transition",
+                  "px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wider transition clip-corner",
                   slippage === bps
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    ? "bg-cyber-blue text-black border border-cyber-blue"
+                    : "bg-black/30 text-gray-400 border border-gray-800 hover:border-cyber-blue/50"
                 )}
               >
                 {bps / 100}%
@@ -315,51 +339,89 @@ export function SwapForm({ keypair, onSuccess }: SwapFormProps) {
 
         {/* Price Impact */}
         {priceImpact > 0 && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Price Impact: <span className={cn(
-              priceImpact > 5 ? "text-red-600 dark:text-red-400 font-semibold" : "text-green-600 dark:text-green-400"
-            )}>
-              {priceImpact.toFixed(2)}%
-            </span>
+          <div className="p-3 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+            <p className="text-[10px] text-gray-300 font-mono">
+              <span className="text-gray-500">PRICE IMPACT:</span>{" "}
+              <span className={cn(
+                "font-bold",
+                priceImpact > 5 ? "text-red-400" : "text-green-400"
+              )}>
+                {priceImpact.toFixed(2)}%
+              </span>
+            </p>
           </div>
         )}
 
         {/* Error Message */}
         {error && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          <div className="p-3 border border-red-600/30 bg-red-900/20 clip-corner">
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 text-sm">✕</span>
+              <p className="text-xs text-red-400 font-mono leading-relaxed">{error}</p>
+            </div>
           </div>
         )}
 
         {/* Success Message */}
         {success && (
-          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-            <p className="text-sm text-green-800 dark:text-green-200">{success}</p>
+          <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
+            <div className="flex items-start gap-2">
+              <span className="text-green-500 text-sm">✓</span>
+              <p className="text-xs text-green-400 font-mono leading-relaxed">{success}</p>
+            </div>
           </div>
         )}
+      </div>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={!isFormValid || isSubmitting}
-          className={cn(
-            "w-full py-3 px-4 rounded-md font-medium transition",
-            isFormValid && !isSubmitting
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-          )}
-        >
-          {isSubmitting ? "Generating Proof..." : "Swap Privately"}
-        </button>
-      </form>
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={!isFormValid || isSubmitting}
+        className={cn(
+          "btn-primary w-full",
+          isSubmitting && "cursor-wait opacity-70"
+        )}
+      >
+        {isSubmitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            GENERATING PROOF...
+          </span>
+        ) : (
+          "⇄ PRIVATE SWAP"
+        )}
+      </button>
 
       {/* Info Box */}
-      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
-        <p className="text-xs text-blue-800 dark:text-blue-200">
-          <strong>Privacy:</strong> Swap executes through Cetus DEX while keeping amounts and addresses private via ZK proofs.
-          The output token is shielded into your private pool automatically.
+      <div className="p-4 border border-gray-800 bg-black/30 clip-corner space-y-3">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-cyber-blue font-mono">
+          Swap Process:
+        </h4>
+        <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
+          <li>Select input notes from pool</li>
+          <li>Fetch price from Cetus DEX</li>
+          <li>Generate Merkle proofs</li>
+          <li>Generate ZK proof (30-60s)</li>
+          <li>Execute private swap</li>
+          <li>Shield output tokens to pool</li>
+        </ol>
+        <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+        <p className="text-[10px] text-gray-500 font-mono">
+          <span className="text-cyber-blue">◉</span> Privacy: Swap amounts and addresses remain hidden via ZK proofs
         </p>
       </div>
-    </div>
+    </form>
   );
 }

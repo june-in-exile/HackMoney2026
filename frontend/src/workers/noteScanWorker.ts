@@ -450,7 +450,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                 ? hash([sibling, currentHash])  // Right: sibling on left
                 : hash([currentHash, sibling]); // Left: sibling on right
             }
-            console.log(`[Worker] Proof verification: computed root = ${currentHash.toString()}, expected = ${treeRoot.toString()}, match = ${currentHash === treeRoot}`);
           }
         }
 

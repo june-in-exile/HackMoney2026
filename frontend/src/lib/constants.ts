@@ -2,16 +2,15 @@
  * Octopus Frontend Constants
  */
 
-// Deployed contract addresses (testnet)
-// Updated 2026-02-02: Redeployed with swapped assertion order (proof check before root check) ✅
-export const PACKAGE_ID = "0xa28c94d54c043742f6322070b77ffffd935844c3ab5f3106c21dcd1c50115424";
-export const POOL_ID = "0xbb0ffb1d57ffae497e62302c944e304cebdff923e84aeaa18f6c424be4b151df";
+// Deployed contract addresses (from environment variables)
+export const PACKAGE_ID = "0x25e5c3d9d8ee95c257134484e13d70135b5fbce1c245479c64d5e7d481bd2973";
+export const POOL_ID = "0x33b258d3b99f06c2cf414a19fcc62d8c4689a2f318b9dda3779f8232abd36b30";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";
 
 // Network configuration
-export const NETWORK = "testnet" as const;
+export const NETWORK = (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
 export const RPC_URL = "https://fullnode.testnet.sui.io:443";
 
 // LocalStorage keys

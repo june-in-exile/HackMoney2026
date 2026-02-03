@@ -257,6 +257,24 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
           "▲ SHIELD TOKENS"
         )}
       </button>
+
+      {/* Info Box */}
+      <div className="p-4 border border-gray-800 bg-black/30 clip-corner space-y-3">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-cyber-blue font-mono">
+          Shield Process:
+        </h4>
+        <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
+          <li>Enter amount to shield</li>
+          <li>Create private note with commitment</li>
+          <li>Encrypt note for recovery</li>
+          <li>Submit deposit transaction</li>
+          <li>Note added to Merkle tree</li>
+        </ol>
+        <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+        <p className="text-[10px] text-gray-500 font-mono">
+          <span className="text-cyber-blue">◉</span> Privacy: Token amount and ownership hidden on-chain
+        </p>
+      </div>
     </form>
   );
 }

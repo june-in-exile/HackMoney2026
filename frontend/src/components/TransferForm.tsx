@@ -16,7 +16,6 @@ import {
   encryptNote,
 } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
-import { computeMerkleRoot } from "@octopus/sdk";
 
 interface TransferFormProps {
   keypair: OctopusKeypair | null;
@@ -110,38 +109,6 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       // 4. Generate ZK proof (30-60 seconds)
       setSuccess("⏳ Generating ZK proof (this may take 30-60 seconds)...");
 
-      console.log("=== Transfer Debug - Detailed Analysis ===");
-      console.log(`Number of selected notes: ${selectedNotes.length}`);
-
-      for (let i = 0; i < selectedNotes.length; i++) {
-        const n = selectedNotes[i];
-        console.log(`\nInput Note ${i}:`);
-        console.log(`  Leaf Index: ${n.leafIndex}`);
-        console.log(`  Value: ${n.note.value.toString()} (${(Number(n.note.value) / 1e9).toFixed(3)} SUI)`);
-        console.log(`  Commitment: ${n.note.commitment.toString()}`);
-        console.log(`  NPK: ${n.note.npk.toString()}`);
-        console.log(`  Path Elements Count: ${n.pathElements?.length || 0}`);
-
-        if (n.pathElements && n.pathElements.length > 0) {
-          const pathBigInt = n.pathElements.map(p => BigInt(p));
-          const root = computeMerkleRoot(
-            n.note.commitment,
-            pathBigInt,
-            n.leafIndex
-          );
-          console.log(`  Computed Root: ${root.toString()}`);
-          console.log(`  First Path Element: ${pathBigInt[0].toString()}`);
-          console.log(`  Last Path Element: ${pathBigInt[pathBigInt.length - 1].toString()}`);
-        } else {
-          console.error(`  ❌ ERROR: No path elements!`);
-        }
-      }
-
-      console.log(`\n=== Output Notes ===`);
-      console.log(`Recipient: ${recipientNote.value.toString()} (${(Number(recipientNote.value) / 1e9).toFixed(3)} SUI)`);
-      console.log(`Change: ${changeNote.value.toString()} (${(Number(changeNote.value) / 1e9).toFixed(3)} SUI)`);
-      console.log(`Balance check: ${inputTotal === (recipientNote.value + changeNote.value) ? '✓' : '✗'}`);
-
       const proof = await generateTransferProof(
         {
           keypair,
@@ -149,7 +116,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
           inputLeafIndices: selectedNotes.map((n) => n.leafIndex),
           inputPathElements: selectedNotes.map((n) => n.pathElements!),
           outputNotes: [recipientNote, changeNote],
-          token: 0n,
+          token: selectedNotes[0].note.token, // Use actual token from the note
         },
         {
           wasmPath: CIRCUIT_URLS.TRANSFER.WASM,

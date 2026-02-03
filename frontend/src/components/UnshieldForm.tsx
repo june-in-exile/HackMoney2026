@@ -384,6 +384,24 @@ export function UnshieldForm({
       >
         {isProcessing ? "◉ PROCESSING..." : "▼ UNSHIELD TOKENS"}
       </button>
+
+      {/* Info Box */}
+      <div className="p-4 border border-gray-800 bg-black/30 clip-corner space-y-3">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-cyber-blue font-mono">
+          Unshield Process:
+        </h4>
+        <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
+          <li>Select note to spend</li>
+          <li>Generate Merkle proof</li>
+          <li>Generate ZK proof (10-30s)</li>
+          <li>Submit withdrawal transaction</li>
+          <li>Tokens sent to recipient</li>
+        </ol>
+        <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+        <p className="text-[10px] text-gray-500 font-mono">
+          <span className="text-cyber-blue">◉</span> Privacy: Note details remain hidden, only nullifier revealed
+        </p>
+      </div>
     </form>
   );
 }
