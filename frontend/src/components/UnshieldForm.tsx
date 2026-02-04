@@ -21,8 +21,6 @@ interface UnshieldFormProps {
   keypair: OctopusKeypair | null;
   maxAmount: bigint;
   notes: OwnedNote[];
-  loading: boolean;
-  error: string | null;
   onSuccess?: () => void | Promise<void>;
   markNoteSpent?: (nullifier: bigint) => void;
 }
@@ -38,8 +36,6 @@ export function UnshieldForm({
   keypair,
   maxAmount,
   notes,
-  loading: notesLoading,
-  error: notesError,
   onSuccess,
   markNoteSpent,
 }: UnshieldFormProps) {
@@ -243,75 +239,6 @@ export function UnshieldForm({
           </div>
         </div>
       </div>
-
-      {/* Available Notes Display */}
-      {notesLoading ? (
-        <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
-          <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
-            Available Notes (UTXO)
-          </p>
-          <div className="flex items-center gap-3">
-            <svg
-              className="h-4 w-4 animate-spin text-cyber-blue"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-            >
-              <circle className="opacity-25" cx="12" cy="12" r="10" />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            <p className="text-[10px] text-gray-400 font-mono">Loading notes from blockchain...</p>
-          </div>
-        </div>
-      ) : notesError ? (
-        <div className="p-4 border border-red-600/30 bg-red-900/20 clip-corner">
-          <p className="text-xs font-bold uppercase tracking-wider text-red-400 mb-2 font-mono">
-            Error Loading Notes
-          </p>
-          <p className="text-[10px] text-red-400 font-mono">{notesError}</p>
-        </div>
-      ) : notes.filter((n: OwnedNote) => !n.spent).length > 0 ? (
-        <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
-          <p className="text-xs font-bold uppercase tracking-wider text-cyber-blue mb-3 font-mono">
-            Available Notes (UTXO)
-          </p>
-          <div className="space-y-1.5 text-[10px] text-gray-300">
-            {notes
-              .filter((n: OwnedNote) => !n.spent)
-              .sort((a: OwnedNote, b: OwnedNote) => Number(b.note.value - a.note.value))
-              .slice(0, 5)
-              .map((note: OwnedNote, i: number) => (
-                <div key={i} className="flex justify-between font-mono p-1.5 bg-black/30 clip-corner">
-                  <span className="text-gray-500">NOTE #{(i + 1).toString().padStart(2, '0')}:</span>
-                  <span className="text-cyber-blue">{formatSui(note.note.value)} SUI</span>
-                </div>
-              ))}
-            {notes.filter((n: OwnedNote) => !n.spent).length > 5 && (
-              <p className="text-gray-500 font-mono pl-1.5">
-                ... +{notes.filter((n: OwnedNote) => !n.spent).length - 5} MORE
-              </p>
-            )}
-          </div>
-          <p className="mt-3 text-[10px] text-gray-400 font-mono flex items-start gap-2">
-            <span className="text-cyber-blue">ℹ</span>
-            <span>Single note spending only. Use transfer to merge.</span>
-          </p>
-        </div>
-      ) : (
-        <div className="p-4 border border-gray-800 bg-black/30 clip-corner">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 font-mono">
-            No Notes Available
-          </p>
-          <p className="text-[10px] text-gray-400 font-mono">
-            Shield some tokens first to create notes for unshield.
-          </p>
-        </div>
-      )}
 
       {/* Progress indicator */}
       {isProcessing && (

@@ -137,7 +137,6 @@ export function useLocalKeypair(walletAddress: string | undefined) {
   const selectKeypair = useCallback(
     (masterPublicKey: string) => {
       if (!walletAddress) {
-        console.warn('[selectKeypair] No wallet address, returning early');
         return;
       }
 
@@ -154,10 +153,6 @@ export function useLocalKeypair(walletAddress: string | undefined) {
 
         setKeypair(keypairObj);
         setActiveKeypair(identifier, selected);
-      } else {
-        console.warn('[selectKeypair] Keypair not found in saved list');
-        console.warn('[selectKeypair] Looking for:', masterPublicKey);
-        console.warn('[selectKeypair] Available:', saved.map(kp => kp.masterPublicKey));
       }
     },
     [walletAddress]

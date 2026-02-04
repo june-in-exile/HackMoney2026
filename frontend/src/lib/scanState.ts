@@ -47,20 +47,11 @@ export function loadScanState(
       typeof state.lastScanTime !== "number" ||
       !Array.isArray(state.cachedCommitments)
     ) {
-      console.warn("[scanState] Invalid scan state structure, ignoring");
       return null;
     }
 
-    console.log(`[scanState] Loaded state:`, {
-      lastShieldCursor: state.lastShieldCursor?.substring(0, 20) + "...",
-      lastTransferCursor: state.lastTransferCursor?.substring(0, 20) + "...",
-      lastScanTime: new Date(state.lastScanTime).toISOString(),
-      cachedCommitments: state.cachedCommitments.length,
-    });
-
     return state;
   } catch (err) {
-    console.error("[scanState] Failed to load scan state:", err);
     return null;
   }
 }
@@ -76,15 +67,7 @@ export function saveScanState(
   try {
     const key = getScanStateKey(poolId, masterPublicKey);
     localStorage.setItem(key, JSON.stringify(state));
-
-    console.log(`[scanState] Saved state:`, {
-      lastShieldCursor: state.lastShieldCursor?.substring(0, 20) + "...",
-      lastTransferCursor: state.lastTransferCursor?.substring(0, 20) + "...",
-      lastScanTime: new Date(state.lastScanTime).toISOString(),
-      cachedCommitments: state.cachedCommitments.length,
-    });
   } catch (err) {
-    console.error("[scanState] Failed to save scan state:", err);
   }
 }
 
@@ -98,9 +81,7 @@ export function clearScanState(
   try {
     const key = getScanStateKey(poolId, masterPublicKey);
     localStorage.removeItem(key);
-    console.log("[scanState] Cleared scan state");
   } catch (err) {
-    console.error("[scanState] Failed to clear scan state:", err);
   }
 }
 

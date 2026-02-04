@@ -5,6 +5,7 @@ import { useCurrentAccount } from "@mysten/dapp-kit";
 import { Header } from "@/components/Header";
 import { KeypairSetup } from "@/components/KeypairSetup";
 import { BalanceCard } from "@/components/BalanceCard";
+import { AvailableNotesList } from "@/components/AvailableNotesList";
 import { ShieldForm } from "@/components/ShieldForm";
 import { UnshieldForm } from "@/components/UnshieldForm";
 import { TransferForm } from "@/components/TransferForm";
@@ -220,6 +221,11 @@ export default function Home() {
                 isRefreshing={isLoadingNotes}
                 onRefresh={refreshNotes}
               />
+              <AvailableNotesList
+                notes={notes}
+                loading={isLoadingNotes}
+                error={notesError}
+              />
             </div>
 
             {/* Right Column */}
@@ -275,7 +281,6 @@ export default function Home() {
                       keypair={keypair}
                       notes={notes}
                       loading={isLoadingNotes}
-                      error={notesError}
                       onSuccess={handleTransferSuccess}
                       onRefresh={refreshNotes}
                     />
@@ -295,8 +300,6 @@ export default function Home() {
                       keypair={keypair}
                       maxAmount={shieldedBalance}
                       notes={notes}
-                      loading={isLoadingNotes}
-                      error={notesError}
                       onSuccess={handleUnshieldSuccess}
                       markNoteSpent={markNoteSpent}
                     />
