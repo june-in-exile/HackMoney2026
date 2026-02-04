@@ -28,6 +28,10 @@ export interface InitRequest {
 
 /**
  * Scan notes from blockchain (query events + decrypt + build tree)
+ *
+ * PHASE 2 OPTIMIZATION: Incremental Scanning
+ * - Supports resuming from last scan position via cursors
+ * - Accepts cached commitments to avoid rebuilding entire Merkle tree
  */
 export interface ScanNotesRequest {
   type: "scan_notes";
@@ -38,6 +42,14 @@ export interface ScanNotesRequest {
   spendingKey: string; // BigInt as string
   nullifyingKey: string; // BigInt as string
   masterPublicKey: string; // BigInt as string
+
+  // PHASE 2: Incremental scanning support
+  startShieldCursor?: string | null; // Resume from this cursor for Shield events
+  startTransferCursor?: string | null; // Resume from this cursor for Transfer events
+  cachedCommitments?: Array<{
+    commitment: string; // BigInt as string
+    leafIndex: number;
+  }>; // Previously scanned commitments
 }
 
 /**
@@ -110,6 +122,8 @@ export interface InitResponse {
 
 /**
  * Scan notes result
+ *
+ * PHASE 2 OPTIMIZATION: Returns cursors and commitments for next incremental scan
  */
 export interface ScanNotesResponse {
   type: "scan_notes_result";
@@ -121,6 +135,14 @@ export interface ScanNotesResponse {
     nullifier: string; // BigInt as string
     txDigest: string;
   }>;
+
+  // PHASE 2: Data for next incremental scan
+  lastShieldCursor: string | null; // Last cursor position for Shield events
+  lastTransferCursor: string | null; // Last cursor position for Transfer events
+  allCommitments: Array<{
+    commitment: string; // BigInt as string
+    leafIndex: number;
+  }>; // All commitments (cached + new) for next scan
 }
 
 /**

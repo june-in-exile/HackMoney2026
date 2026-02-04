@@ -7,6 +7,11 @@ import type { Note } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
 import { bigIntToBE32 } from "@octopus/sdk";
 import { getWorkerManager } from "@/lib/workerManager";
+import {
+  loadScanState,
+  saveScanState,
+  createEmptyScanState,
+} from "@/lib/scanState";
 
 /**
  * Owned note with metadata for selection and spending
@@ -70,6 +75,11 @@ export function useNotes(keypair: OctopusKeypair | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [scanProgress, setScanProgress] = useState<{
+    current: number;
+    total: number;
+    message: string;
+  } | null>(null);
 
   // Initialize localSpentSet from localStorage
   const [localSpentSet, setLocalSpentSet] = useState<Set<string>>(() => {
@@ -125,8 +135,8 @@ export function useNotes(keypair: OctopusKeypair | null) {
         const fields = poolObject.data.content.fields as any;
         const nullifierRegistryId = fields.nullifiers.fields.id.id;
 
-        // Batch query (10 per batch to avoid rate limits)
-        const batchSize = 10;
+        // OPTIMIZATION: Batch query (increased from 10 to 50 for better performance)
+        const batchSize = 50;
         const spentMap = new Map<string, boolean>();
 
         for (let i = 0; i < nullifiers.length; i += batchSize) {
@@ -182,27 +192,52 @@ export function useNotes(keypair: OctopusKeypair | null) {
       try {
         const worker = getWorkerManager();
 
+        // PHASE 2 OPTIMIZATION: Load scan state for incremental scanning
+        const scanState =
+          loadScanState(POOL_ID, keypair.masterPublicKey) ||
+          createEmptyScanState();
+
+        console.log("[useNotes] Starting scan with state:", {
+          isIncremental: !!(
+            scanState.lastShieldCursor || scanState.lastTransferCursor
+          ),
+          cachedCommitments: scanState.cachedCommitments.length,
+          lastScanTime: scanState.lastScanTime
+            ? new Date(scanState.lastScanTime).toISOString()
+            : "never",
+        });
+
         // Scan notes using Worker (GraphQL + decrypt + Merkle tree in background)
-        const scannedNotes = await worker.scanNotes(
+        const result = await worker.scanNotes(
           "https://graphql.testnet.sui.io/graphql",
           PACKAGE_ID,
           POOL_ID,
           keypair.spendingKey,
           keypair.nullifyingKey,
-          keypair.masterPublicKey
+          keypair.masterPublicKey,
+          {
+            // PHASE 2: Pass scan state for incremental scanning
+            startShieldCursor: scanState.lastShieldCursor,
+            startTransferCursor: scanState.lastTransferCursor,
+            cachedCommitments: scanState.cachedCommitments,
+            onProgress: (progress) => {
+              // Update progress state
+              setScanProgress(progress);
+            },
+          }
         );
 
         if (isCancelled) return;
 
         // Collect all nullifiers for batch checking
-        const nullifiers = scannedNotes.map((s) => s.nullifier);
+        const nullifiers = result.notes.map((s) => s.nullifier);
 
         // Batch check spent status (more efficient than one-by-one)
         const spentMap = await batchCheckNullifierStatus(nullifiers);
 
         // Build OwnedNote array with spent status from batch query
-        const ownedNotes: OwnedNote[] = [];
-        for (const scanned of scannedNotes) {
+        const newOwnedNotes: OwnedNote[] = [];
+        for (const scanned of result.notes) {
           // Deserialize note
           const note: Note = {
             npk: BigInt(scanned.note.npk),
@@ -215,7 +250,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
           // Get spent status from batch query result
           const spent = spentMap.get(scanned.nullifier.toString()) ?? false;
 
-          ownedNotes.push({
+          newOwnedNotes.push({
             note,
             leafIndex: scanned.leafIndex,
             nullifier: scanned.nullifier,
@@ -226,12 +261,57 @@ export function useNotes(keypair: OctopusKeypair | null) {
         }
 
         if (!isCancelled) {
-          setNotes(ownedNotes);
+          // PHASE 2 FIX: Merge new notes with existing notes for incremental scanning
+          // Use a Map to deduplicate by leafIndex (primary key)
+          const notesMap = new Map<number, OwnedNote>();
+
+          // First, add existing notes
+          for (const existingNote of notes) {
+            notesMap.set(existingNote.leafIndex, existingNote);
+          }
+
+          // Then, add/update with new notes (new notes take precedence)
+          for (const newNote of newOwnedNotes) {
+            notesMap.set(newNote.leafIndex, newNote);
+          }
+
+          // Convert back to array and sort by leafIndex
+          const mergedNotes = Array.from(notesMap.values()).sort(
+            (a, b) => a.leafIndex - b.leafIndex
+          );
+
+          console.log("[useNotes] Merging notes:", {
+            existingNotes: notes.length,
+            newNotes: newOwnedNotes.length,
+            mergedNotes: mergedNotes.length,
+            isIncremental: !!(
+              scanState.lastShieldCursor || scanState.lastTransferCursor
+            ),
+          });
+
+          setNotes(mergedNotes);
+          // Clear progress after completion
+          setScanProgress(null);
+
+          // PHASE 2 OPTIMIZATION: Save updated scan state for next incremental scan
+          saveScanState(POOL_ID, keypair.masterPublicKey, {
+            lastShieldCursor: result.lastShieldCursor,
+            lastTransferCursor: result.lastTransferCursor,
+            lastScanTime: Date.now(),
+            cachedCommitments: result.allCommitments,
+            version: 1,
+          });
+
+          console.log("[useNotes] Scan complete and state saved:", {
+            notes: mergedNotes.length,
+            commitments: result.allCommitments.length,
+          });
         }
       } catch (err) {
         console.error('[useNotes] scanNotes failed:', err);
         if (!isCancelled) {
           setError(err instanceof Error ? err.message : "Failed to scan notes");
+          setScanProgress(null);
         }
       } finally {
         // Ensure minimum loading duration for better UX
@@ -334,6 +414,13 @@ export function useNotes(keypair: OctopusKeypair | null) {
     spent: note.spent || localSpentSet.has(note.nullifier.toString()),
   }));
 
-  return { notes: notesWithLocalSpent, loading, error, refresh, markNoteSpent };
+  return {
+    notes: notesWithLocalSpent,
+    loading,
+    error,
+    refresh,
+    markNoteSpent,
+    scanProgress, // Include progress in return value
+  };
 }
 
