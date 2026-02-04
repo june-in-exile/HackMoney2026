@@ -330,7 +330,6 @@ export function decryptNote(
 
     // Format: ephemeral_pk (32) || nonce (12) || ciphertext (128 + 16 tag)
     if (data.length !== 32 + 12 + 128 + 16) {
-      console.log(`[SDK decryptNote] Wrong length: ${data.length}, expected 188`);
       return null;
     }
 
@@ -363,7 +362,6 @@ export function decryptNote(
     // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
     const expectedNpk = poseidonHash([myMpk, random]);
     if (expectedNpk !== npk) {
-      console.log(`[SDK decryptNote] NPK mismatch: expected=${expectedNpk}, got=${npk} (not your note)`);
       return null; // Not our note
     }
 
@@ -379,7 +377,6 @@ export function decryptNote(
     };
   } catch (err) {
     // Decryption failed (wrong key, corrupted data, etc.)
-    console.log(`[SDK decryptNote] Exception caught:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

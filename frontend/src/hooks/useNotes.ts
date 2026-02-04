@@ -66,7 +66,7 @@ function saveSpentNullifiers(mpk: bigint, nullifiers: Set<string>): void {
     const key = getSpentNullifiersKey(mpk);
     localStorage.setItem(key, JSON.stringify(Array.from(nullifiers)));
   } catch (err) {
-    console.error("[useNotes] Failed to save spent nullifiers:", err);
+    console.error("Failed to save spent nullifiers:", err);
   }
 }
 
@@ -169,7 +169,6 @@ export function useNotes(keypair: OctopusKeypair | null) {
 
         return spentMap;
       } catch (err) {
-        console.error("[useNotes] Batch check failed:", err);
         return new Map();
       }
     },
@@ -188,19 +187,10 @@ export function useNotes(keypair: OctopusKeypair | null) {
     const keypairChanged = previousMPK !== null &&
                           previousMPK !== keypair.masterPublicKey;
 
-    console.log("[useNotes] useEffect triggered:", {
-      previousMPK: previousMPK?.toString().substring(0, 20),
-      newMPK: keypair.masterPublicKey.toString().substring(0, 20),
-      keypairChanged,
-      currentNotesCount: notes.length
-    });
-
     if (keypairChanged) {
       // Keypair changed - clear notes immediately
-      console.log("[useNotes] Keypair changed, clearing notes and scan state");
       setNotes([]);
-      // CRITICAL: Clear scan state to force full rescan
-      // This ensures we get all notes, not just incremental updates
+      // Clear scan state to force full rescan
       clearScanState(POOL_ID, keypair.masterPublicKey);
     }
 
@@ -226,16 +216,6 @@ export function useNotes(keypair: OctopusKeypair | null) {
         const scanState =
           loadScanState(POOL_ID, keypair.masterPublicKey) ||
           createEmptyScanState();
-
-        console.log("[useNotes] Starting scan with state:", {
-          isIncremental: !!(
-            scanState.lastShieldCursor || scanState.lastTransferCursor
-          ),
-          cachedCommitments: scanState.cachedCommitments.length,
-          lastScanTime: scanState.lastScanTime
-            ? new Date(scanState.lastScanTime).toISOString()
-            : "never",
-        });
 
         // Scan notes using Worker (GraphQL + decrypt + Merkle tree in background)
         const result = await worker.scanNotes(
@@ -300,12 +280,9 @@ export function useNotes(keypair: OctopusKeypair | null) {
 
           // Only merge existing notes if keypair hasn't changed
           if (shouldMergeExisting) {
-            console.log("[useNotes] Incremental scan - merging with existing notes");
             for (const existingNote of notes) {
               notesMap.set(existingNote.leafIndex, existingNote);
             }
-          } else {
-            console.log("[useNotes] Fresh scan - using only new notes");
           }
 
           // Add/update with new notes (new notes take precedence)
@@ -317,16 +294,6 @@ export function useNotes(keypair: OctopusKeypair | null) {
           const mergedNotes = Array.from(notesMap.values()).sort(
             (a, b) => a.leafIndex - b.leafIndex
           );
-
-          console.log("[useNotes] Scan complete:", {
-            keypairChanged,
-            existingNotesUsed: shouldMergeExisting ? notes.length : 0,
-            newNotesScanned: newOwnedNotes.length,
-            finalNotesCount: mergedNotes.length,
-            hasIncrementalState: !!(
-              scanState.lastShieldCursor || scanState.lastTransferCursor
-            ),
-          });
 
           setNotes(mergedNotes);
           // Clear progress after completion
@@ -340,14 +307,8 @@ export function useNotes(keypair: OctopusKeypair | null) {
             cachedCommitments: result.allCommitments,
             version: 1,
           });
-
-          console.log("[useNotes] Scan complete and state saved:", {
-            notes: mergedNotes.length,
-            commitments: result.allCommitments.length,
-          });
         }
       } catch (err) {
-        console.error('[useNotes] scanNotes failed:', err);
         if (!isCancelled) {
           setError(err instanceof Error ? err.message : "Failed to scan notes");
           setScanProgress(null);
@@ -423,7 +384,6 @@ export function useNotes(keypair: OctopusKeypair | null) {
     const intervalId = setInterval(async () => {
       // Safety check: only reconcile if we're still on the same keypair
       if (currentKeypairRef.current !== currentMPK) {
-        console.log("[useNotes] Reconciliation skipped - keypair changed");
         return;
       }
 
@@ -451,9 +411,6 @@ export function useNotes(keypair: OctopusKeypair | null) {
         // Double-check keypair hasn't changed before updating
         if (currentKeypairRef.current === currentMPK) {
           setNotes(updatedNotes);
-          console.log("[useNotes] Reconciliation detected spent notes");
-        } else {
-          console.log("[useNotes] Reconciliation cancelled - keypair changed during check");
         }
       }
     }, 30000); // Every 30 seconds
