@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@octopus/sdk";
@@ -36,6 +36,34 @@ export interface OwnedNote {
  * For each event, attempts to decrypt the note using the user's MPK.
  * If successful, the note belongs to this user.
  */
+// Helper to get localStorage key for spent nullifiers
+function getSpentNullifiersKey(mpk: bigint): string {
+  return `octopus_spent_nullifiers_${mpk.toString()}`;
+}
+
+// Load spent nullifiers from localStorage
+function loadSpentNullifiers(mpk: bigint): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const key = getSpentNullifiersKey(mpk);
+    const stored = localStorage.getItem(key);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+// Save spent nullifiers to localStorage
+function saveSpentNullifiers(mpk: bigint, nullifiers: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = getSpentNullifiersKey(mpk);
+    localStorage.setItem(key, JSON.stringify(Array.from(nullifiers)));
+  } catch (err) {
+    console.error("[useNotes] Failed to save spent nullifiers:", err);
+  }
+}
+
 export function useNotes(keypair: OctopusKeypair | null) {
   const client = useSuiClient();
   const [notes, setNotes] = useState<OwnedNote[]>([]);
@@ -43,10 +71,96 @@ export function useNotes(keypair: OctopusKeypair | null) {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Initialize localSpentSet from localStorage
+  const [localSpentSet, setLocalSpentSet] = useState<Set<string>>(() => {
+    if (!keypair) return new Set();
+    return loadSpentNullifiers(keypair.masterPublicKey);
+  });
+
+  // Load from localStorage when keypair changes
+  useEffect(() => {
+    if (!keypair) {
+      setLocalSpentSet(new Set());
+      return;
+    }
+    setLocalSpentSet(loadSpentNullifiers(keypair.masterPublicKey));
+  }, [keypair?.masterPublicKey]);
+
   // Manual refresh function
   const refresh = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
+
+  // Mark a note as spent locally (optimistic update) and persist to localStorage
+  const markNoteSpent = (nullifier: bigint) => {
+    if (!keypair) return;
+
+    setLocalSpentSet((prev) => {
+      const newSet = new Set(prev).add(nullifier.toString());
+      // Persist to localStorage
+      saveSpentNullifiers(keypair.masterPublicKey, newSet);
+      return newSet;
+    });
+  };
+
+  // Batch check multiple nullifiers for spent status (more efficient than one-by-one)
+  const batchCheckNullifierStatus = useCallback(
+    async (nullifiers: bigint[]): Promise<Map<string, boolean>> => {
+      if (nullifiers.length === 0) return new Map();
+
+      try {
+        // Get nullifier registry ID (only query once)
+        const poolObject = await client.getObject({
+          id: POOL_ID,
+          options: { showContent: true },
+        });
+
+        if (
+          poolObject.data?.content?.dataType !== "moveObject" ||
+          !poolObject.data.content.fields
+        ) {
+          return new Map();
+        }
+
+        const fields = poolObject.data.content.fields as any;
+        const nullifierRegistryId = fields.nullifiers.fields.id.id;
+
+        // Batch query (10 per batch to avoid rate limits)
+        const batchSize = 10;
+        const spentMap = new Map<string, boolean>();
+
+        for (let i = 0; i < nullifiers.length; i += batchSize) {
+          const batch = nullifiers.slice(i, i + batchSize);
+          const results = await Promise.allSettled(
+            batch.map((nullifier) =>
+              client.getDynamicFieldObject({
+                parentId: nullifierRegistryId,
+                name: {
+                  type: "vector<u8>",
+                  value: Array.from(bigIntToBE32(nullifier)),
+                },
+              })
+            )
+          );
+
+          batch.forEach((nullifier, idx) => {
+            const result = results[idx];
+            const spent =
+              result.status === "fulfilled" &&
+              result.value.data !== null &&
+              result.value.data !== undefined;
+            spentMap.set(nullifier.toString(), spent);
+          });
+        }
+
+        return spentMap;
+      } catch (err) {
+        console.error("[useNotes] Batch check failed:", err);
+        return new Map();
+      }
+    },
+    [client]
+  );
 
   useEffect(() => {
     if (!keypair) {
@@ -80,7 +194,13 @@ export function useNotes(keypair: OctopusKeypair | null) {
 
         if (isCancelled) return;
 
-        // Check spent status for each note (Main thread - requires RPC)
+        // Collect all nullifiers for batch checking
+        const nullifiers = scannedNotes.map((s) => s.nullifier);
+
+        // Batch check spent status (more efficient than one-by-one)
+        const spentMap = await batchCheckNullifierStatus(nullifiers);
+
+        // Build OwnedNote array with spent status from batch query
         const ownedNotes: OwnedNote[] = [];
         for (const scanned of scannedNotes) {
           // Deserialize note
@@ -92,8 +212,8 @@ export function useNotes(keypair: OctopusKeypair | null) {
             commitment: BigInt(scanned.note.commitment),
           };
 
-          // Check if spent (Main thread RPC call)
-          const spent = await isNullifierSpent(scanned.nullifier);
+          // Get spent status from batch query result
+          const spent = spentMap.get(scanned.nullifier.toString()) ?? false;
 
           ownedNotes.push({
             note,
@@ -174,6 +294,46 @@ export function useNotes(keypair: OctopusKeypair | null) {
     };
   }, [keypair, client, refreshTrigger]);
 
-  return { notes, loading, error, refresh };
+  // Periodic reconciliation: re-check unspent notes to catch missed events
+  useEffect(() => {
+    if (!keypair || notes.length === 0) return;
+
+    const intervalId = setInterval(async () => {
+      // Only check notes marked as unspent
+      const unspentNotes = notes.filter((n) => !n.spent);
+      if (unspentNotes.length === 0) return;
+
+      const nullifiers = unspentNotes.map((n) => n.nullifier);
+      const spentMap = await batchCheckNullifierStatus(nullifiers);
+
+      // Check if any status changed
+      let hasChanges = false;
+      const updatedNotes = notes.map((note) => {
+        if (!note.spent) {
+          const nowSpent = spentMap.get(note.nullifier.toString()) ?? false;
+          if (nowSpent) {
+            hasChanges = true;
+            return { ...note, spent: true };
+          }
+        }
+        return note;
+      });
+
+      if (hasChanges) {
+        setNotes(updatedNotes);
+        console.log("[useNotes] Reconciliation detected spent notes");
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [keypair, notes, batchCheckNullifierStatus]);
+
+  // Merge local spent status with on-chain spent status
+  const notesWithLocalSpent = notes.map((note) => ({
+    ...note,
+    spent: note.spent || localSpentSet.has(note.nullifier.toString()),
+  }));
+
+  return { notes: notesWithLocalSpent, loading, error, refresh, markNoteSpent };
 }
 

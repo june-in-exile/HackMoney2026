@@ -37,7 +37,6 @@ export default function Home() {
     removeKeypair,
   } = useLocalKeypair(account?.address);
 
-  // Debug: Track keypair changes
   useEffect(() => {
   }, [keypair]);
 
@@ -48,9 +47,9 @@ export default function Home() {
     loading: isLoadingNotes,
     error: notesError,
     refresh: refreshNotes,
+    markNoteSpent,
   } = useNotes(keypair);
 
-  // Debug: Track loading state changes
   useEffect(() => {
   }, [isLoadingNotes]);
 
@@ -299,6 +298,7 @@ export default function Home() {
                       loading={isLoadingNotes}
                       error={notesError}
                       onSuccess={handleUnshieldSuccess}
+                      markNoteSpent={markNoteSpent}
                     />
                   )}
                 </div>

@@ -6,8 +6,8 @@ import {
   useSignAndExecuteTransaction,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
+import { cn, parseSui, formatSui, truncateAddress } from "@/lib/utils";
+import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -24,6 +24,7 @@ interface UnshieldFormProps {
   loading: boolean;
   error: string | null;
   onSuccess?: () => void | Promise<void>;
+  markNoteSpent?: (nullifier: bigint) => void;
 }
 
 type UnshieldState =
@@ -40,12 +41,13 @@ export function UnshieldForm({
   loading: notesLoading,
   error: notesError,
   onSuccess,
+  markNoteSpent,
 }: UnshieldFormProps) {
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [state, setState] = useState<UnshieldState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ message: string; txDigest?: string } | null>(null);
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
@@ -92,21 +94,6 @@ export function UnshieldForm({
       // Step 1: Generate ZK proof (heavy computation)
       setState("generating-proof");
 
-      if (DEMO_MODE) {
-        // Simulate proof generation delay
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-
-        setState("submitting");
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        setState("success");
-        setSuccess(`Demo: Unshielded ${formatSui(amountMist)} SUI to ${recipient.slice(0, 10)}...`);
-        setAmount("");
-        setRecipient("");
-        await onSuccess?.();
-        return;
-      }
-
       // Get unspent notes
       const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
       if (unspentNotes.length === 0) {
@@ -142,8 +129,12 @@ export function UnshieldForm({
       // Generate ZK proof (this takes 10-30 seconds)
       const { proof, publicSignals } = await generateUnshieldProof(unshieldInput);
 
+      console.log("Proof generated:", proof);
+
       // Convert to Sui format
       const suiProof = convertUnshieldProofToSui(proof, publicSignals);
+
+      console.log("Sui proof:", suiProof);
 
       // Use real proof bytes
       const proofBytes = suiProof.proofBytes;          // 128 bytes
@@ -169,8 +160,14 @@ export function UnshieldForm({
         transaction: tx,
       });
 
+      // Immediately mark note as spent locally (optimistic update)
+      markNoteSpent?.(noteToSpend.nullifier);
+
       setState("success");
-      setSuccess(`Unshielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`);
+      setSuccess({
+        message: `Unshielded ${formatSui(amountMist)} SUI!`,
+        txDigest: result.digest
+      });
       setAmount("");
       setRecipient("");
       await onSuccess?.();
@@ -368,7 +365,23 @@ export function UnshieldForm({
         <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
           <div className="flex items-start gap-2">
             <span className="text-green-500 text-sm">✓</span>
-            <p className="text-xs text-green-400 font-mono leading-relaxed">{success}</p>
+            <p className="text-xs text-green-400 font-mono leading-relaxed">
+              {success.message}
+              {success.txDigest && (
+                <>
+                  {' '}
+                  <a
+                    href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyber-blue hover:text-cyber-blue/80 underline"
+                    title={`View transaction: ${success.txDigest}`}
+                  >
+                    [{truncateAddress(success.txDigest, 6)}]
+                  </a>
+                </>
+              )}
+            </p>
           </div>
         </div>
       )}

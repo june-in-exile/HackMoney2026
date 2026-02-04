@@ -7,8 +7,8 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
+import { cn, parseSui, formatSui, truncateAddress } from "@/lib/utils";
+import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   createNote,
@@ -29,7 +29,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ message: string; txDigest?: string } | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
@@ -99,15 +99,6 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       // Initialize Poseidon hash function
       await initPoseidon();
 
-      if (DEMO_MODE) {
-        // Simulate shield in demo mode
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setSuccess(`Demo: Shielded ${formatSui(amountMist)} SUI`);
-        setAmount("");
-        await onSuccess?.();
-        return;
-      }
-
       // Create a token identifier for SUI by hashing the coin type
       const tokenId = poseidonHash([BigInt(0x2)]); // Simplified: use 0x2 for SUI
 
@@ -147,19 +138,20 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         transaction: tx,
       });
 
-      setSuccess(
-        `Shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}\n` +
-        `Refreshing balance...`
-      );
+      setSuccess({
+        message: `Shielded ${formatSui(amountMist)} SUI!\nRefreshing balance...`,
+        txDigest: result.digest
+      });
       setAmount("");
 
       // Call onSuccess callback to refresh balance
       await onSuccess?.();
 
       // Update success message after refresh completes
-      setSuccess(
-        `Successfully shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`
-      );
+      setSuccess({
+        message: `Successfully shielded ${formatSui(amountMist)} SUI!`,
+        txDigest: result.digest
+      });
     } catch (err) {
       console.error("Shield failed:", err);
       setError(err instanceof Error ? err.message : "Shield failed");
@@ -215,7 +207,23 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
           <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
             <div className="flex items-start gap-2">
               <span className="text-green-500 text-sm">✓</span>
-              <p className="text-xs text-green-400 font-mono leading-relaxed whitespace-pre-wrap">{success}</p>
+              <p className="text-xs text-green-400 font-mono leading-relaxed">
+                {success.message}
+                {success.txDigest && (
+                  <>
+                    {' '}
+                    <a
+                      href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyber-blue hover:text-cyber-blue/80 underline"
+                      title={`View transaction: ${success.txDigest}`}
+                    >
+                      [{truncateAddress(success.txDigest, 6)}]
+                    </a>
+                  </>
+                )}
+              </p>
             </div>
           </div>
         )}

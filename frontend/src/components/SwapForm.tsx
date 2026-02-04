@@ -8,7 +8,7 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
+import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -189,12 +189,6 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
       // 1. Scanning ShieldEvents to build Merkle tree
       // 2. Finding user's notes and their leaf indices
       // 3. Computing Merkle proofs for each input note
-
-      if (DEMO_MODE) {
-        setError("Swap demo not yet implemented. Enable production mode with real notes.");
-        setIsSubmitting(false);
-        return;
-      }
 
       // Generate ZK proof
       // const swapInput: SwapInput = { ... };

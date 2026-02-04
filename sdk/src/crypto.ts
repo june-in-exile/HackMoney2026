@@ -127,14 +127,22 @@ export function computeNullifier(
 
 /**
  * Compute zero hashes for empty Merkle tree nodes
- * zeros[0] = Poseidon(0, 0)
- * zeros[i] = Poseidon(zeros[i-1], zeros[i-1])
+ * MUST match Move contract logic (merkle_tree.move:compute_zeros)!
+ *
+ * zeros[0] = 0 (32 zero bytes, not a hash)
+ * zeros[1] = Poseidon(0, 0)
+ * zeros[i] = Poseidon(zeros[i-1], zeros[i-1]) for i = 2..TREE_DEPTH
+ *
+ * Returns array of length TREE_DEPTH + 1 (17 elements for depth 16)
  */
 export function computeZeroHashes(): bigint[] {
   const zeros: bigint[] = [];
-  zeros[0] = poseidonHash([0n, 0n]);
 
-  for (let i = 1; i < MERKLE_TREE_DEPTH; i++) {
+  // Level 0: empty leaf (32 zero bytes → 0)
+  zeros[0] = 0n;
+
+  // Compute hash for each level: zeros[1] to zeros[TREE_DEPTH]
+  for (let i = 1; i <= MERKLE_TREE_DEPTH; i++) {
     zeros[i] = poseidonHash([zeros[i - 1], zeros[i - 1]]);
   }
 
@@ -322,6 +330,7 @@ export function decryptNote(
 
     // Format: ephemeral_pk (32) || nonce (12) || ciphertext (128 + 16 tag)
     if (data.length !== 32 + 12 + 128 + 16) {
+      console.log(`[SDK decryptNote] Wrong length: ${data.length}, expected 188`);
       return null;
     }
 
@@ -331,7 +340,7 @@ export function decryptNote(
     const ciphertext = data.slice(44);
 
     // 2. Derive our viewing private key
-    const { privateKey: myViewingSk } = deriveViewingKeypair(mySpendingKey);
+    const { privateKey: myViewingSk, publicKey: myViewingPk } = deriveViewingKeypair(mySpendingKey);
 
     // 3. Perform ECDH to get shared secret
     const sharedSecret = x25519.getSharedSecret(myViewingSk, ephemeralPk);
@@ -354,6 +363,7 @@ export function decryptNote(
     // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
     const expectedNpk = poseidonHash([myMpk, random]);
     if (expectedNpk !== npk) {
+      console.log(`[SDK decryptNote] NPK mismatch: expected=${expectedNpk}, got=${npk} (not your note)`);
       return null; // Not our note
     }
 
@@ -369,6 +379,7 @@ export function decryptNote(
     };
   } catch (err) {
     // Decryption failed (wrong key, corrupted data, etc.)
+    console.log(`[SDK decryptNote] Exception caught:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

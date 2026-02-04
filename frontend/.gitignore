@@ -6,3 +6,5 @@ node_modules/
 out/
 next-env.d.ts
 tsconfig.tsbuildinfo
+# Unshield script environment (contains private keys)
+.env.unshield

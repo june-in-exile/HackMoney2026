@@ -4,7 +4,7 @@
 
 // Deployed contract addresses (from environment variables)
 export const PACKAGE_ID = "0xd107825d22a404491a284b0ccd23c7ce9b627691e2d4371149fa3bbb0096cbaf";
-export const POOL_ID = "0x07d8ffb4720526371f73f032d1f5b77050ffb36a90513715b8edf0aad76c68fb";
+export const POOL_ID = "0xb788eb216bf6bfa48676fa0eeda2c2cfb168ae9c19b6b00ea11da244615dcef0";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";
@@ -18,9 +18,6 @@ export const STORAGE_KEYS = {
   KEYPAIR: "octopus_keypair",
   NOTES: "octopus_notes",
 } as const;
-
-// Demo mode - set to false to use real on-chain contracts
-export const DEMO_MODE = false;
 
 // Circuit artifact URLs
 export const CIRCUIT_URLS = {

@@ -239,6 +239,9 @@ export function KeypairSetup({
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
                 Spending Key
               </p>
+              <p className="text-[9px] text-gray-600 mb-2 font-mono">
+                // Authorizes spending and transaction creation
+              </p>
               <p className="break-all font-mono text-xs text-gray-400">
                 {bigIntToHex(keypair.spendingKey)}
               </p>
@@ -248,6 +251,9 @@ export function KeypairSetup({
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
                 Nullifying Key
               </p>
+              <p className="text-[9px] text-gray-600 mb-2 font-mono">
+                // Prevents double-spending via unique nullifiers
+              </p>
               <p className="break-all font-mono text-xs text-gray-400">
                 {bigIntToHex(keypair.nullifyingKey)}
               </p>
@@ -256,6 +262,9 @@ export function KeypairSetup({
             <div>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
                 Master Public Key
+              </p>
+              <p className="text-[9px] text-gray-600 mb-2 font-mono">
+                // Your public identity for receiving private funds
               </p>
               <p className="break-all font-mono text-xs text-gray-400">
                 {mpkHex}

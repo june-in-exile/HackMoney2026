@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
-import { cn, formatSui } from "@/lib/utils";
+import { cn, formatSui, truncateAddress } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -27,12 +27,20 @@ interface TransferFormProps {
   onRefresh?: () => void | Promise<void>; // Accept both sync and async
 }
 
+type TransferState =
+  | "idle"
+  | "refreshing"
+  | "generating-proof"
+  | "submitting"
+  | "success"
+  | "error";
+
 export function TransferForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess, onRefresh }: TransferFormProps) {
   const [recipientMpk, setRecipientMpk] = useState("");
   const [amount, setAmount] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [state, setState] = useState<TransferState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ message: string; txDigest?: string } | null>(null);
 
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
@@ -57,8 +65,6 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
       // ============================================
       // PRIVATE TRANSFER FLOW
@@ -73,7 +79,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
 
       // 0. Refresh notes to get latest Merkle paths
       if (onRefresh) {
-        setSuccess("🔄 Refreshing notes to get latest Merkle proofs...");
+        setState("refreshing");
         await onRefresh();
         // Wait for notes to be refetched (useNotes hook triggers async fetch)
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -83,8 +89,8 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
 
       if (unspentNotes.length === 0) {
+        setState("error");
         setError("No unspent notes available. Shield some tokens first!");
-        setIsSubmitting(false);
         return;
       }
 
@@ -100,8 +106,8 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       );
 
       if (!selectedNotes || selectedNotes.length === 0) {
+        setState("error");
         setError("Insufficient balance or notes don't have Merkle proofs yet!");
-        setIsSubmitting(false);
         return;
       }
 
@@ -118,7 +124,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       );
 
       // 4. Generate ZK proof (30-60 seconds)
-      setSuccess("⏳ Generating ZK proof (this may take 30-60 seconds)...");
+      setState("generating-proof");
 
       const proof = await generateTransferProof(
         {
@@ -148,7 +154,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       const encryptedChangeNote = encryptNote(changeNote, myViewingPk);
 
       // 7. Build and submit transaction
-      setSuccess("⏳ Submitting transaction to Sui network...");
+      setState("submitting");
       const tx = buildTransferTransaction(
         PACKAGE_ID,
         POOL_ID,
@@ -160,42 +166,28 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
       const result = await signAndExecute({ transaction: tx });
 
       // 8. Success!
-      if (onSuccess) await onSuccess();
-      setSuccess(
-        `Transfer of ${amount} SUI completed! TX: ${result.digest.slice(0, 8)}...`
-      );
+      setState("success");
+      setSuccess({
+        message: `Transferred ${amount} SUI!`,
+        txDigest: result.digest
+      });
+
+      // Clear form inputs on success
       setRecipientMpk("");
       setAmount("");
 
+      await onSuccess?.();
+
     } catch (err) {
       console.error("Transfer failed:", err);
+      setState("error");
       setError(err instanceof Error ? err.message : "Transfer failed");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-4">
-        {/* Recipient MPK Input */}
-        <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
-            Recipient Master Public Key (MPK)
-          </label>
-          <input
-            type="text"
-            value={recipientMpk}
-            onChange={(e) => setRecipientMpk(e.target.value)}
-            placeholder="Enter recipient's MPK..."
-            className="input"
-            disabled={isSubmitting}
-          />
-          <p className="mt-2 text-[10px] text-gray-600 font-mono break-all">
-            // Example: 0x13495...632235
-          </p>
-        </div>
-
         {/* Amount Input */}
         <div>
           <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
@@ -207,7 +199,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
             placeholder="0.000"
             step={0.001}
             min={0}
-            disabled={isSubmitting}
+            disabled={state !== "idle" && state !== "error"}
           />
           <p className="mt-2 text-[10px] text-gray-500 font-mono">
             {notesLoading ? (
@@ -224,6 +216,24 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
             ) : (
               <>NO NOTES // Shield tokens first</>
             )}
+          </p>
+        </div>
+        
+        {/* Recipient MPK Input */}
+        <div>
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
+            Recipient Master Public Key (MPK)
+          </label>
+          <input
+            type="text"
+            value={recipientMpk}
+            onChange={(e) => setRecipientMpk(e.target.value)}
+            placeholder="Enter recipient's MPK..."
+            className="input"
+            disabled={state !== "idle" && state !== "error"}
+          />
+          <p className="mt-2 text-[10px] text-gray-600 font-mono break-all">
+            // Example: 0x13495...632235
           </p>
         </div>
 
@@ -302,40 +312,19 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
             <span className="text-cyber-blue font-bold">AUTO SELECT:</span> SDK automatically selects optimal notes to cover transfer amount
           </p>
         </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="p-3 border border-red-600/30 bg-red-900/20 clip-corner">
-            <div className="flex items-start gap-2">
-              <span className="text-red-500 text-sm">✕</span>
-              <p className="text-xs text-red-400 font-mono leading-relaxed">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Success Display */}
-        {success && (
-          <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
-            <div className="flex items-start gap-2">
-              <span className="text-green-500 text-sm">✓</span>
-              <p className="text-xs text-green-400 font-mono leading-relaxed">{success}</p>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isSubmitting || !account || !keypair}
-        className={cn(
-          "btn-primary w-full",
-          isSubmitting && "cursor-wait opacity-70"
-        )}
-      >
-        {isSubmitting ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+      {/* Progress indicator */}
+      {(state === "refreshing" || state === "generating-proof" || state === "submitting") && (
+        <div className="p-4 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-5 w-5 animate-spin text-cyber-blue"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+            >
               <circle
                 className="opacity-25"
                 cx="12"
@@ -348,31 +337,96 @@ export function TransferForm({ keypair, notes, loading: notesLoading, error: not
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               />
             </svg>
-            GENERATING PROOF...
-          </span>
-        ) : (
-          "⇄ PRIVATE TRANSFER"
+            <div>
+              <p className="font-bold text-cyber-blue text-xs uppercase tracking-wider">
+                {state === "refreshing"
+                  ? "Refreshing Notes..."
+                  : state === "generating-proof"
+                  ? "Generating ZK Proof..."
+                  : "Submitting Transaction..."}
+              </p>
+              <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                {state === "refreshing"
+                  ? "// Fetching latest Merkle proofs"
+                  : state === "generating-proof"
+                  ? "// Proof generation in progress (30-60s)"
+                  : "// Awaiting wallet confirmation"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3 border border-red-600/30 bg-red-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-red-500 text-sm">✕</span>
+            <p className="text-xs text-red-400 font-mono leading-relaxed">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {success && (
+        <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-green-500 text-sm">✓</span>
+            <p className="text-xs text-green-400 font-mono leading-relaxed">
+              {success.message}
+              {success.txDigest && (
+                <>
+                  {' '}
+                  <a
+                    href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyber-blue hover:text-cyber-blue/80 underline"
+                    title={`View transaction: ${success.txDigest}`}
+                  >
+                    [{truncateAddress(success.txDigest, 6)}]
+                  </a>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!account || !keypair || (state !== "idle" && state !== "error")}
+        className={cn(
+          "btn-primary w-full",
+          (state !== "idle" && state !== "error") && "cursor-wait opacity-70"
         )}
+        style={{
+          backgroundColor: 'transparent',
+          color: '#00d9ff',
+          borderColor: '#00d9ff',
+        }}
+      >
+        {(state !== "idle" && state !== "error") ? "◉ PROCESSING..." : "⇄ PRIVATE TRANSFER"}
       </button>
 
-      {/* Info Box */}
-      <div className="p-4 border border-gray-800 bg-black/30 clip-corner space-y-3">
-        <h4 className="text-[10px] font-bold uppercase tracking-wider text-cyber-blue font-mono">
-          Transfer Process:
-        </h4>
-        <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
-          <li>Select notes (1-2 inputs)</li>
-          <li>Create output notes (recipient + change)</li>
-          <li>Generate Merkle proofs</li>
-          <li>Calculate nullifiers (prevent double-spending)</li>
-          <li>Generate ZK proof (30-60s)</li>
-          <li>Submit private transaction</li>
-        </ol>
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
-        <p className="text-[10px] text-gray-500 font-mono">
-          <span className="text-cyber-blue">◉</span> Privacy: Sender, recipient, amount remain hidden on-chain
-        </p>
-      </div>
+      {/* Info Box - Hidden when success is shown */}
+      {!success && (
+        <div className="p-4 border border-gray-800 bg-black/30 clip-corner space-y-3">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-cyber-blue font-mono">
+            Transfer Process:
+          </h4>
+          <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
+            <li>Select notes (1-2 inputs)</li>
+            <li>Create output notes (recipient + change)</li>
+            <li>Generate Merkle proofs</li>
+            <li>Calculate nullifiers (prevent double-spending)</li>
+            <li>Generate ZK proof (30-60s)</li>
+            <li>Submit private transaction</li>
+          </ol>
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+          <p className="text-[10px] text-gray-500 font-mono">
+            <span className="text-cyber-blue">◉</span> Privacy: Sender, recipient, amount remain hidden on-chain
+          </p>
+        </div>
+      )}
     </form>
   );
 }

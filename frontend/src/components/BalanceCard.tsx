@@ -2,7 +2,6 @@
 
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { formatSui } from "@/lib/utils";
-import { DEMO_MODE } from "@/lib/constants";
 
 interface BalanceCardProps {
   shieldedBalance: bigint;
@@ -65,11 +64,6 @@ export function BalanceCard({
                   />
                 </svg>
               </button>
-            )}
-            {DEMO_MODE && (
-              <span className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase border border-yellow-600 text-yellow-500 clip-corner font-mono">
-                DEMO
-              </span>
             )}
           </div>
         </div>
