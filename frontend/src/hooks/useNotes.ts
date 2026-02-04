@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@octopus/sdk";
@@ -11,6 +11,7 @@ import {
   loadScanState,
   saveScanState,
   createEmptyScanState,
+  clearScanState,
 } from "@/lib/scanState";
 
 /**
@@ -80,6 +81,9 @@ export function useNotes(keypair: OctopusKeypair | null) {
     total: number;
     message: string;
   } | null>(null);
+
+  // Track current keypair to detect changes
+  const currentKeypairRef = useRef<bigint | null>(null);
 
   // Initialize localSpentSet from localStorage
   const [localSpentSet, setLocalSpentSet] = useState<Set<string>>(() => {
@@ -175,8 +179,33 @@ export function useNotes(keypair: OctopusKeypair | null) {
   useEffect(() => {
     if (!keypair) {
       setNotes([]);
+      currentKeypairRef.current = null;
       return;
     }
+
+    // Check if keypair changed by comparing with previous value
+    const previousMPK = currentKeypairRef.current;
+    const keypairChanged = previousMPK !== null &&
+                          previousMPK !== keypair.masterPublicKey;
+
+    console.log("[useNotes] useEffect triggered:", {
+      previousMPK: previousMPK?.toString().substring(0, 20),
+      newMPK: keypair.masterPublicKey.toString().substring(0, 20),
+      keypairChanged,
+      currentNotesCount: notes.length
+    });
+
+    if (keypairChanged) {
+      // Keypair changed - clear notes immediately
+      console.log("[useNotes] Keypair changed, clearing notes and scan state");
+      setNotes([]);
+      // CRITICAL: Clear scan state to force full rescan
+      // This ensures we get all notes, not just incremental updates
+      clearScanState(POOL_ID, keypair.masterPublicKey);
+    }
+
+    // Update ref to track current keypair
+    currentKeypairRef.current = keypair.masterPublicKey;
 
     let isCancelled = false;
 
@@ -193,6 +222,7 @@ export function useNotes(keypair: OctopusKeypair | null) {
         const worker = getWorkerManager();
 
         // PHASE 2 OPTIMIZATION: Load scan state for incremental scanning
+        // Note: If keypair just changed, scan state was cleared above
         const scanState =
           loadScanState(POOL_ID, keypair.masterPublicKey) ||
           createEmptyScanState();
@@ -262,15 +292,23 @@ export function useNotes(keypair: OctopusKeypair | null) {
 
         if (!isCancelled) {
           // PHASE 2 FIX: Merge new notes with existing notes for incremental scanning
-          // Use a Map to deduplicate by leafIndex (primary key)
+          // Only merge existing notes if this is the SAME keypair (not a fresh scan)
+          // We use the saved keypairChanged flag from the start of useEffect
+          const shouldMergeExisting = !keypairChanged;
+
           const notesMap = new Map<number, OwnedNote>();
 
-          // First, add existing notes
-          for (const existingNote of notes) {
-            notesMap.set(existingNote.leafIndex, existingNote);
+          // Only merge existing notes if keypair hasn't changed
+          if (shouldMergeExisting) {
+            console.log("[useNotes] Incremental scan - merging with existing notes");
+            for (const existingNote of notes) {
+              notesMap.set(existingNote.leafIndex, existingNote);
+            }
+          } else {
+            console.log("[useNotes] Fresh scan - using only new notes");
           }
 
-          // Then, add/update with new notes (new notes take precedence)
+          // Add/update with new notes (new notes take precedence)
           for (const newNote of newOwnedNotes) {
             notesMap.set(newNote.leafIndex, newNote);
           }
@@ -280,11 +318,12 @@ export function useNotes(keypair: OctopusKeypair | null) {
             (a, b) => a.leafIndex - b.leafIndex
           );
 
-          console.log("[useNotes] Merging notes:", {
-            existingNotes: notes.length,
-            newNotes: newOwnedNotes.length,
-            mergedNotes: mergedNotes.length,
-            isIncremental: !!(
+          console.log("[useNotes] Scan complete:", {
+            keypairChanged,
+            existingNotesUsed: shouldMergeExisting ? notes.length : 0,
+            newNotesScanned: newOwnedNotes.length,
+            finalNotesCount: mergedNotes.length,
+            hasIncrementalState: !!(
               scanState.lastShieldCursor || scanState.lastTransferCursor
             ),
           });
@@ -378,7 +417,16 @@ export function useNotes(keypair: OctopusKeypair | null) {
   useEffect(() => {
     if (!keypair || notes.length === 0) return;
 
+    // Capture current keypair MPK to ensure we only update if keypair hasn't changed
+    const currentMPK = keypair.masterPublicKey;
+
     const intervalId = setInterval(async () => {
+      // Safety check: only reconcile if we're still on the same keypair
+      if (currentKeypairRef.current !== currentMPK) {
+        console.log("[useNotes] Reconciliation skipped - keypair changed");
+        return;
+      }
+
       // Only check notes marked as unspent
       const unspentNotes = notes.filter((n) => !n.spent);
       if (unspentNotes.length === 0) return;
@@ -400,8 +448,13 @@ export function useNotes(keypair: OctopusKeypair | null) {
       });
 
       if (hasChanges) {
-        setNotes(updatedNotes);
-        console.log("[useNotes] Reconciliation detected spent notes");
+        // Double-check keypair hasn't changed before updating
+        if (currentKeypairRef.current === currentMPK) {
+          setNotes(updatedNotes);
+          console.log("[useNotes] Reconciliation detected spent notes");
+        } else {
+          console.log("[useNotes] Reconciliation cancelled - keypair changed during check");
+        }
       }
     }, 30000); // Every 30 seconds
 
