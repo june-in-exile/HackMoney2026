@@ -6,12 +6,12 @@ include "../node_modules/circomlib/circuits/bitify.circom";
 /// Merkle proof verifier using Poseidon hash
 template MerkleProof(levels) {
     signal input leaf;
-    signal input path_indices;           // Leaf position as integer
+    signal input leaf_index;             // Leaf position as integer
     signal input path_elements[levels];  // Sibling hashes at each level
     signal output root;
 
-    // Convert path_indices to bits for left/right determination
-    signal levelBits[levels] <== Num2Bits(levels)(path_indices);
+    // Convert leaf_index to bits for left/right determination
+    signal levelBits[levels] <== Num2Bits(levels)(leaf_index);
 
     signal hashes[levels + 1];
     hashes[0] <== leaf;
