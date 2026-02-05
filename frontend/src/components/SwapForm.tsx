@@ -269,7 +269,7 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
               value={amountIn}
               onChange={setAmountIn}
               placeholder="0.0"
-              step={0.001}
+              step={0.000000001}
               min={0}
               disabled={isSubmitting}
               className="flex-1"

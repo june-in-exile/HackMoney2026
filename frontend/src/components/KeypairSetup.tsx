@@ -4,6 +4,7 @@ import { useState } from "react";
 import { truncateAddress, bigIntToHex } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { StoredKeypair } from "@/lib/keypairStorage";
+import { ViewingKeyDisplay } from "./ViewingKeyDisplay";
 
 interface KeypairSetupProps {
   keypair: OctopusKeypair | null;
@@ -218,7 +219,10 @@ export function KeypairSetup({
           </p>
         </div>
 
-        <div className="flex gap-2">
+        {/* Viewing Key Display */}
+        <ViewingKeyDisplay spendingKey={keypair.spendingKey} />
+
+        <div className="flex gap-2 mt-4">
           <button
             onClick={() => setShowDetails(!showDetails)}
             className="btn-secondary flex-1 text-xs"

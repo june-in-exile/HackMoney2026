@@ -12,11 +12,13 @@ import {
   convertTransferProofToSui,
   buildTransferTransaction,
   deriveViewingPublicKey,
-  mpkToViewingPublicKeyUnsafe,
+  importViewingPublicKey,
   encryptNote,
+  type RecipientProfile,
 } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
 import { NumberInput } from "@/components/NumberInput";
+import { RecipientInput } from "@/components/RecipientInput";
 
 interface TransferFormProps {
   keypair: OctopusKeypair | null;
@@ -35,7 +37,7 @@ type TransferState =
   | "error";
 
 export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess, onRefresh }: TransferFormProps) {
-  const [recipientMpk, setRecipientMpk] = useState("");
+  const [recipientProfile, setRecipientProfile] = useState<RecipientProfile | null>(null);
   const [amount, setAmount] = useState("");
   const [state, setState] = useState<TransferState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +61,8 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       return;
     }
 
-    if (!recipientMpk || !amount || parseFloat(amount) <= 0) {
-      setError("Please enter valid recipient MPK and amount");
+    if (!recipientProfile || !amount || parseFloat(amount) <= 0) {
+      setError("Please enter valid recipient profile and amount");
       return;
     }
 
@@ -111,11 +113,10 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       }
 
       // 3. Create output notes (recipient + change)
-      const recipientMpkBigInt = BigInt(recipientMpk);
       const inputTotal = selectedNotes.reduce((sum: bigint, n: { note: { value: bigint } }) => sum + n.note.value, 0n);
       const noteToken = selectedNotes[0].note.token; // Use actual token from selected note
       const [recipientNote, changeNote] = createTransferOutputs(
-        recipientMpkBigInt,
+        recipientProfile.mpk,
         keypair.masterPublicKey,
         amountNano,
         inputTotal,
@@ -144,9 +145,10 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       const suiProof = convertTransferProofToSui(proof.proof, proof.publicSignals);
 
       // 6. Encrypt output notes for recipients using viewing public keys
-      // ⚠️ MVP LIMITATION: Using deterministic viewing key derivation from MPK
-      // In production, recipient should explicitly share their viewing public key
-      const recipientViewingPk = mpkToViewingPublicKeyUnsafe(recipientMpkBigInt);
+      // ✅ PRODUCTION: Using explicitly shared viewing public key
+      const recipientViewingPk = typeof recipientProfile.viewingPublicKey === 'string'
+        ? importViewingPublicKey(recipientProfile.viewingPublicKey)
+        : recipientProfile.viewingPublicKey;
       const myViewingPk = deriveViewingPublicKey(keypair.spendingKey);
 
       const encryptedRecipientNote = encryptNote(recipientNote, recipientViewingPk);
@@ -172,7 +174,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       });
 
       // Clear form inputs on success
-      setRecipientMpk("");
+      setRecipientProfile(null);
       setAmount("");
 
       await onSuccess?.();
@@ -195,8 +197,8 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
           <NumberInput
             value={amount}
             onChange={setAmount}
-            placeholder="0.000"
-            step={0.001}
+            placeholder="0.000000000"
+            step={0.000000001}
             min={0}
             disabled={state !== "idle" && state !== "error"}
           />
@@ -218,28 +220,16 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
           </p>
         </div>
         
-        {/* Recipient MPK Input */}
-        <div>
-          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
-            Recipient Master Public Key (MPK)
-          </label>
-          <input
-            type="text"
-            value={recipientMpk}
-            onChange={(e) => setRecipientMpk(e.target.value)}
-            placeholder="Enter recipient's MPK..."
-            className="input"
-            disabled={state !== "idle" && state !== "error"}
-          />
-          <p className="mt-2 text-[10px] text-gray-600 font-mono break-all">
-            // Example: 0x13495...632235
-          </p>
-        </div>
+        {/* Recipient Profile Input */}
+        <RecipientInput
+          onRecipientChange={setRecipientProfile}
+          disabled={state !== "idle" && state !== "error"}
+        />
 
         {/* Note Selection Info */}
         <div className="p-3 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
           <p className="text-[10px] text-gray-300 font-mono leading-relaxed">
-            <span className="text-cyber-blue font-bold">AUTO SELECT:</span> SDK automatically selects optimal notes to cover transfer amount
+            <span className="text-cyber-blue font-bold">AUTO SELECT:</span> SDK automatically selects notes to cover transfer amount
           </p>
         </div>
       </div>

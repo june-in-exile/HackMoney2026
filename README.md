@@ -13,7 +13,7 @@ Octopus enables private token operations on Sui by implementing a UTXO-based pri
 - **Shield**: Deposit tokens into the privacy pool, creating encrypted notes
 - **Transfer**: Send tokens privately to other users within the pool ✨ **WORKING**
 - **Swap**: Exchange tokens privately through integrated DEXs 🚧 **85% Complete**
-- **Unshield**: Withdraw tokens with ZK proof verification, preserving privacy
+- **Unshield**: Withdraw tokens with ZK proof verification and automatic change handling
 
 ```
 ┌─────────────┐     Shield      ┌────────────────────────────┐
@@ -110,17 +110,19 @@ Open <http://localhost:3000> to access the web interface.
 
 | Property | Value |
 |----------|-------|
-| Constraints | 10,477 |
-| Public Inputs | 3 (merkle_root, nullifier, commitment) |
-| Private Inputs | 7 (keys, note data, Merkle path) |
+| Constraints | ~11,000 |
+| Public Inputs | 1 (unshield_amount) |
+| Public Outputs | 3 (nullifier, merkle_root, change_commitment) |
+| Private Inputs | 8 (keys, note data, Merkle path, change_random) |
 | Merkle Depth | 16 levels |
 
 The circuit proves:
 
 1. Knowledge of spending_key and nullifying_key (ownership)
-2. Correct commitment computation
-3. Commitment exists in Merkle tree
-4. Correct nullifier derivation (prevents double-spend)
+2. Input note exists in Merkle tree
+3. Correct nullifier derivation (prevents double-spend)
+4. Balance conservation: `input_value = unshield_amount + change_value`
+5. Correct change commitment computation (if change exists)
 
 ### Transfer Circuit (`transfer.circom`)
 

@@ -102,10 +102,12 @@ nullifier = Poseidon(nullifying_key, leaf_index)
 
 * No ZK proof required, adds commitment to Merkle tree
 
-**Unshield** (withdraw): `pool::unshield<T>(pool, proof_bytes, public_inputs_bytes, amount, recipient, ctx)`
+**Unshield** (withdraw): `pool::unshield<T>(pool, proof_bytes, public_inputs_bytes, recipient, encrypted_change_note, ctx)`
 
-* Requires 128-byte Groth16 proof + 96-byte public inputs (root, nullifier, commitment)
-* Verifies proof, marks nullifier spent, transfers tokens
+* Requires 128-byte Groth16 proof + 128-byte public inputs (nullifier, root, change_commitment, amount)
+* Supports automatic change note creation (no fund loss)
+* Amount is extracted from public inputs (no separate parameter needed)
+* Verifies proof, marks nullifier spent, transfers tokens, creates change note if needed
 
 **Transfer** (private transfer): `pool::transfer<T>(pool, proof_bytes, public_inputs_bytes, encrypted_notes, ctx)`
 

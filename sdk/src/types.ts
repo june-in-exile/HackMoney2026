@@ -254,3 +254,41 @@ export interface SuiSwapProof {
   /** Public inputs (192 bytes: root || nullifiers[2] || output_commitment || change_commitment || swap_data_hash) */
   publicInputsBytes: Uint8Array;
 }
+
+// ============ Viewing Key & Recipient Management ============
+
+/**
+ * Recipient profile for encrypted transfers
+ *
+ * Contains both the MPK (for creating notes) and the viewing public key
+ * (for encrypting notes). Recipients must explicitly share both values.
+ */
+export interface RecipientProfile {
+  /** Master Public Key (for creating notes) */
+  mpk: bigint;
+
+  /** Viewing Public Key (for encrypting notes) - explicitly shared by recipient */
+  viewingPublicKey: Uint8Array | string;
+
+  /** Optional label/name for this recipient */
+  label?: string;
+}
+
+/**
+ * Stored recipient profile (serialized for localStorage)
+ *
+ * All bigint and Uint8Array values are converted to hex strings for storage.
+ */
+export interface RecipientProfileStored {
+  /** Master Public Key as hex string */
+  mpk: string;
+
+  /** Viewing Public Key as 64-character hex string */
+  viewingPublicKey: string;
+
+  /** Optional label/name */
+  label?: string;
+
+  /** Timestamp when recipient was added */
+  addedAt: number;
+}

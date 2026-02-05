@@ -15,7 +15,7 @@ import {
   type OctopusKeypair,
   type Note,
 } from "./types.js";
-import { bigIntToBE32, bytesToBigIntBE } from "./utils/bytes.js";
+import { bigIntToBE32, bytesToBigIntBE, bytesToHex, hexToBytes } from "./utils/bytes.js";
 
 let poseidonInstance: Poseidon | null = null;
 
@@ -214,32 +214,101 @@ export function deriveViewingPublicKey(spendingKey: bigint): Uint8Array {
 }
 
 /**
- * TEMPORARY: Derive viewing public key from MPK (for MVP testing only)
+ * Export viewing public key in shareable hex format
  *
- * ⚠️ WARNING: This is NOT secure for production use!
- * This function deterministically derives a viewing public key from MPK.
- * The problem is that anyone with MPK can compute this public key, but only
- * the owner (with spending key) can derive the matching private key to decrypt.
+ * Converts the X25519 viewing public key to a 64-character hex string
+ * that can be shared with others for encrypted note sending.
  *
- * For production, recipients should explicitly share their viewing public key.
- * This function exists only to enable MVP testing without complex key sharing.
+ * @param spendingKey - User's spending key
+ * @returns 64-character hex string (no "0x" prefix)
  *
- * @deprecated Use proper viewing public key sharing instead
+ * @example
+ * const viewingKeyHex = exportViewingPublicKey(keypair.spendingKey);
+ * // Share viewingKeyHex with senders via secure channel
  */
-export function mpkToViewingPublicKeyUnsafe(mpk: bigint): Uint8Array {
-  // Hash MPK to create a deterministic seed
-  const seed = sha256(bigIntToBE32(mpk));
+export function exportViewingPublicKey(spendingKey: bigint): string {
+  const viewingPk = deriveViewingPublicKey(spendingKey);
+  return bytesToHex(viewingPk);
+}
 
-  // Treat seed as X25519 private scalar
-  const privateKey = new Uint8Array(32);
-  privateKey.set(seed);
+/**
+ * Import viewing public key from hex string format
+ *
+ * Converts a 64-character hex string back to a Uint8Array viewing public key
+ * for use in note encryption.
+ *
+ * @param hexString - 64-character hex string (with or without "0x" prefix)
+ * @returns Viewing public key as Uint8Array (32 bytes)
+ * @throws Error if format is invalid
+ *
+ * @example
+ * const recipientViewingPk = importViewingPublicKey("a1b2c3d4...");
+ * const encrypted = encryptNote(note, recipientViewingPk);
+ */
+export function importViewingPublicKey(hexString: string): Uint8Array {
+  const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
 
-  // Clamp to valid X25519 scalar
-  privateKey[0] &= 248;
-  privateKey[31] &= 127;
-  privateKey[31] |= 64;
+  if (cleanHex.length !== 64) {
+    throw new Error(
+      `Invalid viewing public key format: expected 64 hex characters, got ${cleanHex.length}`
+    );
+  }
 
-  return x25519.getPublicKey(privateKey);
+  if (!/^[0-9a-fA-F]{64}$/.test(cleanHex)) {
+    throw new Error(
+      'Invalid viewing public key format: must contain only hex characters (0-9, a-f, A-F)'
+    );
+  }
+
+  return hexToBytes(cleanHex);
+}
+
+/**
+ * Validate viewing public key hex string format
+ *
+ * Checks if a string is a valid 64-character hex representation
+ * of a viewing public key.
+ *
+ * @param hexString - String to validate
+ * @returns true if valid format, false otherwise
+ *
+ * @example
+ * if (isValidViewingPublicKey(userInput)) {
+ *   const viewingPk = importViewingPublicKey(userInput);
+ * }
+ */
+export function isValidViewingPublicKey(hexString: string): boolean {
+  const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
+  return /^[0-9a-fA-F]{64}$/.test(cleanHex);
+}
+
+/**
+ * Encrypt note with explicitly provided viewing public key
+ *
+ * Production-ready encryption that accepts an explicit viewing public key
+ * instead of deriving it from MPK. This is the recommended approach for
+ * cross-user transfers.
+ *
+ * @param note - Note to encrypt
+ * @param recipientViewingPk - Recipient's viewing public key (Uint8Array or hex string)
+ * @returns Encrypted note data (188 bytes)
+ *
+ * @example
+ * // Option 1: Use Uint8Array directly
+ * const encrypted = encryptNoteExplicit(note, recipientViewingPkBytes);
+ *
+ * // Option 2: Use hex string
+ * const encrypted = encryptNoteExplicit(note, "a1b2c3d4...");
+ */
+export function encryptNoteExplicit(
+  note: Note,
+  recipientViewingPk: Uint8Array | string
+): Uint8Array {
+  const viewingPk = typeof recipientViewingPk === 'string'
+    ? importViewingPublicKey(recipientViewingPk)
+    : recipientViewingPk;
+
+  return encryptNote(note, viewingPk);
 }
 
 /**

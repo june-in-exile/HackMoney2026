@@ -62,7 +62,7 @@ console.log('Master Public Key:', keypair.masterPublicKey);
 ### Shield Tokens (Deposit)
 
 ```typescript
-import { createNote, encryptNote, buildShieldTransaction, mpkToViewingPublicKeyUnsafe, bigIntToBE32 } from '@octopus/sdk';
+import { createNote, encryptNoteExplicit, buildShieldTransaction, exportViewingPublicKey, bigIntToBE32 } from '@octopus/sdk';
 
 // Create a note for 1000 tokens
 const note = createNote(
@@ -71,9 +71,11 @@ const note = createNote(
   1000n // amount
 );
 
-// Encrypt the note for the recipient
-const recipientViewingPk = mpkToViewingPublicKeyUnsafe(keypair.masterPublicKey);
-const encryptedNote = encryptNote(note, recipientViewingPk);
+// Export your viewing public key for encrypting notes to yourself
+const myViewingPublicKey = exportViewingPublicKey(keypair.spendingKey);
+
+// Encrypt the note for yourself
+const encryptedNote = encryptNoteExplicit(note, myViewingPublicKey);
 
 // Build shield transaction
 const tx = buildShieldTransaction(
@@ -131,9 +133,12 @@ import {
   generateTransferProof,
   convertTransferProofToSui,
   buildTransferTransaction,
-  encryptNote,
-  mpkToViewingPublicKeyUnsafe
+  encryptNoteExplicit,
+  exportViewingPublicKey
 } from '@octopus/sdk';
+
+// Recipient shares their viewing public key (received out-of-band)
+const recipientViewingPublicKey = "a1b2c3d4..."; // 64-char hex string
 
 // Select input notes to cover the amount
 const inputNotes = selectNotesForTransfer(myNotes, 500n);
@@ -160,13 +165,12 @@ const transferInput = {
 const { proof, publicSignals } = await generateTransferProof(transferInput);
 const suiProof = convertTransferProofToSui(proof, publicSignals);
 
-// Encrypt output notes
-const recipientViewingPk = mpkToViewingPublicKeyUnsafe(recipientMpk);
-const senderViewingPk = mpkToViewingPublicKeyUnsafe(senderKeypair.masterPublicKey);
+// Encrypt output notes with explicit viewing keys
+const myViewingPublicKey = exportViewingPublicKey(senderKeypair.spendingKey);
 
 const encryptedNotes = [
-  encryptNote(recipientNote, recipientViewingPk),
-  encryptNote(changeNote, senderViewingPk)
+  encryptNoteExplicit(recipientNote, recipientViewingPublicKey),
+  encryptNoteExplicit(changeNote, myViewingPublicKey)
 ];
 
 // Build transfer transaction
@@ -324,7 +328,7 @@ Build a private swap transaction.
 
 #### `selectNotesForTransfer(availableNotes: SelectableNote[], amount: bigint): SelectableNote[]`
 
-Select optimal notes to cover transfer amount (1 or 2 notes).
+Select notes to cover transfer amount (1 or 2 notes).
 
 **Strategy:**
 
@@ -442,6 +446,175 @@ Octopus uses a UTXO (Unspent Transaction Output) model similar to Bitcoin:
 - HKDF-SHA256 for key derivation
 - ChaCha20-Poly1305 AEAD for encryption
 
+## Viewing Key Management
+
+### Overview
+
+Viewing keys enable secure note encryption without exposing the spending key. Users share their **viewing public key** with senders, who use it to encrypt notes. Only the recipient (with the spending-key-derived viewing private key) can decrypt.
+
+### Key Hierarchy
+
+```
+Random Spending Key (256-bit)
+    ↓
+┌───────────────────┴────────────────────┐
+│                                        │
+Nullifying Key                   Viewing Keypair (X25519)
+    ↓                                    ↓
+Master Public Key (MPK)          Viewing Public Key (shareable)
+    ↓
+Note Public Key (NPK)
+```
+
+**Key Derivation:**
+
+- `nullifyingKey = Poseidon(spendingKey, 1)`
+- `MPK = Poseidon(spendingKey, nullifyingKey)`
+- `viewingPrivateKey = X25519(SHA256(spendingKey))`
+- `viewingPublicKey = X25519.publicKey(viewingPrivateKey)`
+
+### Exporting Viewing Keys
+
+```typescript
+import { exportViewingPublicKey } from '@octopus/sdk';
+
+// Export viewing public key for sharing
+const viewingKeyHex = exportViewingPublicKey(keypair.spendingKey);
+// Returns: 64-character hex string (e.g., "a1b2c3d4...")
+
+// Share this with senders via secure channel
+console.log("My Viewing Public Key:", viewingKeyHex);
+```
+
+### Importing Viewing Keys
+
+```typescript
+import { importViewingPublicKey, isValidViewingPublicKey } from '@octopus/sdk';
+
+const recipientViewingKey = "a1b2c3d4..."; // Received from recipient
+
+// Validate format (optional but recommended)
+if (!isValidViewingPublicKey(recipientViewingKey)) {
+  throw new Error('Invalid viewing key format');
+}
+
+// Import for use in encryption
+const viewingPk = importViewingPublicKey(recipientViewingKey);
+```
+
+### Encrypting Notes for Recipients
+
+#### Production Method (Recommended)
+
+```typescript
+import {
+  createNote,
+  encryptNoteExplicit,
+  importViewingPublicKey
+} from '@octopus/sdk';
+
+// 1. Recipient shares both MPK and viewing public key
+const recipientProfile = {
+  mpk: BigInt("123456789..."),
+  viewingPublicKey: "a1b2c3d4..." // 64-char hex
+};
+
+// 2. Create note for recipient
+const note = createNote(
+  recipientProfile.mpk,
+  tokenId,
+  amountNano
+);
+
+// 3. Encrypt with explicitly shared viewing key
+const encrypted = encryptNoteExplicit(
+  note,
+  recipientProfile.viewingPublicKey
+);
+```
+
+#### Alternative (Direct Usage)
+
+```typescript
+import { encryptNote, importViewingPublicKey } from '@octopus/sdk';
+
+const viewingPk = importViewingPublicKey(recipientViewingKeyHex);
+const encrypted = encryptNote(note, viewingPk);
+```
+
+### Recipient Management Pattern
+
+```typescript
+interface RecipientProfile {
+  mpk: bigint;                     // For creating notes
+  viewingPublicKey: string;        // For encrypting notes
+  label?: string;                  // Optional nickname
+}
+
+// Save recipients to localStorage
+const recipients: RecipientProfile[] = [
+  {
+    mpk: BigInt("123456789..."),
+    viewingPublicKey: "a1b2c3d4...",
+    label: "Alice"
+  },
+  {
+    mpk: BigInt("987654321..."),
+    viewingPublicKey: "e5f6g7h8...",
+    label: "Bob"
+  }
+];
+
+// Use saved recipient for transfer
+const recipient = recipients[0];
+const note = createNote(recipient.mpk, tokenId, amount);
+const encrypted = encryptNoteExplicit(note, recipient.viewingPublicKey);
+```
+
+### Security Best Practices
+
+✅ **DO:**
+
+- Share viewing public keys through secure channels (encrypted messaging, QR codes)
+- Validate viewing key format before importing
+- Store viewing public keys separately from MPKs
+- Use explicit viewing keys for all cross-user transfers
+
+⚠️ **DON'T:**
+
+- Share spending keys (these authorize spending!)
+- Assume viewing public keys are the same as MPKs
+- Skip validation when importing user-provided keys
+
+### Viewing Key Use Cases
+
+1. **Private Transfers:** Encrypt notes for specific recipients
+2. **View-Only Wallets:** Share viewing key for read-only access (future)
+3. **Compliance:** Selective disclosure to auditors (Milestone 4)
+4. **Tax Reporting:** Export transaction history without spending authority
+
+### API Reference
+
+```typescript
+// Export viewing public key from spending key
+function exportViewingPublicKey(spendingKey: bigint): string;
+
+// Import viewing public key from hex string
+function importViewingPublicKey(hexString: string): Uint8Array;
+
+// Validate viewing public key format
+function isValidViewingPublicKey(hexString: string): boolean;
+
+// Encrypt note with explicit viewing key
+function encryptNoteExplicit(
+  note: Note,
+  recipientViewingPk: Uint8Array | string
+): Uint8Array;
+
+// Derive viewing public key from spending key (low-level)
+function deriveViewingPublicKey(spendingKey: bigint): Uint8Array;
+```
+
 ## Examples
 
 ### Complete Shield → Transfer → Unshield Flow
@@ -451,7 +624,8 @@ import {
   initPoseidon,
   generateKeypair,
   createNote,
-  encryptNote,
+  encryptNoteExplicit,
+  exportViewingPublicKey,
   ClientMerkleTree,
   selectNotesForTransfer,
   createTransferOutputs,
@@ -462,7 +636,6 @@ import {
   buildShieldTransaction,
   buildTransferTransaction,
   buildUnshieldTransaction,
-  mpkToViewingPublicKeyUnsafe,
   bigIntToBE32
 } from '@octopus/sdk';
 
@@ -473,10 +646,13 @@ await initPoseidon();
 const alice = generateKeypair();
 const bob = generateKeypair();
 
+// Export viewing public keys
+const aliceViewingPubKey = exportViewingPublicKey(alice.spendingKey);
+const bobViewingPubKey = exportViewingPublicKey(bob.spendingKey);
+
 // 3. Alice shields 1000 tokens
 const aliceNote = createNote(alice.masterPublicKey, 1n, 1000n);
-const aliceViewingPk = mpkToViewingPublicKeyUnsafe(alice.masterPublicKey);
-const encryptedAliceNote = encryptNote(aliceNote, aliceViewingPk);
+const encryptedAliceNote = encryptNoteExplicit(aliceNote, aliceViewingPubKey);
 
 const shieldTx = buildShieldTransaction(
   packageId,
@@ -514,10 +690,10 @@ const { proof: transferProof, publicSignals: transferSignals } =
   await generateTransferProof(transferInput);
 const suiTransferProof = convertTransferProofToSui(transferProof, transferSignals);
 
-const bobViewingPk = mpkToViewingPublicKeyUnsafe(bob.masterPublicKey);
+// Encrypt with explicit viewing keys
 const encryptedNotes = [
-  encryptNote(bobNote, bobViewingPk),
-  encryptNote(aliceChangeNote, aliceViewingPk)
+  encryptNoteExplicit(bobNote, bobViewingPubKey),
+  encryptNoteExplicit(aliceChangeNote, aliceViewingPubKey)
 ];
 
 const transferTx = buildTransferTransaction(
@@ -686,13 +862,20 @@ On a modern CPU (M1 Mac):
 
 ### Viewing Keys
 
-The current implementation uses `mpkToViewingPublicKeyUnsafe()` which is **NOT production-ready**.
+**Current Implementation:**
 
-**For Production:**
+The SDK now uses explicit viewing key sharing as the standard approach:
 
-- Users should explicitly share viewing public keys
+- Recipients export their viewing public key using `exportViewingPublicKey(spendingKey)`
+- Senders encrypt notes using `encryptNoteExplicit(note, recipientViewingPubKey)`
+- Viewing public keys are shared out-of-band (QR codes, secure messaging, etc.)
+
+**Best Practices:**
+
+- Always use explicit viewing keys for cross-user transfers
 - Store viewing keypairs separately from spending keys
-- Implement proper key sharing protocol
+- Validate viewing key format with `isValidViewingPublicKey()` before importing
+- Share viewing public keys through secure channels only
 
 ### Random Number Generation
 

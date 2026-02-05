@@ -4,7 +4,9 @@ This directory contains the Zero-Knowledge Succinct Non-Interactive Argument of 
 
 ## Circuits Overview
 
-- `unshield.circom`: A basic unshield circuit. Proves knowledge of an input note's private keys and its existence in a Merkle tree, allowing a user to "unshield" funds.
+- `unshield.circom`: Unshield circuit with automatic change support (1-input, 1-output design). Proves knowledge of an input note's private keys and its existence in a Merkle tree, allowing a user to "unshield" any amount from a note. Automatically creates an encrypted change note if unshield amount < note value, preventing fund loss.
+  - **Public Input**: `unshield_amount` (amount to withdraw)
+  - **Public Outputs**: `nullifier`, `merkle_root`, `change_commitment`
 - `transfer.circom`: A private transfer circuit. Allows a user to transfer funds privately between two notes (which can belong to the same or different users), preserving balance conservation. Supports 2-input, 2-output transfers.
 - `swap.circom`: A private swap circuit. Enables users to perform private token swaps through an external DEX (e.g., Cetus), proving ownership of input notes and correct swap parameters.
 

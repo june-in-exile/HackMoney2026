@@ -41,6 +41,10 @@ export interface OwnedNote {
  *
  * For each event, attempts to decrypt the note using the user's MPK.
  * If successful, the note belongs to this user.
+ *
+ * @param keypair - The Octopus keypair to scan notes for
+ * @param isInitializing - Whether the keypair is still being initialized (Poseidon, etc.)
+ * @returns Notes, loading state, and helper functions
  */
 // Helper to get localStorage key for spent nullifiers
 function getSpentNullifiersKey(mpk: bigint): string {
@@ -70,10 +74,13 @@ function saveSpentNullifiers(mpk: bigint, nullifiers: Set<string>): void {
   }
 }
 
-export function useNotes(keypair: OctopusKeypair | null) {
+export function useNotes(
+  keypair: OctopusKeypair | null,
+  isInitializing = false
+) {
   const client = useSuiClient();
   const [notes, setNotes] = useState<OwnedNote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);  // Start with loading=true to avoid showing balance=0 before first scan
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [scanProgress, setScanProgress] = useState<{
@@ -84,6 +91,8 @@ export function useNotes(keypair: OctopusKeypair | null) {
 
   // Track current keypair to detect changes
   const currentKeypairRef = useRef<bigint | null>(null);
+  // Track if a scan is currently in progress to prevent concurrent scans
+  const isScanningRef = useRef(false);
 
   // Initialize localSpentSet from localStorage
   const [localSpentSet, setLocalSpentSet] = useState<Set<string>>(() => {
@@ -178,6 +187,14 @@ export function useNotes(keypair: OctopusKeypair | null) {
   useEffect(() => {
     if (!keypair) {
       setNotes([]);
+
+      // Only set loading=false if we're not still initializing
+      // This prevents showing "0 SUI" while Poseidon/keypair are still loading
+      if (!isInitializing) {
+        setLoading(false);
+      }
+      // If still initializing, keep loading=true to show loading state
+
       currentKeypairRef.current = null;
       return;
     }
@@ -202,6 +219,12 @@ export function useNotes(keypair: OctopusKeypair | null) {
     async function scanNotesWithWorker() {
       if (!keypair) return; // TypeScript null check
 
+      // Prevent concurrent scans - if already scanning, skip
+      if (isScanningRef.current) {
+        return;
+      }
+
+      isScanningRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -325,6 +348,9 @@ export function useNotes(keypair: OctopusKeypair | null) {
         if (!isCancelled) {
           setLoading(false);
         }
+
+        // Reset scanning flag to allow future scans
+        isScanningRef.current = false;
       }
     }
 
@@ -371,8 +397,10 @@ export function useNotes(keypair: OctopusKeypair | null) {
 
     return () => {
       isCancelled = true;
+      // Reset scanning flag when effect is cleaned up
+      isScanningRef.current = false;
     };
-  }, [keypair, client, refreshTrigger]);
+  }, [keypair?.masterPublicKey, client, refreshTrigger, isInitializing]);
 
   // Periodic reconciliation: re-check unspent notes to catch missed events
   useEffect(() => {

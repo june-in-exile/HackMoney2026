@@ -33,15 +33,16 @@ export function useLocalKeypair(walletAddress: string | undefined) {
   // Initialize Poseidon and load keypair from storage
   useEffect(() => {
     async function init() {
+      setIsLoading(true);  // Ensure loading state is set at start
       try {
         // Use shared singleton to avoid concurrent WebAssembly allocations
         const { initPoseidon } = await import("@/lib/poseidon");
         await initPoseidon();
         setPoseidonReady(true);
+        // Don't set isLoading=false here - wait for keypair to load in next effect
       } catch (error) {
         console.error("Failed to initialize:", error);
-      } finally {
-        setIsLoading(false);
+        setIsLoading(false); // Only set to false on error
       }
     }
 
@@ -54,10 +55,16 @@ export function useLocalKeypair(walletAddress: string | undefined) {
       // Wallet disconnected - clear everything
       setKeypair(null);
       setSavedKeypairs([]);
+      setIsLoading(false); // Wallet disconnected, stop loading
       return;
     }
 
-    // Wallet address changed - try to load active keypair for new address
+    // Wait for Poseidon to be ready before loading keypair
+    if (!poseidonReady) {
+      return; // Still initializing, keep isLoading = true
+    }
+
+    // Poseidon is ready - safe to load keypair from localStorage
     const identifier = getDefaultIdentifier(walletAddress);
     const activeKeypair = getActiveKeypair(identifier);
 
@@ -77,7 +84,10 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     // Update saved keypairs list
     const saved = getSavedKeypairs(identifier);
     setSavedKeypairs(saved);
-  }, [walletAddress]);
+
+    // Initialization complete - Poseidon is ready and keypair is loaded (or confirmed absent)
+    setIsLoading(false);
+  }, [walletAddress, poseidonReady]);
 
   // Generate a new keypair
   const generateKeypair = useCallback(async () => {

@@ -199,8 +199,8 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
             id="shield-amount"
             value={amount}
             onChange={setAmount}
-            placeholder="0.000"
-            step={0.001}
+            placeholder="0.000000000"
+            step={0.000000001}
             min={0}
             disabled={isSubmitting}
           />

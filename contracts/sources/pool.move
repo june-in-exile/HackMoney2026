@@ -716,28 +716,6 @@ module octopus::pool {
         false
     }
 
-    /// Parse public inputs from concatenated bytes (for old unshield - deprecated).
-    /// Returns (merkle_root, nullifier) each as 32-byte vectors.
-    fun parse_public_inputs(bytes: &vector<u8>): (vector<u8>, vector<u8>) {
-        let mut merkle_root = vector::empty<u8>();
-        let mut nullifier = vector::empty<u8>();
-
-        // Extract merkle_root (bytes 0-31)
-        let mut i = 0;
-        while (i < 32) {
-            vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        // Extract nullifier (bytes 32-63)
-        while (i < 64) {
-            vector::push_back(&mut nullifier, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        (merkle_root, nullifier)
-    }
-
     /// Parse unshield public inputs from concatenated bytes (for unshield with change).
     /// Returns (merkle_root, nullifier, unshield_amount, change_commitment) each as 32-byte vectors.
     ///

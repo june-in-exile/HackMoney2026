@@ -38,21 +38,16 @@ export default function Home() {
     removeKeypair,
   } = useLocalKeypair(account?.address);
 
-  useEffect(() => {
-  }, [keypair]);
-
   // Fetch all notes from blockchain (includes Merkle proofs)
   // Loads in background as soon as keypair is selected
+  // Pass isLoading to prevent showing 0 balance during initialization
   const {
     notes,
     loading: isLoadingNotes,
     error: notesError,
     refresh: refreshNotes,
     markNoteSpent,
-  } = useNotes(keypair);
-
-  useEffect(() => {
-  }, [isLoadingNotes]);
+  } = useNotes(keypair, isLoading);
 
   // Calculate balance and note count from loaded notes
   const unspentNotes = notes.filter((n) => !n.spent);

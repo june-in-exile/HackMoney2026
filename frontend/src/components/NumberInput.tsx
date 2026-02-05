@@ -16,9 +16,9 @@ export function NumberInput({
   id,
   value,
   onChange,
-  placeholder = "0.000",
+  placeholder = "0.000000000",
   disabled = false,
-  step = 0.001,
+  step = 0.000000001,
   min = 0,
   max,
   className,
@@ -27,14 +27,37 @@ export function NumberInput({
     const currentValue = parseFloat(value) || 0;
     const newValue = currentValue + step;
     if (max === undefined || newValue <= max) {
-      onChange(newValue.toFixed(3));
+      onChange(newValue.toFixed(9));
     }
   };
 
   const handleDecrement = () => {
     const currentValue = parseFloat(value) || 0;
     const newValue = Math.max(min, currentValue - step);
-    onChange(newValue.toFixed(3));
+    onChange(newValue.toFixed(9));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+
+    // If empty, allow it
+    if (inputValue === '' || inputValue === '-') {
+      onChange(inputValue);
+      return;
+    }
+
+    // If it contains scientific notation (e or E), convert to decimal
+    if (inputValue.includes('e') || inputValue.includes('E')) {
+      const num = parseFloat(inputValue);
+      if (!isNaN(num)) {
+        // Convert to decimal notation, remove trailing zeros
+        const formatted = num.toFixed(9).replace(/\.?0+$/, '');
+        onChange(formatted);
+        return;
+      }
+    }
+
+    onChange(inputValue);
   };
 
   return (
@@ -46,7 +69,7 @@ export function NumberInput({
         min={min}
         max={max}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleInputChange}
         placeholder={placeholder}
         className={cn("input pr-12", className)}
         disabled={disabled}
