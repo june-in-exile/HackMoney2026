@@ -57,10 +57,10 @@ export interface SuiVerificationKey {
 // ============ Unshield Types ============
 
 /**
- * Input for unshielding a note
+ * Input for unshielding a note with automatic change handling
  */
 export interface UnshieldInput {
-  /** The note being unshield */
+  /** The note being unshielded */
   note: Note;
   /** Position in the Merkle tree */
   leafIndex: number;
@@ -68,33 +68,41 @@ export interface UnshieldInput {
   pathElements: bigint[];
   /** The keypair that owns this note */
   keypair: OctopusKeypair;
+  /** Amount to unshield (must be <= note.value) */
+  unshieldAmount: bigint;
 }
 
 /**
- * Circuit input for unshield proof generation
+ * Circuit input for unshield proof generation (with change support)
+ * Matches the new circuit design with updated field names
  */
 export interface UnshieldCircuitInput {
-  // Private inputs
+  // Private inputs (matching new circuit)
   spending_key: string;
   nullifying_key: string;
-  random: string;
-  value: string;
+  random: string;               // Changed from input_random
+  value: string;                // Changed from input_value
   token: string;
-  path_elements: string[];
-  path_indices: string;
-  // Public inputs
-  merkle_root: string;
-  nullifier: string;
+  leaf_index: string;           // Changed from input_leaf_index
+  path_elements: string[];      // Changed from input_path_elements
+  change_random: string;
+  // Public input
+  unshield_amount: string;
+  // Note: merkle_root, nullifier, change_commitment are outputs, not inputs
 }
 
 /**
- * ZK proof data in Sui-compatible format
+ * ZK proof data in Sui-compatible format (with change support)
  */
 export interface SuiUnshieldProof {
   /** Proof points (128 bytes: A || B || C) */
   proofBytes: Uint8Array;
-  /** Public inputs (64 bytes: root || nullifier) - commitment is now private */
+  /** Public inputs (128 bytes: root || nullifier || unshield_amount || change_commitment) */
   publicInputsBytes: Uint8Array;
+  /** Change note (if any) */
+  changeNote: Note | null;
+  /** Encrypted change note data for scanning */
+  encryptedChangeNote: Uint8Array;
 }
 
 // ============ Transfer Types ============

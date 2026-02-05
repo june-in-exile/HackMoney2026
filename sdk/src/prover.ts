@@ -22,6 +22,8 @@ import {
   computeNullifier,
   computeMerkleRoot,
   poseidonHash,
+  randomFieldElement,
+  encryptNote,
 } from "./crypto.js";
 import {
   serializeProof,
@@ -96,10 +98,10 @@ function getUnshieldCircuitPaths() {
 }
 
 /**
- * Build circuit input for unshield proof
+ * Build circuit input for unshield proof with change support
  */
-export function buildUnshieldInput(unshieldInput: UnshieldInput): UnshieldCircuitInput {
-  const { note, leafIndex, pathElements, keypair } = unshieldInput;
+export function buildUnshieldInput(unshieldInput: UnshieldInput): { circuitInput: UnshieldCircuitInput; changeNote: Note | null; changeRandom: bigint } {
+  const { note, leafIndex, pathElements, keypair, unshieldAmount } = unshieldInput;
 
   // Verify path elements length
   if (pathElements.length !== MERKLE_TREE_DEPTH) {
@@ -108,40 +110,71 @@ export function buildUnshieldInput(unshieldInput: UnshieldInput): UnshieldCircui
     );
   }
 
-  // Compute nullifier
-  const nullifier = computeNullifier(keypair.nullifyingKey, leafIndex);
+  // Verify unshield amount is valid
+  if (unshieldAmount <= 0n) {
+    throw new Error(`Unshield amount must be positive, got: ${unshieldAmount}`);
+  }
+  if (unshieldAmount > note.value) {
+    throw new Error(
+      `Unshield amount (${unshieldAmount}) exceeds note value (${note.value})`
+    );
+  }
 
-  // Compute merkle root
-  const merkleRoot = computeMerkleRoot(note.commitment, pathElements, leafIndex);
+  // Compute MPK (master public key) - needed for change note
+  const mpk = poseidonHash([keypair.spendingKey, keypair.nullifyingKey]);
 
-  return {
-    // Private inputs
+  // Calculate change amount
+  const changeValue = note.value - unshieldAmount;
+
+  // Generate random for change note
+  const changeRandom = randomFieldElement();
+
+  // Compute change NPK and commitment
+  const changeNpk = poseidonHash([mpk, changeRandom]);
+  const changeCommitment = changeValue > 0n
+    ? poseidonHash([changeNpk, note.token, changeValue])
+    : 0n;
+
+  // Create change note object (if any)
+  const changeNote = changeValue > 0n ? {
+    npk: changeNpk,
+    token: note.token,
+    value: changeValue,
+    random: changeRandom,
+    commitment: changeCommitment,
+  } : null;
+
+  const circuitInput: UnshieldCircuitInput = {
+    // Private inputs (matching new circuit field names)
     spending_key: keypair.spendingKey.toString(),
     nullifying_key: keypair.nullifyingKey.toString(),
-    random: note.random.toString(),
-    value: note.value.toString(),
+    random: note.random.toString(),              // Changed from input_random
+    value: note.value.toString(),                // Changed from input_value
     token: note.token.toString(),
-    path_elements: pathElements.map((e) => e.toString()),
-    path_indices: leafIndex.toString(),
-    // Public inputs
-    merkle_root: merkleRoot.toString(),
-    nullifier: nullifier.toString(),
+    leaf_index: leafIndex.toString(),            // Changed from input_leaf_index
+    path_elements: pathElements.map((e) => e.toString()), // Changed from input_path_elements
+    change_random: changeRandom.toString(),
+    // Public input
+    unshield_amount: unshieldAmount.toString(),
+    // Note: merkle_root, nullifier, change_commitment are computed by the circuit
   };
+
+  return { circuitInput, changeNote, changeRandom };
 }
 
 /**
- * Generate unshield proof using snarkjs
+ * Generate unshield proof using snarkjs (with change support)
  */
 export async function generateUnshieldProof(
   unshieldInput: UnshieldInput,
   config: ProverConfig = {}
-): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
+): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[]; changeNote: Note | null; changeRandom: bigint }> {
   const paths = getUnshieldCircuitPaths();
   const wasmPath = config.wasmPath ?? paths.wasmPath;
   const zkeyPath = config.zkeyPath ?? paths.zkeyPath;
 
   // Build circuit input
-  const input = buildUnshieldInput(unshieldInput);
+  const { circuitInput, changeNote, changeRandom } = buildUnshieldInput(unshieldInput);
 
   // Generate proof (snarkjs supports both Node.js and browser)
   if (isNodeEnvironment()) {
@@ -154,12 +187,12 @@ export async function generateUnshieldProof(
     }
 
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input as unknown as snarkjs.CircuitSignals,
+      circuitInput as unknown as snarkjs.CircuitSignals,
       wasmPath,
       zkeyPath
     );
 
-    return { proof, publicSignals };
+    return { proof, publicSignals, changeNote, changeRandom };
   } else {
     const [wasmBuffer, zkeyBuffer] = await Promise.all([
       loadFileBrowser(wasmPath),
@@ -167,28 +200,40 @@ export async function generateUnshieldProof(
     ]);
 
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input as unknown as snarkjs.CircuitSignals,
+      circuitInput as unknown as snarkjs.CircuitSignals,
       new Uint8Array(wasmBuffer),
       new Uint8Array(zkeyBuffer)
     );
 
-    return { proof, publicSignals };
+    return { proof, publicSignals, changeNote, changeRandom };
   }
 }
 
 /**
- * Convert snarkjs proof to Sui-compatible format (Arkworks compressed)
+ * Convert snarkjs proof to Sui-compatible format (Arkworks compressed) with change note support
  *
  * Uses shared compression utilities for consistent serialization.
  */
 export function convertUnshieldProofToSui(
   proof: snarkjs.Groth16Proof,
-  publicSignals: string[]
+  publicSignals: string[],
+  changeNote: Note | null,
+  recipientViewingPk: Uint8Array
 ): SuiUnshieldProof {
   const proofBytes = serializeProof(proof as any);
   const publicInputsBytes = serializePublicInputs(publicSignals);
 
-  return { proofBytes, publicInputsBytes };
+  // Encrypt change note if it exists (user sends change to themselves)
+  const encryptedChangeNote = changeNote
+    ? encryptNote(changeNote, recipientViewingPk)
+    : new Uint8Array(0);
+
+  return {
+    proofBytes,
+    publicInputsBytes,
+    changeNote,
+    encryptedChangeNote,
+  };
 }
 
 // ============ Transfer Proof Functions ============

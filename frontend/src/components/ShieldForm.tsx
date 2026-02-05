@@ -78,7 +78,9 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
+    // Pro-actively parse amount to enable robust checks
+    const numericAmount = parseFloat(amount);
+    if (amount.trim() === '' || isNaN(numericAmount) || numericAmount < 0) {
       setError("Please enter a valid amount");
       return;
     }
@@ -108,6 +110,16 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         tokenId,
         amountMist
       );
+
+      // Debug log for amount = 0 case
+      if (amountMist === 0n) {
+        console.log('=== SHIELD WITH AMOUNT = 0 ===');
+        console.log('Commitment:', note.commitment.toString());
+        console.log('Token ID:', tokenId.toString());
+        console.log('Amount (mist):', amountMist.toString());
+        console.log('Random:', note.random.toString());
+        console.log('Commitment bytes:', Array.from(bigIntToLE32(note.commitment)));
+      }
 
       // Encrypt the note for the recipient (self in this case)
       // Derive viewing public key from spending key

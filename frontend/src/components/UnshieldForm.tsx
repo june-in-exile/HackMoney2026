@@ -13,6 +13,7 @@ import type { OwnedNote } from "@/hooks/useNotes";
 import {
   generateUnshieldProof,
   convertUnshieldProofToSui,
+  deriveViewingPublicKey,
   type UnshieldInput,
 } from "@octopus/sdk";
 import { NumberInput } from "@/components/NumberInput";
@@ -96,18 +97,21 @@ export function UnshieldForm({
         throw new Error("No unspent notes available");
       }
 
-      // Sort notes by value (largest first) for better UX
-      const sortedNotes = unspentNotes.sort((a: OwnedNote, b: OwnedNote) => Number(b.note.value - a.note.value));
-
-      // Use the largest note (current implementation supports 1-input only)
-      const noteToSpend = sortedNotes.find((n: OwnedNote) => n.note.value >= amountMist);
-      if (!noteToSpend) {
-        const maxSingleNote = sortedNotes[0]?.note.value ?? 0n;
+      // Select smallest suitable note to minimize change
+      // (Automatic change note will be created if note value > unshield amount)
+      const suitableNotes = unspentNotes
+        .filter((n: OwnedNote) => n.note.value >= amountMist)
+        .sort((a: OwnedNote, b: OwnedNote) => Number(a.note.value - b.note.value)); // Smallest first
+      if (suitableNotes.length === 0) {
+        const maxSingleNote = unspentNotes.sort((a, b) => Number(b.note.value - a.note.value))[0]?.note.value ?? 0n;
         throw new Error(
           `No single note with sufficient balance. Largest note: ${formatSui(maxSingleNote)} SUI. ` +
-          `To unshield larger amounts, use private transfer to merge notes first.`
+          `Use private transfer to merge notes first, or unshield a smaller amount.`
         );
       }
+
+      // Use smallest suitable note (minimizes change, better for privacy)
+      const noteToSpend = suitableNotes[0];
 
       // Validate that Merkle proof exists
       if (!noteToSpend.pathElements || noteToSpend.pathElements.length === 0) {
@@ -120,21 +124,31 @@ export function UnshieldForm({
         leafIndex: noteToSpend.leafIndex,
         pathElements: noteToSpend.pathElements,
         keypair: keypair,
+        unshieldAmount: amountMist, // NEW: specify amount to unshield
       };
 
       // Generate ZK proof (this takes 10-30 seconds)
-      const { proof, publicSignals } = await generateUnshieldProof(unshieldInput);
+      // NEW: Now returns changeNote for automatic change handling
+      const { proof, publicSignals, changeNote } = await generateUnshieldProof(unshieldInput);
 
       console.log("Proof generated:", proof);
+      console.log("Change note:", changeNote);
 
       // Convert to Sui format
-      const suiProof = convertUnshieldProofToSui(proof, publicSignals);
+      // NEW: Pass changeNote and recipient's viewing key for encryption
+      const viewingPk = deriveViewingPublicKey(keypair.spendingKey);
+      const suiProof = convertUnshieldProofToSui(
+        proof,
+        publicSignals,
+        changeNote,
+        viewingPk // Encrypt change note for ourselves
+      );
 
       console.log("Sui proof:", suiProof);
 
       // Use real proof bytes
       const proofBytes = suiProof.proofBytes;          // 128 bytes
-      const publicInputsBytes = suiProof.publicInputsBytes; // 64 bytes
+      const publicInputsBytes = suiProof.publicInputsBytes; // 128 bytes (NEW: was 64)
 
       // Step 2: Submit transaction
       setState("submitting");
@@ -147,8 +161,8 @@ export function UnshieldForm({
           tx.object(POOL_ID),
           tx.pure.vector("u8", Array.from(proofBytes)),
           tx.pure.vector("u8", Array.from(publicInputsBytes)),
-          tx.pure.u64(amountMist),
           tx.pure.address(recipient),
+          tx.pure.vector("u8", Array.from(suiProof.encryptedChangeNote)), // NEW: encrypted change note
         ],
       });
 
@@ -160,12 +174,22 @@ export function UnshieldForm({
       markNoteSpent?.(noteToSpend.nullifier);
 
       setState("success");
+
+      // Build success message with change info
+      const changeValue = noteToSpend.note.value - amountMist;
+      let successMessage = `Unshielded ${formatSui(amountMist)} SUI!`;
+      if (changeValue > 0n) {
+        successMessage += ` (Change: ${formatSui(changeValue)} SUI)`;
+      }
+
       setSuccess({
-        message: `Unshielded ${formatSui(amountMist)} SUI!`,
+        message: successMessage,
         txDigest: result.digest
       });
       setAmount("");
       setRecipient("");
+
+      // Trigger note rescan to pick up the change note
       await onSuccess?.();
     } catch (err) {
       console.error("Unshield failed:", err);
@@ -338,9 +362,10 @@ export function UnshieldForm({
           <li>Select note to spend</li>
           <li>Generate Merkle proof</li>
           <li>Calculate nullifier (prevent double-spending)</li>
+          <li>Compute change note (if amount &lt; note value)</li>
           <li>Generate ZK proof (10-30s)</li>
           <li>Submit withdrawal transaction</li>
-          <li>Tokens sent to recipient</li>
+          <li>Tokens sent to recipient + change note created</li>
         </ol>
         <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
         <p className="text-[10px] text-gray-500 font-mono">
