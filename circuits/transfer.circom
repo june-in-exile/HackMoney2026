@@ -17,8 +17,8 @@ include "./lib/merkle_proof.circom";
 ///
 /// Based on cryptographic formulas:
 /// - MPK = Poseidon(spending_key, nullifying_key)
-/// - NPK = Poseidon(MPK, random)
-/// - Commitment = Poseidon(NPK, token, value)
+/// - NSK = Poseidon(MPK, random)
+/// - Commitment = Poseidon(NSK, token, value)
 /// - Nullifier = Poseidon(nullifying_key, leaf_index)
 template Transfer(levels) {
     // ============ Private Inputs ============
@@ -28,14 +28,14 @@ template Transfer(levels) {
     signal input nullifying_key;         // Secret key for nullifier generation (256-bit)
 
     // Input notes (notes being spent)
-    signal input input_npks[2];          // Note public keys for input notes
+    signal input input_nsks[2];          // Note secret keys for input notes
     signal input input_values[2];        // Note amounts (can be 0 for dummy)
     signal input input_randoms[2];       // Random blinding factors
     signal input input_leaf_indices[2];  // Leaf positions in tree
     signal input input_path_elements[2][levels];  // Merkle proof siblings
 
     // Output notes (notes being created)
-    signal input output_npks[2];         // Note public keys for recipients
+    signal input output_nsks[2];         // Note secret keys for recipients
     signal input output_values[2];       // Output amounts
     signal input output_randoms[2];      // Random blinding factors for outputs
 
@@ -57,8 +57,8 @@ template Transfer(levels) {
 
     // ============ Step 2: Verify Input Notes ============
     // For each input note:
-    // 1. Verify NPK = Poseidon(MPK, random)
-    // 2. Compute commitment = Poseidon(NPK, token, value)
+    // 1. Verify NSK = Poseidon(MPK, random)
+    // 2. Compute commitment = Poseidon(NSK, token, value)
     // 3. Verify nullifier = Poseidon(nullifying_key, leaf_index)
     // 4. Verify commitment exists in Merkle tree (skip for dummy notes with value=0)
 
@@ -75,15 +75,15 @@ template Transfer(levels) {
         isValueZero[i].in <== input_values[i];
         enabled[i] <== 1 - isValueZero[i].out;
 
-        // Verify NPK ownership: NPK = Poseidon(MPK, random)
+        // Verify NSK ownership: NSK = Poseidon(MPK, random)
         inputNpkHashers[i] = Poseidon(2);
         inputNpkHashers[i].inputs[0] <== mpk;
         inputNpkHashers[i].inputs[1] <== input_randoms[i];
-        input_npks[i] === inputNpkHashers[i].out;
+        input_nsks[i] === inputNpkHashers[i].out;
 
-        // Compute commitment = Poseidon(NPK, token, value)
+        // Compute commitment = Poseidon(NSK, token, value)
         inputCommitmentHashers[i] = Poseidon(3);
-        inputCommitmentHashers[i].inputs[0] <== input_npks[i];
+        inputCommitmentHashers[i].inputs[0] <== input_nsks[i];
         inputCommitmentHashers[i].inputs[1] <== token;
         inputCommitmentHashers[i].inputs[2] <== input_values[i];
 
@@ -111,14 +111,14 @@ template Transfer(levels) {
     }
 
     // ============ Step 3: Verify Output Commitments ============
-    // For each output note, verify commitment = Poseidon(NPK, token, value)
-    // Note: NPKs are provided directly (derived from recipient's MPK off-circuit)
+    // For each output note, verify commitment = Poseidon(NSK, token, value)
+    // Note: NSKs are provided directly (derived from recipient's MPK off-circuit)
 
     component outputCommitmentHashers[2];
 
     for (var i = 0; i < 2; i++) {
         outputCommitmentHashers[i] = Poseidon(3);
-        outputCommitmentHashers[i].inputs[0] <== output_npks[i];
+        outputCommitmentHashers[i].inputs[0] <== output_nsks[i];
         outputCommitmentHashers[i].inputs[1] <== token;
         outputCommitmentHashers[i].inputs[2] <== output_values[i];
         output_commitments[i] === outputCommitmentHashers[i].out;

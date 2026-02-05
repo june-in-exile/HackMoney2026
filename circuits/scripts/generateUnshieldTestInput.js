@@ -34,12 +34,12 @@ async function main() {
     const mpk = hash([spending_key, nullifying_key]);
     console.log("MPK:", mpk);
 
-    // Input NPK = Poseidon(MPK, input_random)
-    const npk = hash([mpk, input_random]);
-    console.log("NPK:", npk);
+    // Input NSK = Poseidon(MPK, input_random)
+    const nsk = hash([mpk, input_random]);
+    console.log("NSK:", nsk);
 
-    // Input Commitment = Poseidon(npk, token, input_value)
-    const commitment = hash([npk, token, input_value]);
+    // Input Commitment = Poseidon(nsk, token, input_value)
+    const commitment = hash([nsk, token, input_value]);
     console.log("Commitment:", commitment);
 
     // Nullifier = Poseidon(nullifying_key, input_leaf_index)
@@ -50,14 +50,14 @@ async function main() {
     const change_value = BigInt(input_value) - BigInt(unshield_amount);
     console.log("Change Value:", change_value.toString());
 
-    // Change NPK = Poseidon(MPK, change_random)
+    // Change NSK = Poseidon(MPK, change_random)
     // (User sends change to themselves)
-    const change_npk = hash([mpk, change_random]);
-    console.log("Change NPK:", change_npk);
+    const change_nsk = hash([mpk, change_random]);
+    console.log("Change NSK:", change_nsk);
 
-    // Change Commitment = Poseidon(change_npk, token, change_value)
+    // Change Commitment = Poseidon(change_nsk, token, change_value)
     const change_commitment = change_value > 0n
-        ? hash([change_npk, token, change_value.toString()])
+        ? hash([change_nsk, token, change_value.toString()])
         : "0";
     console.log("Change Commitment:", change_commitment);
 
@@ -73,7 +73,7 @@ async function main() {
     const zeros = [];
     zeros[0] = hash(["0", "0"]);
     for (let i = 1; i < LEVELS; i++) {
-        zeros[i] = hash([zeros[i-1], zeros[i-1]]);
+        zeros[i] = hash([zeros[i - 1], zeros[i - 1]]);
     }
     console.log("Zero hashes computed");
 

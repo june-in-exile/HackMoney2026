@@ -33,7 +33,7 @@ export function bigIntToLE32(n: bigint): Uint8Array {
  * Convert BigInt to 32-byte big-endian Uint8Array
  *
  * Used for:
- * - Note encryption (NPK, token, value, random)
+ * - Note encryption (NSK, token, value, random)
  * - General cryptographic operations
  *
  * @param n - BigInt value to convert

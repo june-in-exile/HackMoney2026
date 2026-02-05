@@ -213,7 +213,7 @@ export interface ProgressResponse {
  * Serialized note with BigInt → string conversion
  */
 export interface SerializedNote {
-  npk: string; // BigInt as string
+  nsk: string; // BigInt as string
   token: string; // BigInt as string
   value: string; // BigInt as string
   random: string; // BigInt as string

@@ -129,7 +129,7 @@ export function buildUnshieldInput(unshieldInput: UnshieldInput): { circuitInput
   // Generate random for change note
   const changeRandom = randomFieldElement();
 
-  // Compute change NPK and commitment
+  // Compute change NSK and commitment
   const changeNpk = poseidonHash([mpk, changeRandom]);
   const changeCommitment = changeValue > 0n
     ? poseidonHash([changeNpk, note.token, changeValue])
@@ -137,7 +137,7 @@ export function buildUnshieldInput(unshieldInput: UnshieldInput): { circuitInput
 
   // Create change note object (if any)
   const changeNote = changeValue > 0n ? {
-    npk: changeNpk,
+    nsk: changeNpk,
     token: note.token,
     value: changeValue,
     random: changeRandom,
@@ -303,23 +303,23 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
     // Key requirements for dummy note:
     // 1. value = 0 (triggers Merkle proof bypass in circuit line 110)
     // 2. token = same as transfer token (circuit requires all notes use same token)
-    // 3. NPK = Poseidon(MPK, random) (circuit verifies this at line 82)
-    // 4. commitment = Poseidon(NPK, token, value)
+    // 3. NSK = Poseidon(MPK, random) (circuit verifies this at line 82)
+    // 4. commitment = Poseidon(NSK, token, value)
     // 5. Unique leaf index (to avoid duplicate nullifiers with real note)
 
     // Compute MPK from keypair (same as circuit does at line 53-56)
     const mpk = poseidonHash([keypair.spendingKey, keypair.nullifyingKey]);
 
-    // Generate valid NPK for dummy note
+    // Generate valid NSK for dummy note
     const dummyRandom = 0n;  // Can be any value, using 0 for simplicity
     const dummyNpk = poseidonHash([mpk, dummyRandom]);
 
     const dummyNote: Note = {
-      npk: dummyNpk,           // Valid NPK = Poseidon(MPK, random)
+      nsk: dummyNpk,           // Valid NSK = Poseidon(MPK, random)
       token: token,            // Must match transfer token
       value: 0n,               // Triggers Merkle bypass
-      random: dummyRandom,     // Matches NPK computation
-      commitment: poseidonHash([dummyNpk, token, 0n])  // Use computed NPK
+      random: dummyRandom,     // Matches NSK computation
+      commitment: poseidonHash([dummyNpk, token, 0n])  // Use computed NSK
     };
 
     paddedInputs.push(dummyNote);
@@ -370,12 +370,12 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
     // Private inputs
     spending_key: keypair.spendingKey.toString(),
     nullifying_key: keypair.nullifyingKey.toString(),
-    input_npks: paddedInputs.map((n) => n.npk.toString()),
+    input_nsks: paddedInputs.map((n) => n.nsk.toString()),
     input_values: paddedInputs.map((n) => n.value.toString()),
     input_randoms: paddedInputs.map((n) => n.random.toString()),
     input_leaf_indices: paddedIndices.map((idx) => idx.toString()),
     input_path_elements: paddedPaths.map((path) => path.map((e) => e.toString())),
-    output_npks: outputNotes.map((n) => n.npk.toString()),
+    output_nsks: outputNotes.map((n) => n.nsk.toString()),
     output_values: outputNotes.map((n) => n.value.toString()),
     output_randoms: outputNotes.map((n) => n.random.toString()),
     token: token.toString(),
@@ -494,10 +494,10 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
     inputLeafIndices,
     inputPathElements,
     swapParams,
-    outputNPK,
+    outputNSK,
     outputRandom,
     outputValue,
-    changeNPK,
+    changeNSK,
     changeRandom,
     changeValue,
   } = swapInput;
@@ -510,7 +510,7 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
   while (notes.length < 2) {
     // Create dummy note with zero value
     const dummyNote: Note = {
-      npk: 0n,
+      nsk: 0n,
       token: swapParams.tokenIn,
       value: 0n,
       random: 0n,
@@ -532,11 +532,11 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
   const nullifier1 = poseidonHash([keypair.nullifyingKey, BigInt(leafIndices[0])]);
   const nullifier2 = poseidonHash([keypair.nullifyingKey, BigInt(leafIndices[1])]);
 
-  // Compute output commitment = Poseidon(NPK, token_out, output_value)
-  const outputCommitment = poseidonHash([outputNPK, swapParams.tokenOut, outputValue]);
+  // Compute output commitment = Poseidon(NSK, token_out, output_value)
+  const outputCommitment = poseidonHash([outputNSK, swapParams.tokenOut, outputValue]);
 
-  // Compute change commitment = Poseidon(NPK, token_in, change_value)
-  const changeCommitment = poseidonHash([changeNPK, swapParams.tokenIn, changeValue]);
+  // Compute change commitment = Poseidon(NSK, token_in, change_value)
+  const changeCommitment = poseidonHash([changeNSK, swapParams.tokenIn, changeValue]);
 
   // Compute swap data hash = Poseidon(token_in, token_out, amount_in, min_amount_out, dex_pool_id)
   const swapDataHash = poseidonHash([
@@ -567,7 +567,7 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
     nullifying_key: keypair.nullifyingKey.toString(),
 
     // Private inputs - Input notes
-    input_npks: notes.map(n => n.npk.toString()),
+    input_nsks: notes.map(n => n.nsk.toString()),
     input_values: notes.map(n => n.value.toString()),
     input_randoms: notes.map(n => n.random.toString()),
     input_leaf_indices: leafIndices.map(i => i.toString()),
@@ -583,12 +583,12 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
     dex_pool_id: swapParams.dexPoolId.toString(),
 
     // Private inputs - Output note
-    output_npk: outputNPK.toString(),
+    output_nsk: outputNSK.toString(),
     output_value: outputValue.toString(),
     output_random: outputRandom.toString(),
 
     // Private inputs - Change note
-    change_npk: changeNPK.toString(),
+    change_nsk: changeNSK.toString(),
     change_value: changeValue.toString(),
     change_random: changeRandom.toString(),
 

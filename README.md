@@ -11,9 +11,19 @@ A privacy protocol implementation for the Sui blockchain, enabling shielded tran
 Octopus enables private token operations on Sui by implementing a UTXO-based privacy pool with Groth16 ZK-SNARKs verification. Users can:
 
 - **Shield**: Deposit tokens into the privacy pool, creating encrypted notes
-- **Transfer**: Send tokens privately to other users within the pool ✨ **WORKING**
-- **Swap**: Exchange tokens privately through integrated DEXs 🚧 **85% Complete**
+  - Shield = Sending (Commitment, Encrypted Note) Into Pool & Depositing
+  - No ZKP required.
 - **Unshield**: Withdraw tokens with ZK proof verification and automatic change handling
+  - Sending (ZKP, Input Nullifier, Output Note) Into Pool & Withdrawing
+  - ZKP proves
+    1. you own the Note
+    2. the calculations for the withdrawal amount, change, and nullifier are correct.
+- **Transfer**: Send tokens privately to other users within the pool
+  - Sending (ZKP, Input Nullifiers, Output Note) Into Pool
+  - ZKP proves
+    1. you own the Notes
+    2. total input amount = total output amount
+- **Swap**: Exchange tokens privately through integrated DEXs 🚧 **85% Complete**
 
 ```
 ┌─────────────┐     Shield      ┌────────────────────────────┐
@@ -28,25 +38,19 @@ Octopus enables private token operations on Sui by implementing a UTXO-based pri
                    (ZK Proof)
 ```
 
-## Architecture
-
-### Cryptographic Primitives
-
-| Component | Implementation |
-|-----------|----------------|
-| Curve | BN254 (alt_bn128) |
-| Hash | Poseidon (ZK-friendly) |
-| Proof System | Groth16 |
-| Merkle Tree | Incremental, depth 16 (65,536 notes) |
-
-### Key Formulas
+![Cryptographic Primitives Overview](docs/technical.svg)
 
 ```
 MPK = Poseidon(spending_key, nullifying_key)   // Master Public Key
-NPK = Poseidon(MPK, random)                    // Note Public Key
-commitment = Poseidon(NPK, token, value)       // Note Commitment
+NSK = Poseidon(MPK, random)                    // Note Secret Key
+commitment = Poseidon(NSK, token, value)       // Note Commitment
 nullifier = Poseidon(nullifying_key, leaf_index) // Prevents double-spend
 ```
+
+- **`Spending Key`**: A private key that proves ownership of a note and authorizes spending it. It must be kept secret.
+- **`Nullifying Key`**: A private key used to generate a unique `nullifier` for each spent note, preventing double-spends. It must be kept secret.
+- **`MPK (Master Public Key)`**: A public key derived from the spending and nullifying keys, serving as the root of a user's identity within the protocol.
+- **`Viewing Key`**: A key that grants read-only access to transaction details. See the "Security Considerations" section for details on its two forms (personal vs. third-party).
 
 ## Quick Start
 
@@ -183,7 +187,9 @@ The circuit proves:
 ## Security Considerations
 
 - **MVP Simplifications**: This is a hackathon proof-of-concept
-  - Viewing key derivation is deterministic from MPK (temporary for testing)
+- **`Viewing Key`**: A key that grants read-only access to transaction details. In this project, it has two forms:
+  - **Personal Viewing Key (Implemented)**: An encryption/decryption keypair is derived from the `spendingKey`. This allows the user to decrypt and view their own notes.
+  - **Third-Party Viewing Key (Planned)**: A future feature will allow for a separate key to be shared with third parties (e.g., for compliance) for selective disclosure, without granting them spending authority.
   - Note encryption uses ChaCha20-Poly1305 (production-ready but needs key management review)
   - No EdDSA signature verification in circuits
 - **For Production**:

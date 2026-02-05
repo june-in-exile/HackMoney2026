@@ -11,6 +11,7 @@
 **Problem**: Users lose funds when unshielding amounts smaller than their note values.
 
 **Example**:
+
 - User has notes: 0.01 SUI and 0.02 SUI
 - User wants to unshield: 0.01 SUI
 - **Result**: 0.02 SUI note is destroyed, but only 0.01 SUI transferred
@@ -25,6 +26,7 @@
 ## Problem Statement
 
 用户报告了严重的资金损失问题：
+
 - 有 0.01 SUI 和 0.02 SUI 两个 notes
 - 想要 unshield 0.01 SUI
 - 结果：0.02 SUI 的 note 被选中并销毁
@@ -64,7 +66,7 @@ const noteToSpend = sortedNotes.find(n => n.note.value >= amountMist);
 ```
 1. ZK Circuit 证明:
    - 用户拥有 0.02 SUI note
-   - commitment = Poseidon(NPK, token, 0.02 SUI)
+   - commitment = Poseidon(NSK, token, 0.02 SUI)
    - 电路验证通过 ✓
 
 2. Public Inputs (64 bytes):
@@ -149,26 +151,30 @@ const noteToSpend = sortedNotes.find(n => n.note.value >= amountMist);
 
 ### Supporting Changes
 
-3. **[frontend/src/lib/utils.ts](../frontend/src/lib/utils.ts)**
+1. **[frontend/src/lib/utils.ts](../frontend/src/lib/utils.ts)**
    - Add utility functions for note selection
 
 ### Testing
 
-4. **[frontend/src/components/__tests__/UnshieldForm.test.tsx](../frontend/src/components/__tests__/UnshieldForm.test.tsx)** (new)
-5. **[frontend/e2e/unshield-fund-loss.spec.ts](../frontend/e2e/unshield-fund-loss.spec.ts)** (new)
+1. **[frontend/src/components/**tests**/UnshieldForm.test.tsx](../frontend/src/components/__tests__/UnshieldForm.test.tsx)** (new)
+2. **[frontend/e2e/unshield-fund-loss.spec.ts](../frontend/e2e/unshield-fund-loss.spec.ts)** (new)
 
 ---
 
 ## Future Phases (Post-Hackathon)
 
 ### Phase 2: Contract Hardening
+
 **Timeline**: 7-8 hours
+
 - Add `commitment` to circuit public inputs (96 bytes total)
 - Modify contract to verify `amount` matches commitment value
 - Requires circuit recompilation and contract redeployment
 
 ### Phase 3: Circuit Redesign
+
 **Timeline**: 3-4 days
+
 - Redesign unshield.circom as 1-input, 2-output
 - Support automatic change note creation
 - Perfect UX: unshield any amount with automatic change handling

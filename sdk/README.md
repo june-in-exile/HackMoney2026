@@ -217,8 +217,8 @@ Create a new shielded note (UTXO).
 
 **Formula:**
 
-- NPK = Poseidon(MPK, random)
-- commitment = Poseidon(NPK, token, value)
+- NSK = Poseidon(MPK, random)
+- commitment = Poseidon(NSK, token, value)
 
 #### `computeNullifier(nullifyingKey: bigint, leafIndex: number): bigint`
 
@@ -397,8 +397,8 @@ Estimate swap output with slippage protection.
 **Poseidon Hash:** BN254-friendly hash function used for:
 
 - Key derivation: MPK = Poseidon(spending_key, nullifying_key)
-- Note public keys: NPK = Poseidon(MPK, random)
-- Commitments: commitment = Poseidon(NPK, token, value)
+- Note secret keys: NSK = Poseidon(MPK, random)
+- Commitments: commitment = Poseidon(NSK, token, value)
 - Nullifiers: nullifier = Poseidon(nullifying_key, leaf_index)
 - Merkle tree: node = Poseidon(left, right)
 
@@ -463,7 +463,7 @@ Nullifying Key                   Viewing Keypair (X25519)
     ↓                                    ↓
 Master Public Key (MPK)          Viewing Public Key (shareable)
     ↓
-Note Public Key (NPK)
+Note Secret Key (NSK)
 ```
 
 **Key Derivation:**

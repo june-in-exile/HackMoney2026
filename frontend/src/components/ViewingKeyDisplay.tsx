@@ -62,24 +62,8 @@ export function ViewingKeyDisplay({ spendingKey }: ViewingKeyDisplayProps) {
 
       <div className="text-xs text-gray-400 space-y-2">
         <p className="flex items-start gap-2">
-          <span className="text-yellow-500 mt-0.5">⚠️</span>
           <span>
-            <strong className="text-gray-300">For receiving encrypted notes:</strong>{" "}
             Share this key with senders along with your Master Public Key (MPK).
-          </span>
-        </p>
-        <p className="flex items-start gap-2">
-          <span className="text-green-500 mt-0.5">✓</span>
-          <span>
-            <strong className="text-gray-300">Safe to share:</strong>{" "}
-            This key does NOT allow spending - only viewing encrypted notes.
-          </span>
-        </p>
-        <p className="flex items-start gap-2">
-          <span className="text-blue-500 mt-0.5">ℹ️</span>
-          <span>
-            <strong className="text-gray-300">Technical:</strong>{" "}
-            X25519 public key (32 bytes, hex-encoded)
           </span>
         </p>
       </div>

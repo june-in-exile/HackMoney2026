@@ -91,8 +91,8 @@ The application will be available at `http://localhost:3000`.
 
 ``` txt
 MPK = Poseidon(spending_key, nullifying_key)   // Master Public Key
-NPK = Poseidon(MPK, random)                    // Note Public Key
-commitment = Poseidon(NPK, token, value)       // Note Commitment
+NSK = Poseidon(MPK, random)                    // Note Secret Key
+commitment = Poseidon(NSK, token, value)       // Note Commitment
 nullifier = Poseidon(nullifying_key, leaf_index)
 ```
 

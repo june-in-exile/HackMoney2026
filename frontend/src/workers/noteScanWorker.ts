@@ -85,7 +85,7 @@ function decryptNote(
     if (!note) return null;
 
     return {
-      npk: note.npk.toString(),
+      nsk: note.nsk.toString(),
       token: note.token.toString(),
       value: note.value.toString(),
       random: note.random.toString(),
@@ -262,11 +262,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           commitment: bigint;
           leafIndex: number;
         }> = request.cachedCommitments
-          ? request.cachedCommitments.map((c) => ({
+            ? request.cachedCommitments.map((c) => ({
               commitment: BigInt(c.commitment),
               leafIndex: c.leafIndex,
             }))
-          : [];
+            : [];
 
         // ========================================================================
         // OPTIMIZATION 1: Parallel Query + Larger Page Size

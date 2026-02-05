@@ -91,8 +91,8 @@ export function generateKeypair(): OctopusKeypair {
  * Create a new note (UTXO)
  *
  * Formula:
- * - NPK = Poseidon(MPK, random)
- * - commitment = Poseidon(NPK, token, value)
+ * - NSK = Poseidon(MPK, random)
+ * - commitment = Poseidon(NSK, token, value)
  */
 export function createNote(
   recipientMpk: bigint,
@@ -101,11 +101,11 @@ export function createNote(
   random?: bigint
 ): Note {
   const r = random ?? randomFieldElement();
-  const npk = poseidonHash([recipientMpk, r]);
-  const commitment = poseidonHash([npk, token, value]);
+  const nsk = poseidonHash([recipientMpk, r]);
+  const commitment = poseidonHash([nsk, token, value]);
 
   return {
-    npk,
+    nsk,
     token,
     value,
     random: r,
@@ -344,9 +344,9 @@ export function encryptNote(
   const info = new TextEncoder().encode("octopus-note-encryption-v1");
   const encryptionKey = hkdf(sha256, sharedSecret, undefined, info, 32);
 
-  // 4. Serialize note data (npk || token || value || random, each 32 bytes)
+  // 4. Serialize note data (nsk || token || value || random, each 32 bytes)
   const noteData = new Uint8Array(128);
-  noteData.set(bigIntToBE32(note.npk), 0);
+  noteData.set(bigIntToBE32(note.nsk), 0);
   noteData.set(bigIntToBE32(note.token), 32);
   noteData.set(bigIntToBE32(note.value), 64);
   noteData.set(bigIntToBE32(note.random), 96);
@@ -378,7 +378,7 @@ export function encryptNote(
  * 2. Compute shared secret via ECDH with our viewing private key
  * 3. Derive decryption key using HKDF-SHA256
  * 4. Decrypt with ChaCha20-Poly1305
- * 5. Verify note ownership by recomputing NPK
+ * 5. Verify note ownership by recomputing NSK
  *
  * @param encryptedData - Encrypted note (ephemeral_pk || nonce || ciphertext)
  * @param mySpendingKey - Our spending key (to derive viewing private key)
@@ -422,23 +422,23 @@ export function decryptNote(
     const noteData = cipher.decrypt(ciphertext);
 
     // 6. Parse decrypted data
-    const npk = bytesToBigIntBE(noteData.slice(0, 32));
+    const nsk = bytesToBigIntBE(noteData.slice(0, 32));
     const token = bytesToBigIntBE(noteData.slice(32, 64));
     const value = bytesToBigIntBE(noteData.slice(64, 96));
     const random = bytesToBigIntBE(noteData.slice(96, 128));
 
-    // 7. Verify ownership by recomputing NPK
-    // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
+    // 7. Verify ownership by recomputing NSK
+    // If this note belongs to us, NSK should equal Poseidon(myMpk, random)
     const expectedNpk = poseidonHash([myMpk, random]);
-    if (expectedNpk !== npk) {
+    if (expectedNpk !== nsk) {
       return null; // Not our note
     }
 
     // 8. Recompute commitment to verify data integrity
-    const commitment = poseidonHash([npk, token, value]);
+    const commitment = poseidonHash([nsk, token, value]);
 
     return {
-      npk,
+      nsk,
       token,
       value,
       random,

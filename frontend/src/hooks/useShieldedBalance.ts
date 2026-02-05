@@ -153,7 +153,7 @@ export function useShieldedBalance(
               // This note belongs to us!
               decryptedNotes.push({
                 commitment: Buffer.from(eventData.commitment).toString("hex"),
-                npk: decrypted.npk.toString(),
+                nsk: decrypted.nsk.toString(),
                 token: decrypted.token.toString(),
                 value: decrypted.value,
                 random: decrypted.random.toString(),

@@ -202,7 +202,7 @@ export function useNotes(
     // Check if keypair changed by comparing with previous value
     const previousMPK = currentKeypairRef.current;
     const keypairChanged = previousMPK !== null &&
-                          previousMPK !== keypair.masterPublicKey;
+      previousMPK !== keypair.masterPublicKey;
 
     if (keypairChanged) {
       // Keypair changed - clear notes immediately
@@ -273,7 +273,7 @@ export function useNotes(
         for (const scanned of result.notes) {
           // Deserialize note
           const note: Note = {
-            npk: BigInt(scanned.note.npk),
+            nsk: BigInt(scanned.note.nsk),
             token: BigInt(scanned.note.token),
             value: BigInt(scanned.note.value),
             random: BigInt(scanned.note.random),

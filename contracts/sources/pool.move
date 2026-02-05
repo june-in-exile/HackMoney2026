@@ -216,8 +216,8 @@ module octopus::pool {
     ///
     /// The commitment is computed off-chain using the following formulas:
     /// - MPK = Poseidon(spending_key, nullifying_key)
-    /// - NPK = Poseidon(MPK, random)
-    /// - commitment = Poseidon(NPK, token, value)
+    /// - NSK = Poseidon(MPK, random)
+    /// - commitment = Poseidon(NSK, token, value)
     ///
     /// The encrypted_note allows the recipient to scan and identify their notes.
     public fun shield<T>(
