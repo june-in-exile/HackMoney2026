@@ -108,11 +108,13 @@ update_env_var() {
 }
 
 update_env_var "POOL_ID" "$POOL_ID" "$ENV_FILE"
+update_env_var "NEXT_PUBLIC_POOL_ID" "$POOL_ID" "$ENV_FILE"
 update_env_var "UNSHIELD_VK" "$UNSHIELD_VK" "$ENV_FILE"
 update_env_var "TRANSFER_VK" "$TRANSFER_VK" "$ENV_FILE"
 update_env_var "SWAP_VK" "$SWAP_VK" "$ENV_FILE"
 
 echo "✓ Updated POOL_ID in $ENV_FILE"
+echo "✓ Updated NEXT_PUBLIC_POOL_ID in $ENV_FILE"
 echo "✓ Updated UNSHIELD_VK in $ENV_FILE"
 echo "✓ Updated TRANSFER_VK in $ENV_FILE"
 echo "✓ Updated SWAP_VK in $ENV_FILE"
@@ -125,8 +127,3 @@ echo "Network: testnet"
 echo "Unshield VK: ${#UNSHIELD_VK} bytes"
 echo "Transfer VK: ${#TRANSFER_VK} bytes"
 echo "Swap VK: ${#SWAP_VK} bytes"
-echo ""
-
-echo "=== Next Steps ==="
-echo "1. Update frontend/src/lib/constants.ts:"
-echo "   export const POOL_ID = \"$POOL_ID\";"

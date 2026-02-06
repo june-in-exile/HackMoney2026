@@ -3,8 +3,22 @@
  */
 
 // Deployed contract addresses (from environment variables)
-export const PACKAGE_ID = "0x4e78bba09daefa2d22618523aae83d6f52ad143fdf4d989c9edfed4b6e8d918f";
-export const POOL_ID = "0x98ea785c5142db3aaedcb8649f2223d5f7442c6096a5c57b8d6dc0fcd847c526";
+// Use IIFEs to validate and type as string
+export const PACKAGE_ID: string = (() => {
+  const id = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  if (!id) {
+    throw new Error("NEXT_PUBLIC_PACKAGE_ID is not defined in environment variables");
+  }
+  return id;
+})();
+
+export const POOL_ID: string = (() => {
+  const id = process.env.NEXT_PUBLIC_POOL_ID;
+  if (!id) {
+    throw new Error("NEXT_PUBLIC_POOL_ID is not defined in environment variables");
+  }
+  return id;
+})();
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";

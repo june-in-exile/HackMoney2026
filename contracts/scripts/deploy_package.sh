@@ -70,8 +70,10 @@ if [ -n "$ENV_FILE" ]; then
     }
 
     update_env_var "PACKAGE_ID" "$PACKAGE_ID" "$ENV_FILE"
+    update_env_var "NEXT_PUBLIC_PACKAGE_ID" "$PACKAGE_ID" "$ENV_FILE"
 
     echo "✓ Updated PACKAGE_ID in $ENV_FILE"
+    echo "✓ Updated NEXT_PUBLIC_PACKAGE_ID in $ENV_FILE"
     echo ""
 fi
 
@@ -80,8 +82,5 @@ echo "Package ID: $PACKAGE_ID"
 echo "Network: testnet"
 echo ""
 echo "=== Next Steps ==="
-echo "1. Update frontend/src/lib/constants.ts:"
-echo "   export const PACKAGE_ID = \"$PACKAGE_ID\";"
-echo ""
-echo "2. Create a privacy pool by running:"
+echo "1. Create a privacy pool by running:"
 echo "   ./create_pool.sh"
