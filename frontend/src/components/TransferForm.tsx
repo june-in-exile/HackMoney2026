@@ -26,6 +26,7 @@ interface TransferFormProps {
   loading: boolean;
   onSuccess?: () => void | Promise<void>;
   onRefresh?: () => void | Promise<void>;
+  markNoteSpent?: (nullifier: bigint) => void;
 }
 
 type TransferState =
@@ -36,7 +37,7 @@ type TransferState =
   | "success"
   | "error";
 
-export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess, onRefresh }: TransferFormProps) {
+export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess, onRefresh, markNoteSpent }: TransferFormProps) {
   const [recipientProfile, setRecipientProfile] = useState<RecipientProfile | null>(null);
   const [amount, setAmount] = useState("");
   const [state, setState] = useState<TransferState>("idle");
@@ -112,6 +113,15 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
         return;
       }
 
+      // Create a map to track which OwnedNotes were selected (for nullifier lookup)
+      const selectedOwnedNotes = selectedNotes.map((selectedNote) => {
+        const ownedNote = unspentNotes.find((n) => n.leafIndex === selectedNote.leafIndex);
+        if (!ownedNote) {
+          throw new Error(`Could not find owned note for leafIndex ${selectedNote.leafIndex}`);
+        }
+        return ownedNote;
+      });
+
       // 3. Create output notes (recipient + change)
       const inputTotal = selectedNotes.reduce((sum: bigint, n: { note: { value: bigint } }) => sum + n.note.value, 0n);
       const noteToken = selectedNotes[0].note.token; // Use actual token from selected note
@@ -123,7 +133,14 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
         noteToken
       );
 
-      // 4. Generate ZK proof (30-60 seconds)
+      // 4. Mark notes as spent BEFORE generating proof
+      // This prevents the same notes from being selected again while proof is generating
+      // Even if transaction fails later, the periodic on-chain reconciliation will fix the state
+      selectedOwnedNotes.forEach((ownedNote) => {
+        markNoteSpent?.(ownedNote.nullifier);
+      });
+
+      // 5. Generate ZK proof (30-60 seconds)
       setState("generating-proof");
 
       const proof = await generateTransferProof(
@@ -141,10 +158,10 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
         }
       );
 
-      // 5. Convert proof to Sui format
+      // 6. Convert proof to Sui format
       const suiProof = convertTransferProofToSui(proof.proof, proof.publicSignals);
 
-      // 6. Encrypt output notes for recipients using viewing public keys
+      // 7. Encrypt output notes for recipients using viewing public keys
       // ✅ PRODUCTION: Using explicitly shared viewing public key
       const recipientViewingPk = typeof recipientProfile.viewingPublicKey === 'string'
         ? importViewingPublicKey(recipientProfile.viewingPublicKey)
@@ -154,7 +171,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       const encryptedRecipientNote = encryptNote(recipientNote, recipientViewingPk);
       const encryptedChangeNote = encryptNote(changeNote, myViewingPk);
 
-      // 7. Build and submit transaction
+      // 8. Build and submit transaction
       setState("submitting");
       const tx = buildTransferTransaction(
         PACKAGE_ID,

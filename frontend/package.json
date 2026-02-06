@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
+    "prebuild": "(cd ../sdk && npm install && npm run build)",
     "start": "next start",
     "lint": "next lint"
   },

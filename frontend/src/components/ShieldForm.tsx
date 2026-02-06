@@ -111,16 +111,6 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         amountMist
       );
 
-      // Debug log for amount = 0 case
-      if (amountMist === 0n) {
-        console.log('=== SHIELD WITH AMOUNT = 0 ===');
-        console.log('Commitment:', note.commitment.toString());
-        console.log('Token ID:', tokenId.toString());
-        console.log('Amount (mist):', amountMist.toString());
-        console.log('Random:', note.random.toString());
-        console.log('Commitment bytes:', Array.from(bigIntToLE32(note.commitment)));
-      }
-
       // Encrypt the note for the recipient (self in this case)
       // Derive viewing public key from spending key
       const viewingPk = deriveViewingPublicKey(keypair.spendingKey);

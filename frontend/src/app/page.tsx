@@ -325,6 +325,7 @@ export default function Home() {
                       loading={isLoadingNotes}
                       onSuccess={handleTransferSuccess}
                       onRefresh={refreshNotes}
+                      markNoteSpent={markNoteSpent}
                     />
                   )}
                   {activeTab === "swap" && (
