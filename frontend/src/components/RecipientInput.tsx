@@ -187,9 +187,6 @@ export function RecipientInput({
             Invalid format. Expected 64 hex characters.
           </p>
         )}
-        <p className="mt-2 text-[10px] text-gray-600 font-mono">
-          // Ask recipient to share their viewing public key
-        </p>
       </div>
 
       {/* Optional Label */}

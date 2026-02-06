@@ -373,16 +373,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           return eventData?.pool_id === request.poolId;
         });
 
-        // DEBUG: Log unshield events to diagnose filtering issue
-        console.log(`[Worker] 🔍 DEBUG Unshield Events:`);
-        console.log(`  - Total unshield events found: ${allUnshieldNodes.length}`);
-        console.log(`  - Target pool ID: ${request.poolId}`);
-        allUnshieldNodes.forEach((node, idx) => {
-          const eventData = node.contents?.json as any;
-          console.log(`  - Unshield #${idx}: pool_id = ${eventData?.pool_id} (match: ${eventData?.pool_id === request.poolId})`);
-        });
-        console.log(`  - Unshield events in pool after filter: ${unshieldEventsInPool.length}`);
-
         const totalNotesInPool = shieldEventsInPool.length - unshieldEventsInPool.length;
 
         // Progress: Query complete - send totalNotesInPool immediately
@@ -432,17 +422,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           } else if (Array.isArray(encrypted_note)) {
             encryptedNoteBytes = encrypted_note;
           } else {
-            console.warn(`[Worker] Shield event ${position}: encrypted_note has unexpected type`, typeof encrypted_note);
             continue;
-          }
-
-          // Log first few attempts for debugging
-          if (shieldNotesAttempted <= 3) {
-            console.log(`[Worker] 🔓 Attempting to decrypt Shield note #${position}`);
-            console.log(`  - Encrypted length: ${encryptedNoteBytes.length} bytes`);
-            console.log(`  - Pool ID: ${eventData.pool_id}`);
-            console.log(`  - Commitment: ${commitment}`);
-            console.log(`  - Your MPK: ${request.masterPublicKey.substring(0, 20)}...`);
           }
 
           // Try to decrypt
@@ -460,12 +440,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               leafIndex
             );
 
-            console.log(`[Worker] ✅ Successfully decrypted Shield note #${position}!`);
-            console.log(`  - NSK: ${note.nsk.substring(0, 20)}...`);
-            console.log(`  - Token: ${note.token}`);
-            console.log(`  - Value: ${note.value}`);
-            console.log(`  - Nullifier: ${nullifier.substring(0, 20)}...`);
-
             ownedNotes.push({
               note,
               leafIndex,
@@ -473,8 +447,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               nullifier,
               txDigest: (node.transaction as any)?.digest || "",
             });
-          } else if (shieldNotesAttempted <= 3) {
-            console.log(`[Worker] ❌ Failed to decrypt Shield note #${position} (not owned by this keypair)`);
           }
 
           // Collect all commitments for Merkle tree
@@ -574,33 +546,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         // DIAGNOSTIC: Log scan statistics
         const totalEventsScanned = shieldNotesAttempted + transferNotesAttempted;
         const totalNotesDecrypted = shieldNotesDecrypted + transferNotesDecrypted;
-
-        console.log('\n[Worker] 📊 === SCAN STATISTICS ===');
-        console.log(`Shield Events:`);
-        console.log(`  - Total found: ${allShieldNodes.length}`);
-        console.log(`  - Attempted to decrypt: ${shieldNotesAttempted}`);
-        console.log(`  - Successfully decrypted: ${shieldNotesDecrypted}`);
-        console.log(`  - Skipped (no data): ${shieldNotesSkippedNoData}`);
-        console.log(`  - Skipped (wrong pool): ${shieldNotesSkippedWrongPool}`);
-        console.log(`Transfer Events:`);
-        console.log(`  - Total found: ${allTransferNodes.length}`);
-        console.log(`  - Attempted to decrypt: ${transferNotesAttempted}`);
-        console.log(`  - Successfully decrypted: ${transferNotesDecrypted}`);
-        console.log(`  - Skipped (no data): ${transferNotesSkippedNoData}`);
-        console.log(`  - Skipped (wrong pool): ${transferNotesSkippedWrongPool}`);
-        console.log(`Unshield Events:`);
-        console.log(`  - Total found: ${allUnshieldNodes.length}`);
-        console.log(`  - In this pool: ${unshieldEventsInPool.length}`);
-        console.log(`Pool Statistics:`);
-        console.log(`  - Shield events in pool: ${shieldEventsInPool.length}`);
-        console.log(`  - Unshield events in pool: ${unshieldEventsInPool.length}`);
-        console.log(`  - Total notes in pool: ${totalNotesInPool} (Shield - Unshield)`);
-        console.log(`Results:`);
-        console.log(`  - Owned notes found: ${ownedNotes.length}`);
-        console.log(`  - Total commitments: ${allCommitments.length}`);
-        console.log(`  - Target Pool ID: ${request.poolId}`);
-        console.log(`  - Your MPK: ${request.masterPublicKey}`);
-        console.log('================================\n');
 
         // Progress: Decryption complete with detailed statistics
         postMessage({
