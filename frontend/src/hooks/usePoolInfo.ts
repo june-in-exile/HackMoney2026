@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { POOL_ID } from "@/lib/constants";
 
@@ -17,13 +17,19 @@ export interface PoolInfo {
 /**
  * Hook to fetch pool information from blockchain
  *
- * @returns Pool info, loading state, and error
+ * @returns Pool info, loading state, error, and refresh function
  */
 export function usePoolInfo() {
   const client = useSuiClient();
   const [poolInfo, setPoolInfo] = useState<PoolInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Expose refresh function to manually trigger a refetch
+  const refresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -92,11 +98,12 @@ export function usePoolInfo() {
     return () => {
       isCancelled = true;
     };
-  }, [client]);
+  }, [client, refreshTrigger]);
 
   return {
     poolInfo,
     loading,
     error,
+    refresh,
   };
 }

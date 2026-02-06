@@ -188,6 +188,7 @@ export interface ProgressResponse {
   current: number;
   total: number;
   message: string;
+  totalNotesInPool?: number; // Available after event query completes
 }
 
 // ============================================================================

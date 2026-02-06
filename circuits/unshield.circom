@@ -39,7 +39,7 @@ template Unshield(levels) {
     signal input unshield_amount;         // Amount to unshield to public address
     signal output nullifier;              // Nullifier for input note
     signal output merkle_root;            // Merkle root
-    signal output change_commitment;      // Commitment for change note
+    signal output change_commitment;      // Commitment for change note (0 if no change)
 
     // ============ Step 1: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)
@@ -71,7 +71,9 @@ template Unshield(levels) {
 
     // ============ Step 8: Compute Change Commitment ============
     signal change_nsk <== Poseidon(2)([mpk, change_random]);
-    change_commitment <== Poseidon(3)([change_nsk, token, change_value]);
+    signal real_change_commitment <== Poseidon(3)([change_nsk, token, change_value]);
+    signal no_change <== IsZero()(change_value);
+    change_commitment <== real_change_commitment * (1 - no_change);
 }
 
 // Main circuit with 16 levels (supports 2^16 = 65,536 notes)

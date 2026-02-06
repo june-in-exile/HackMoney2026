@@ -245,6 +245,11 @@ export function useNotes(
               // Update progress state
               setScanProgress(progress);
 
+              // Update totalNotesInPool immediately when available (after event query)
+              if (progress.totalNotesInPool !== undefined) {
+                setTotalNotesInPool(progress.totalNotesInPool);
+              }
+
               // Extract scan stats from the final progress message
               if (progress.current === 60) {
                 const match = progress.message.match(/Scanned (\d+) events.*Decrypted (\d+) notes/);

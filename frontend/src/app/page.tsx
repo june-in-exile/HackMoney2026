@@ -53,7 +53,7 @@ export default function Home() {
   } = useNotes(keypair, isLoading);
 
   // Fetch pool information from blockchain
-  const { poolInfo, loading: isLoadingPoolInfo } = usePoolInfo();
+  const { poolInfo, loading: isLoadingPoolInfo, refresh: refreshPoolInfo } = usePoolInfo();
 
   // Calculate balance and note count from loaded notes
   const unspentNotes = notes.filter((n) => !n.spent);
@@ -61,50 +61,58 @@ export default function Home() {
   const noteCount = unspentNotes.length;
 
   const handleShieldSuccess = async () => {
-    // Refresh notes from blockchain after successful shield
+    // Refresh notes and pool info from blockchain after successful shield
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
+    refreshPoolInfo();
 
     // Retry after another delay to ensure we catch the event
     setTimeout(() => {
       refreshNotes();
+      refreshPoolInfo();
     }, 3000);
   };
 
   const handleUnshieldSuccess = async () => {
-    // Refresh notes from blockchain after successful unshield
+    // Refresh notes and pool info from blockchain after successful unshield
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
+    refreshPoolInfo();
 
     // Retry after another delay to ensure we catch the event
     setTimeout(() => {
       refreshNotes();
+      refreshPoolInfo();
     }, 3000);
   };
 
   const handleTransferSuccess = async () => {
-    // Refresh notes from blockchain after successful transfer
+    // Refresh notes and pool info from blockchain after successful transfer
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
+    refreshPoolInfo();
 
     // Retry after another delay to ensure we catch the event
     setTimeout(() => {
       refreshNotes();
+      refreshPoolInfo();
     }, 3000);
   };
 
   const handleSwapSuccess = async () => {
-    // Refresh notes from blockchain after successful swap
+    // Refresh notes and pool info from blockchain after successful swap
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
+    refreshPoolInfo();
 
     // Retry after another delay to ensure we catch the event
     setTimeout(() => {
       refreshNotes();
+      refreshPoolInfo();
     }, 3000);
   };
 
@@ -114,17 +122,22 @@ export default function Home() {
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-12 relative overflow-hidden">
-          {/* Scanning line effect */}
-          <div className="absolute inset-0 pointer-events-none z-20">
-            <div className="absolute w-full h-0.5 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-50 animate-scan"
-              style={{ filter: 'blur(1px)' }} />
-          </div>
-
           {/* Top corner accent */}
           <div className="absolute top-0 right-0 w-32 h-32 border-t-2 border-r-2 border-cyber-blue/30 clip-corner opacity-50" />
 
           {/* Main title section */}
-          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8">
+          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8 pr-4">
+            {/* Scanning line effect - sweeps across the entire title section */}
+            <div className="absolute inset-0 -left-6 -right-4 pointer-events-none z-20 overflow-hidden">
+              <div className="absolute w-full h-[3px] top-0 animate-scan-full">
+                {/* Outer glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-60 blur-md" />
+                {/* Main scanning line */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-60" />
+                {/* Bright core */}
+                <div className="absolute inset-0 h-[1px] top-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-white to-transparent" />
+              </div>
+            </div>
             {/* Animated line */}
             <div className="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-cyber-blue via-cyber-purple to-transparent animate-pulse-slow" />
 

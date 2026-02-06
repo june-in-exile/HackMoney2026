@@ -385,13 +385,14 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
         const totalNotesInPool = shieldEventsInPool.length - unshieldEventsInPool.length;
 
-        // Progress: Query complete
+        // Progress: Query complete - send totalNotesInPool immediately
         postMessage({
           type: "progress",
           id: request.id,
           current: 30,
           total: 100,
           message: `Found ${allShieldNodes.length + allTransferNodes.length} events, decrypting notes... (This pool: ${shieldEventsInPool.length} shields - ${unshieldEventsInPool.length} unshields = ${totalNotesInPool} notes)`,
+          totalNotesInPool, // Send immediately after event query
         } as WorkerResponse);
 
         const shieldQueryTime = queryTime; // For backward compatibility

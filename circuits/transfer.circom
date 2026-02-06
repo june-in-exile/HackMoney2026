@@ -96,7 +96,7 @@ template Transfer(levels) {
         // Verify Merkle proof (commitment exists in tree at leaf_index)
         inputMerkleProofs[i] = MerkleProof(levels);
         inputMerkleProofs[i].leaf <== inputCommitmentHashers[i].out;
-        inputMerkleProofs[i].path_indices <== input_leaf_indices[i];
+        inputMerkleProofs[i].leaf_index <== input_leaf_indices[i];
         for (var j = 0; j < levels; j++) {
             inputMerkleProofs[i].path_elements[j] <== input_path_elements[i][j];
         }

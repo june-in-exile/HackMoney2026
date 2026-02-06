@@ -55,9 +55,9 @@ fi
 echo "✗ VK changed - contract update required"
 echo ""
 
-# Find AdminCap object ID
+# Find AdminCap object ID that matches both package and pool
 echo "Looking for PoolAdminCap..."
-ADMIN_CAP_ID=$(sui client objects --json 2>/dev/null | jq -r '.[] | select(.data.type | contains("PoolAdminCap")) | .data.objectId' | head -1)
+ADMIN_CAP_ID=$(sui client objects --json 2>/dev/null | jq -r --arg pkg "$PACKAGE_ID" --arg pool "$POOL_ID" '.[] | select(.data.type == ($pkg + "::pool::PoolAdminCap") and .data.content.fields.pool_id == $pool) | .data.objectId' | head -1)
 
 if [ -z "$ADMIN_CAP_ID" ]; then
     echo "Error: PoolAdminCap not found in your wallet"
