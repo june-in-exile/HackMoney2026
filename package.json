@@ -7,6 +7,7 @@
     "frontend"
   ],
   "scripts": {
-    "build": "npm run build --workspace=sdk && npm run build --workspace=frontend"
+    "build": "npm run build --workspace=sdk && npm run build --workspace=frontend",
+    "build:all": "npm run build --workspace=sdk && npm run build --workspace=frontend"
   }
 }
