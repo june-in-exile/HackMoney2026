@@ -47,7 +47,7 @@ export function BalanceCard({
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                className="p-1.5 text-gray-500 hover:text-cyber-blue transition-colors border border-gray-800 hover:border-cyber-blue clip-corner"
+                className="p-1.5 text-green-500 hover:text-green-400 transition-colors border border-green-600 hover:border-green-500 clip-corner"
                 title="Refresh balance"
               >
                 <svg

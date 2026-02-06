@@ -197,6 +197,57 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     [walletAddress, keypair]
   );
 
+  // Restore keypair from existing spending key
+  const restoreKeypair = useCallback(async (spendingKeyHex: string) => {
+    if (!poseidonReady) {
+      throw new Error("Poseidon not ready");
+    }
+
+    if (!walletAddress) {
+      throw new Error("Wallet not connected");
+    }
+
+    try {
+      const { deriveKeypair } = await import("@june_zk/octopus-sdk");
+
+      // Parse spending key from hex
+      const spendingKey = hexToBigInt(spendingKeyHex);
+
+      // Derive all keys from spending key
+      const derived = deriveKeypair(spendingKey);
+
+      const restoredKeypair: OctopusKeypair = {
+        spendingKey: derived.spendingKey,
+        nullifyingKey: derived.nullifyingKey,
+        masterPublicKey: derived.masterPublicKey,
+      };
+
+      // Store in localStorage
+      const identifier = getDefaultIdentifier(walletAddress);
+      const toStore: StoredKeypair = {
+        spendingKey: bigIntToHex(derived.spendingKey),
+        nullifyingKey: bigIntToHex(derived.nullifyingKey),
+        masterPublicKey: bigIntToHex(derived.masterPublicKey),
+        timestamp: Date.now(),
+      };
+
+      // Save to the list of keypairs
+      saveKeypair(identifier, toStore);
+
+      // Set as active keypair
+      setActiveKeypair(identifier, toStore);
+
+      // Update state
+      setKeypair(restoredKeypair);
+      setSavedKeypairs(getSavedKeypairs(identifier));
+
+      return restoredKeypair;
+    } catch (error) {
+      console.error("Failed to restore keypair:", error);
+      throw error;
+    }
+  }, [poseidonReady, walletAddress]);
+
   return {
     keypair,
     isLoading,
@@ -206,6 +257,7 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     selectKeypair,
     clearKeypair,
     removeKeypair,
+    restoreKeypair,
     hasKeypair: keypair !== null,
   };
 }

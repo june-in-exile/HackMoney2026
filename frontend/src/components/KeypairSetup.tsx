@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { truncateAddress, bigIntToHex } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { StoredKeypair } from "@/lib/keypairStorage";
 import { exportViewingPublicKey } from "@june_zk/octopus-sdk";
+import { SecurityWarningModal } from "@/components/SecurityWarningModal";
 
 interface KeypairSetupProps {
   keypair: OctopusKeypair | null;
@@ -14,6 +15,7 @@ interface KeypairSetupProps {
   onSelect: (masterPublicKey: string) => void;
   onClear: () => void;
   onRemove: (masterPublicKey: string) => void;
+  onRestore: (spendingKeyHex: string) => Promise<OctopusKeypair>;
 }
 
 export function KeypairSetup({
@@ -24,6 +26,7 @@ export function KeypairSetup({
   onSelect,
   onClear,
   onRemove,
+  onRestore,
 }: KeypairSetupProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
@@ -32,6 +35,11 @@ export function KeypairSetup({
   const [copiedVPK, setCopiedVPK] = useState(false);
   const [showFullMPK, setShowFullMPK] = useState(false);
   const [showFullVPK, setShowFullVPK] = useState(false);
+  const [showRestoreInput, setShowRestoreInput] = useState(false);
+  const [spendingKeyInput, setSpendingKeyInput] = useState("");
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -41,6 +49,39 @@ export function KeypairSetup({
       console.error("Failed to generate keypair:", error);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!spendingKeyInput.trim()) {
+      setRestoreError("Please enter a spending key");
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreError(null);
+
+    try {
+      // Validate hex format
+      const cleanInput = spendingKeyInput.trim().startsWith("0x")
+        ? spendingKeyInput.trim()
+        : `0x${spendingKeyInput.trim()}`;
+
+      if (!/^0x[0-9a-fA-F]+$/.test(cleanInput)) {
+        throw new Error("Invalid hex format");
+      }
+
+      await onRestore(cleanInput);
+
+      // Success - clear input and hide form
+      setSpendingKeyInput("");
+      setShowRestoreInput(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to restore keypair";
+      setRestoreError(errorMessage);
+      console.error("Failed to restore keypair:", error);
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -64,6 +105,37 @@ export function KeypairSetup({
     }
   };
 
+  const handleToggleSecrets = () => {
+    if (!showSecrets) {
+      // Show custom security warning modal
+      setShowSecurityWarning(true);
+    } else {
+      setShowSecrets(false);
+    }
+  };
+
+  const handleConfirmSecurityWarning = () => {
+    setShowSecurityWarning(false);
+    setShowSecrets(true);
+  };
+
+  const handleCancelSecurityWarning = () => {
+    setShowSecurityWarning(false);
+  };
+
+  // Auto-hide secrets after 10 seconds
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (showSecrets) {
+      timer = setTimeout(() => {
+        setShowSecrets(false);
+      }, 10000); // 10 seconds
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [showSecrets]);
+
   if (!keypair) {
     const hasSavedKeypairs = savedKeypairs.length > 0;
 
@@ -81,22 +153,16 @@ export function KeypairSetup({
               Privacy Keypair
             </h2>
           </div>
-          <p className="mb-6 text-xs text-gray-400 font-mono leading-relaxed">
-            // Generate keypair to initialize privacy protocol
-            <br />
-            // Stored locally in browser storage
-          </p>
-
           {hasSavedKeypairs && (
             <div className="mb-4">
               <button
                 onClick={() => setShowSavedKeypairs(!showSavedKeypairs)}
-                className="btn-secondary w-full text-xs flex items-center justify-between"
+                className="btn-action w-full text-xs flex items-center justify-between group"
               >
                 <span>
                   {showSavedKeypairs ? "▼" : "►"} LOAD EXISTING KEYPAIR
                 </span>
-                <span className="text-cyber-blue font-bold">
+                <span className="font-bold">
                   {savedKeypairs.length}
                 </span>
               </button>
@@ -157,24 +223,106 @@ export function KeypairSetup({
                   })}
                 </div>
               )}
-
-              <div className="my-4 flex items-center gap-3">
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
-                <span className="text-[10px] text-gray-600 font-mono uppercase">
-                  OR
-                </span>
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
-              </div>
             </div>
           )}
+
+          {/* OR Divider (only show if there are saved keypairs) */}
+          {hasSavedKeypairs && (
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
+              <span className="text-xs text-gray-600 font-mono">OR</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
+            </div>
+          )}
+
+          {/* Restore from Spending Key */}
+          <div className="mb-4">
+            <button
+              onClick={() => setShowRestoreInput(!showRestoreInput)}
+              className="btn-action w-full text-xs flex items-center justify-between"
+            >
+              <span>
+                {showRestoreInput ? "▼" : "►"} RESTORE FROM SPENDING KEY
+              </span>
+            </button>
+
+            {showRestoreInput && (
+              <div className="mt-3 space-y-3 p-4 bg-black/30 border border-gray-800 clip-corner">
+                <div>
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-mono">
+                    Spending Key (Hex)
+                  </label>
+                  <input
+                    type="text"
+                    value={spendingKeyInput}
+                    onChange={(e) => {
+                      setSpendingKeyInput(e.target.value);
+                      setRestoreError(null);
+                    }}
+                    placeholder="0x..."
+                    className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 text-gray-300 text-xs font-mono focus:border-cyber-blue focus:outline-none transition-colors"
+                    disabled={isRestoring}
+                  />
+                </div>
+
+                {restoreError && (
+                  <div className="p-2 border border-red-600/30 bg-red-900/10 clip-corner">
+                    <p className="text-[10px] text-red-500 font-mono">
+                      ⚠ {restoreError}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleRestore}
+                  disabled={isRestoring || !spendingKeyInput.trim()}
+                  className="btn-primary w-full text-xs"
+                >
+                  {isRestoring ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg
+                        className="h-3 w-3 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      RESTORING...
+                    </span>
+                  ) : (
+                    "RESTORE KEYPAIR"
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* OR Divider */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
+            <span className="text-xs text-gray-600 font-mono">OR</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent" />
+          </div>
 
           <button
             onClick={handleGenerate}
             disabled={isGenerating || isLoading}
-            className="btn-primary w-full"
+            className="btn-action w-full text-xs flex items-center justify-between"
           >
             {isGenerating ? (
-              <span className="flex items-center justify-center gap-2">
+              <span className="flex items-center gap-2">
                 <svg
                   className="h-4 w-4 animate-spin"
                   viewBox="0 0 24 24"
@@ -197,15 +345,9 @@ export function KeypairSetup({
                 GENERATING...
               </span>
             ) : (
-              "GENERATE NEW KEYPAIR"
+              <span>► GENERATE NEW KEYPAIR</span>
             )}
           </button>
-          <div className="mt-4 flex items-start gap-2 p-3 border border-yellow-600/30 bg-yellow-900/10 clip-corner">
-            <span className="text-yellow-500 text-sm">⚠</span>
-            <p className="text-[10px] text-yellow-500 font-mono uppercase tracking-wide">
-              Demo Mode - Not Secure for Production
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -234,19 +376,32 @@ export function KeypairSetup({
               Privacy Keypair
             </h2>
           </div>
-          <div className="flex items-center gap-2 px-2 py-1 border border-green-600 bg-green-900/20 clip-corner">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest font-mono">
-              Active
-            </span>
-          </div>
+          <button
+            onClick={onClear}
+            className="p-1.5 text-red-500 hover:text-red-400 transition-colors border border-red-600 hover:border-red-500 clip-corner"
+            title="Clear keypair"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
 
         {/* Master Public Key */}
         <div className="mb-3 p-4 border border-gray-700 bg-gray-800/50 clip-corner">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-cyber-blue">
-              Master Public Key
+              Master Public Key (MPK)
             </h3>
             <div className="flex gap-2">
               <button
@@ -257,10 +412,10 @@ export function KeypairSetup({
               </button>
               <button
                 onClick={() => handleCopyMPK(mpkHex)}
-                className="btn-secondary text-xs py-2 px-4"
+                className="btn-secondary text-xs py-2 px-4 min-w-[68px]"
                 disabled={copiedMPK}
               >
-                {copiedMPK ? "✓ COPIED" : "COPY"}
+                {copiedMPK ? "✓" : "COPY"}
               </button>
             </div>
           </div>
@@ -275,7 +430,7 @@ export function KeypairSetup({
         <div className="mb-4 p-4 border border-gray-700 bg-gray-800/50 clip-corner">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-cyber-blue">
-              Viewing Public Key
+              Viewing Public Key (VPK)
             </h3>
             <div className="flex gap-2">
               <button
@@ -286,10 +441,10 @@ export function KeypairSetup({
               </button>
               <button
                 onClick={() => handleCopyVPK(vpkHex)}
-                className="btn-secondary text-xs py-2 px-4"
+                className="btn-secondary text-xs py-2 px-4 min-w-[68px]"
                 disabled={copiedVPK}
               >
-                {copiedVPK ? "✓ COPIED" : "COPY"}
+                {copiedVPK ? "✓" : "COPY"}
               </button>
             </div>
           </div>
@@ -298,38 +453,36 @@ export function KeypairSetup({
               {displayVPK}
             </code>
           </div>
-          <div className="text-xs text-gray-400">
-            <p className="flex items-start gap-2">
-              <span>
-                Share this key with senders along with your Master Public Key (MPK).
-              </span>
-            </p>
-          </div>
         </div>
 
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => setShowSecrets(!showSecrets)}
-            className="btn-secondary flex-1 text-xs"
-          >
+        <button
+          onClick={handleToggleSecrets}
+          className="btn-secondary w-full text-xs relative overflow-hidden hover:!border-yellow-500 hover:!text-yellow-500"
+        >
+          {/* Progress bar background - animates when secrets are shown */}
+          {showSecrets && (
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-purple-400/50 to-purple-500/60"
+              style={{
+                animation: "progressFill 10s linear forwards",
+                zIndex: 0,
+              }}
+            />
+          )}
+          <span className="relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
             {showSecrets ? "▲ HIDE" : "▼ SHOW"} SECRETS
-          </button>
-          <button
-            onClick={onClear}
-            className="btn-secondary text-xs border-red-600/50 text-red-500 hover:border-red-500 hover:text-red-400"
-          >
-            ✕ CLEAR
-          </button>
-        </div>
+          </span>
+        </button>
 
-        {showSecrets && (
-          <div className="mt-4 space-y-3 p-4 bg-black/50 border border-gray-800 clip-corner">
+        <div
+          className={`overflow-hidden transition-all duration-500 ease-out ${
+            showSecrets ? "max-h-96 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"
+          }`}
+        >
+          <div className="space-y-3 p-4 bg-black/30 border border-gray-800 clip-corner">
             <div>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
                 Spending Key
-              </p>
-              <p className="text-[9px] text-gray-600 mb-2 font-mono">
-                // Authorizes spending and transaction creation
               </p>
               <p className="break-all font-mono text-xs text-gray-400">
                 {bigIntToHex(keypair.spendingKey)}
@@ -340,17 +493,21 @@ export function KeypairSetup({
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
                 Nullifying Key
               </p>
-              <p className="text-[9px] text-gray-600 mb-2 font-mono">
-                // Prevents double-spending via unique nullifiers
-              </p>
               <p className="break-all font-mono text-xs text-gray-400">
                 {bigIntToHex(keypair.nullifyingKey)}
               </p>
             </div>
             <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Security Warning Modal */}
+      <SecurityWarningModal
+        isOpen={showSecurityWarning}
+        onConfirm={handleConfirmSecurityWarning}
+        onCancel={handleCancelSecurityWarning}
+      />
     </div>
   );
 }

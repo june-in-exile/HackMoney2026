@@ -134,7 +134,7 @@ export function RecipientInput({
               <button
                 type="button"
                 onClick={() => handleDeleteRecipient(selectedRecipient)}
-                className="btn-secondary text-xs px-3"
+                className="btn-danger text-xs px-3"
                 disabled={disabled}
               >
                 Delete

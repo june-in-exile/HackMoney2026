@@ -37,6 +37,7 @@ export default function Home() {
     selectKeypair,
     clearKeypair,
     removeKeypair,
+    restoreKeypair,
   } = useLocalKeypair(account?.address);
 
   // Fetch all notes from blockchain (includes Merkle proofs)
@@ -151,7 +152,7 @@ export default function Home() {
                     {POOL_ID.slice(0, 8)}...{POOL_ID.slice(-6)}
                   </a>
                   <span className="text-gray-500">
-                    (Type:
+                    {" | "}Type:
                     <span className="text-cyber-blue ml-1">
                       {isLoadingPoolInfo ? (
                         "..."
@@ -161,7 +162,7 @@ export default function Home() {
                         "Unknown"
                       )}
                     </span>
-                    {" / "}Balance:
+                    {" | "}Balance:
                     <span className="text-cyber-blue ml-1">
                       {isLoadingPoolInfo ? (
                         "..."
@@ -171,11 +172,10 @@ export default function Home() {
                         "Unknown"
                       )}
                     </span>
-                    {" / "}Total Notes:
+                    {" | "}Total Notes:
                     <span className="text-cyber-blue ml-1">
                       {totalNotesInPool.toLocaleString()}
                     </span>
-                    )
                   </span>
                 </div>
               </div>
@@ -212,6 +212,7 @@ export default function Home() {
                 onSelect={selectKeypair}
                 onClear={clearKeypair}
                 onRemove={removeKeypair}
+                onRestore={restoreKeypair}
               />
               <BalanceCard
                 shieldedBalance={shieldedBalance}
@@ -236,8 +237,8 @@ export default function Home() {
                   <button
                     onClick={() => setActiveTab("shield")}
                     className={`tab-button flex-1 ${activeTab === "shield"
-                        ? "text-cyber-blue active"
-                        : "text-gray-500 hover:text-gray-300"
+                      ? "text-cyber-blue active"
+                      : "text-gray-500 hover:text-gray-300"
                       }`}
                   >
                     ▲ SHIELD
@@ -245,8 +246,8 @@ export default function Home() {
                   <button
                     onClick={() => setActiveTab("transfer")}
                     className={`tab-button flex-1 ${activeTab === "transfer"
-                        ? "text-cyber-blue active"
-                        : "text-gray-500 hover:text-gray-300"
+                      ? "text-cyber-blue active"
+                      : "text-gray-500 hover:text-gray-300"
                       }`}
                   >
                     ⇄ TRANSFER
@@ -254,8 +255,8 @@ export default function Home() {
                   <button
                     onClick={() => setActiveTab("swap")}
                     className={`tab-button flex-1 ${activeTab === "swap"
-                        ? "text-cyber-blue active"
-                        : "text-gray-500 hover:text-gray-300"
+                      ? "text-cyber-blue active"
+                      : "text-gray-500 hover:text-gray-300"
                       }`}
                   >
                     ⇌ SWAP
@@ -263,8 +264,8 @@ export default function Home() {
                   <button
                     onClick={() => setActiveTab("unshield")}
                     className={`tab-button flex-1 ${activeTab === "unshield"
-                        ? "text-cyber-blue active"
-                        : "text-gray-500 hover:text-gray-300"
+                      ? "text-cyber-blue active"
+                      : "text-gray-500 hover:text-gray-300"
                       }`}
                   >
                     ▼ UNSHIELD

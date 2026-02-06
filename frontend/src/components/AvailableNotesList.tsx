@@ -78,7 +78,7 @@ export function AvailableNotesList({ notes, loading, error, lastScanStats }: Ava
           </h2>
         </div>
         <div className="p-4 border border-gray-800 bg-black/30 clip-corner">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 font-mono">
+          <p className="text-xs font-bold uppercase tracking-wider text-yellow-500 mb-2 font-mono">
             No Notes Available
           </p>
           <p className="text-[10px] text-gray-400 font-mono mb-3">
@@ -95,11 +95,6 @@ export function AvailableNotesList({ notes, loading, error, lastScanStats }: Ava
               <p className="text-[10px] text-gray-400 font-mono">
                 • Decrypted {lastScanStats.notesDecrypted} note{lastScanStats.notesDecrypted !== 1 ? 's' : ''} with your keypair
               </p>
-              {lastScanStats.eventsScanned > 0 && lastScanStats.notesDecrypted === 0 && (
-                <p className="text-[10px] text-yellow-500 font-mono mt-2">
-                  ⚠️ No notes belong to your current keypair. Make sure you're using the correct keypair, or shield some tokens to create new notes.
-                </p>
-              )}
             </div>
           )}
         </div>
