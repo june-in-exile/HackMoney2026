@@ -185,6 +185,7 @@ class NoteScanWorkerManager {
     lastShieldCursor: string | null;
     lastTransferCursor: string | null;
     allCommitments: Array<{ commitment: string; leafIndex: number }>;
+    totalNotesInPool?: number;
   }> {
     // Ensure worker is initialized before sending request
     await this.initialize();
@@ -218,6 +219,7 @@ class NoteScanWorkerManager {
       lastShieldCursor: response.lastShieldCursor,
       lastTransferCursor: response.lastTransferCursor,
       allCommitments: response.allCommitments,
+      totalNotesInPool: response.totalNotesInPool,
     };
   }
 

@@ -168,22 +168,6 @@ export default function DeveloperPage() {
               </div>
             </div>
 
-            <div className="bg-gray-900/50 border border-gray-800 rounded p-4">
-              <h3 className="text-sm font-bold text-cyber-blue uppercase mb-3">MOVE CONTRACT SIGNATURE</h3>
-              <div className="font-mono text-xs text-gray-300">
-                <div className="text-cyber-purple">public entry fun</div>
-                <div className="ml-4">shield&lt;T&gt;(</div>
-                <div className="ml-8 space-y-1">
-                  <div>pool: &mut Pool&lt;T&gt;,</div>
-                  <div>coin: Coin&lt;T&gt;,</div>
-                  <div>commitment: u256,</div>
-                  <div>encrypted_note: vector&lt;u8&gt;,</div>
-                  <div>ctx: &mut TxContext</div>
-                </div>
-                <div className="ml-4">)</div>
-              </div>
-            </div>
-
             <div className="p-4 bg-green-500/5 border border-green-500/30 rounded">
               <h3 className="text-sm font-bold text-green-400 mb-2 uppercase">RESULT</h3>
               <ul className="text-xs text-gray-400 font-mono space-y-1">
@@ -259,11 +243,6 @@ export default function DeveloperPage() {
                       Prove: (1) ownership of note, (2) note exists in Merkle tree, (3) correct nullifier,
                       (4) balance conservation, (5) correct change commitment
                     </p>
-                    <div className="bg-gray-900/50 border border-gray-700 rounded p-2 text-xs">
-                      <div className="text-cyber-purple mb-1">Circuit Constraints: ~11,000</div>
-                      <div className="text-gray-400">Public Inputs: unshield_amount</div>
-                      <div className="text-gray-400">Public Outputs: nullifier, merkle_root, change_commitment</div>
-                    </div>
                   </div>
                 </div>
 
@@ -278,23 +257,6 @@ export default function DeveloperPage() {
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900/50 border border-gray-800 rounded p-4">
-              <h3 className="text-sm font-bold text-cyber-blue uppercase mb-3">MOVE CONTRACT SIGNATURE</h3>
-              <div className="font-mono text-xs text-gray-300">
-                <div className="text-cyber-purple">public entry fun</div>
-                <div className="ml-4">unshield&lt;T&gt;(</div>
-                <div className="ml-8 space-y-1">
-                  <div>pool: &mut Pool&lt;T&gt;,</div>
-                  <div>proof_bytes: vector&lt;u8&gt;,           <span className="text-gray-500">// 128 bytes (Groth16)</span></div>
-                  <div>public_inputs_bytes: vector&lt;u8&gt;,   <span className="text-gray-500">// 128 bytes (4 × u256)</span></div>
-                  <div>recipient: address,</div>
-                  <div>encrypted_change_note: vector&lt;u8&gt;,</div>
-                  <div>ctx: &mut TxContext</div>
-                </div>
-                <div className="ml-4">)</div>
               </div>
             </div>
 
@@ -377,11 +339,6 @@ export default function DeveloperPage() {
                       Prove: (1) ownership of input notes, (2) inputs exist in Merkle tree,
                       (3) correct nullifiers, (4) balance conservation (in = out), (5) valid output commitments
                     </p>
-                    <div className="bg-gray-900/50 border border-gray-700 rounded p-2 text-xs">
-                      <div className="text-cyber-purple mb-1">Circuit Constraints: ~21,649</div>
-                      <div className="text-gray-400">Public Inputs: merkle_root, nullifier_1, nullifier_2, commitment_1, commitment_2</div>
-                      <div className="text-gray-400">Transaction Model: 2-input, 2-output UTXO</div>
-                    </div>
                   </div>
                 </div>
 
@@ -396,22 +353,6 @@ export default function DeveloperPage() {
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900/50 border border-gray-800 rounded p-4">
-              <h3 className="text-sm font-bold text-cyber-blue uppercase mb-3">MOVE CONTRACT SIGNATURE</h3>
-              <div className="font-mono text-xs text-gray-300">
-                <div className="text-cyber-purple">public entry fun</div>
-                <div className="ml-4">transfer&lt;T&gt;(</div>
-                <div className="ml-8 space-y-1">
-                  <div>pool: &mut Pool&lt;T&gt;,</div>
-                  <div>proof_bytes: vector&lt;u8&gt;,           <span className="text-gray-500">// 128 bytes</span></div>
-                  <div>public_inputs_bytes: vector&lt;u8&gt;,   <span className="text-gray-500">// 160 bytes (5 × u256)</span></div>
-                  <div>encrypted_notes: vector&lt;vector&lt;u8&gt;&gt;,  <span className="text-gray-500">// 2 output notes</span></div>
-                  <div>ctx: &mut TxContext</div>
-                </div>
-                <div className="ml-4">)</div>
               </div>
             </div>
 
@@ -526,16 +467,6 @@ export default function DeveloperPage() {
                   <li>Reconstruct note parameters</li>
                 </ol>
               </div>
-            </div>
-
-            <div className="p-4 bg-cyber-purple/5 border border-cyber-purple/30 rounded">
-              <h3 className="text-sm font-bold text-cyber-purple mb-2 uppercase">SECURITY PROPERTIES</h3>
-              <ul className="text-xs text-gray-400 font-mono space-y-1">
-                <li><span className="text-cyber-purple">•</span> Only recipient can decrypt notes (viewing key required)</li>
-                <li><span className="text-cyber-purple">•</span> Encrypted data authenticated (tamper-proof)</li>
-                <li><span className="text-cyber-purple">•</span> Nonce ensures unique ciphertext per note</li>
-                <li><span className="text-cyber-purple">•</span> Forward secrecy via ephemeral ECDH keys</li>
-              </ul>
             </div>
           </div>
         </div>

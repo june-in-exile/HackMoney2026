@@ -7,12 +7,6 @@ import type { Note } from "@octopus/sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
 import { bigIntToBE32 } from "@octopus/sdk";
 import { getWorkerManager } from "@/lib/workerManager";
-import {
-  loadScanState,
-  saveScanState,
-  createEmptyScanState,
-  clearScanState,
-} from "@/lib/scanState";
 
 /**
  * Owned note with metadata for selection and spending
@@ -88,6 +82,12 @@ export function useNotes(
     total: number;
     message: string;
   } | null>(null);
+  const [lastScanStats, setLastScanStats] = useState<{
+    eventsScanned: number;
+    notesDecrypted: number;
+    timestamp: number;
+  } | null>(null);
+  const [totalNotesInPool, setTotalNotesInPool] = useState<number>(0);
 
   // Track current keypair to detect changes
   const currentKeypairRef = useRef<bigint | null>(null);
@@ -207,8 +207,6 @@ export function useNotes(
     if (keypairChanged) {
       // Keypair changed - clear notes immediately
       setNotes([]);
-      // Clear scan state to force full rescan
-      clearScanState(POOL_ID, keypair.masterPublicKey);
     }
 
     // Update ref to track current keypair
@@ -234,12 +232,6 @@ export function useNotes(
       try {
         const worker = getWorkerManager();
 
-        // PHASE 2 OPTIMIZATION: Load scan state for incremental scanning
-        // Note: If keypair just changed, scan state was cleared above
-        const scanState =
-          loadScanState(POOL_ID, keypair.masterPublicKey) ||
-          createEmptyScanState();
-
         // Scan notes using Worker (GraphQL + decrypt + Merkle tree in background)
         const result = await worker.scanNotes(
           "https://graphql.testnet.sui.io/graphql",
@@ -249,24 +241,40 @@ export function useNotes(
           keypair.nullifyingKey,
           keypair.masterPublicKey,
           {
-            // PHASE 2: Pass scan state for incremental scanning
-            startShieldCursor: scanState.lastShieldCursor,
-            startTransferCursor: scanState.lastTransferCursor,
-            cachedCommitments: scanState.cachedCommitments,
             onProgress: (progress) => {
               // Update progress state
               setScanProgress(progress);
+
+              // Extract scan stats from the final progress message
+              if (progress.current === 60) {
+                const match = progress.message.match(/Scanned (\d+) events.*Decrypted (\d+) notes/);
+                if (match) {
+                  setLastScanStats({
+                    eventsScanned: parseInt(match[1]),
+                    notesDecrypted: parseInt(match[2]),
+                    timestamp: Date.now(),
+                  });
+                }
+              }
             },
           }
         );
 
         if (isCancelled) return;
 
+        console.log(`[useNotes] 📦 Received scan results from Worker:`);
+        console.log(`  - Notes received: ${result.notes.length}`);
+        console.log(`  - Total Notes in Pool: ${result.totalNotesInPool ?? 'unknown'}`);
+
         // Collect all nullifiers for batch checking
         const nullifiers = result.notes.map((s) => s.nullifier);
 
+        console.log(`[useNotes] 🔍 Checking spent status for ${nullifiers.length} nullifiers...`);
+
         // Batch check spent status (more efficient than one-by-one)
         const spentMap = await batchCheckNullifierStatus(nullifiers);
+
+        console.log(`[useNotes] ✓ Spent status checked. Found ${Array.from(spentMap.values()).filter(v => v).length} spent notes.`);
 
         // Build OwnedNote array with spent status from batch query
         const newOwnedNotes: OwnedNote[] = [];
@@ -318,18 +326,17 @@ export function useNotes(
             (a, b) => a.leafIndex - b.leafIndex
           );
 
+          console.log(`[useNotes] 💾 Updating state with ${mergedNotes.length} notes (merged existing: ${shouldMergeExisting})`);
+          console.log(`  - Unspent notes: ${mergedNotes.filter(n => !n.spent).length}`);
+          console.log(`  - Spent notes: ${mergedNotes.filter(n => n.spent).length}`);
+
           setNotes(mergedNotes);
           // Clear progress after completion
           setScanProgress(null);
-
-          // PHASE 2 OPTIMIZATION: Save updated scan state for next incremental scan
-          saveScanState(POOL_ID, keypair.masterPublicKey, {
-            lastShieldCursor: result.lastShieldCursor,
-            lastTransferCursor: result.lastTransferCursor,
-            lastScanTime: Date.now(),
-            cachedCommitments: result.allCommitments,
-            version: 1,
-          });
+          // Update total notes in pool
+          if (result.totalNotesInPool !== undefined) {
+            setTotalNotesInPool(result.totalNotesInPool);
+          }
         }
       } catch (err) {
         if (!isCancelled) {
@@ -459,6 +466,8 @@ export function useNotes(
     refresh,
     markNoteSpent,
     scanProgress, // Include progress in return value
+    lastScanStats, // Include scan statistics
+    totalNotesInPool, // Total notes in pool (Shield - Unshield)
   };
 }
 

@@ -5,7 +5,6 @@
 :root {
   --foreground: #00d9ff;
   --background: #050508;
-  --cyber-grid: #0a1a2a;
 }
 
 body {
@@ -57,17 +56,8 @@ body::before {
 /* Removed scanline effect */
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
   .text-cyber {
     text-shadow: 0 0 10px rgba(0, 217, 255, 0.8), 0 0 20px rgba(157, 0, 255, 0.3);
-  }
-
-  .border-glow {
-    border-color: #00d9ff;
-    box-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
   }
 
   .clip-corner {
@@ -96,6 +86,63 @@ body::before {
         100% 100%,
         0 100%);
   }
+}
+
+/* Override Mysten DApp-Kit styles to match Octopus theme */
+[data-dapp-kit] {
+  font-family: 'Courier New', monospace, system-ui, -apple-system, sans-serif !important;
+}
+
+/* Modal backgrounds */
+[data-dapp-kit] [role="dialog"] {
+  background: #050508 !important;
+  border: 2px solid rgba(0, 217, 255, 0.2) !important;
+}
+
+/* Wallet list items */
+[data-dapp-kit] button[data-wallet] {
+  background: transparent !important;
+  color: #00d9ff !important;
+  border: 1px solid rgba(0, 217, 255, 0.2) !important;
+}
+
+[data-dapp-kit] button[data-wallet]:hover {
+  background: rgba(0, 217, 255, 0.1) !important;
+  border-color: #00d9ff !important;
+}
+
+/* Connect button styling */
+[data-dapp-kit] button {
+  background: #0a0a0d !important;
+  color: #00d9ff !important;
+  border-color: #00d9ff !important;
+}
+
+[data-dapp-kit] button:hover {
+  background: rgba(0, 217, 255, 0.1) !important;
+}
+
+/* Dropdown menus */
+[data-dapp-kit] [role="menu"],
+[data-dapp-kit] [role="listbox"] {
+  background: #0a1a2a !important;
+  border: 1px solid rgba(0, 217, 255, 0.2) !important;
+}
+
+/* Menu items */
+[data-dapp-kit] [role="menuitem"],
+[data-dapp-kit] [role="option"] {
+  color: #00d9ff !important;
+}
+
+[data-dapp-kit] [role="menuitem"]:hover,
+[data-dapp-kit] [role="option"]:hover {
+  background: rgba(0, 217, 255, 0.1) !important;
+}
+
+/* Account info */
+[data-dapp-kit] [data-account-address] {
+  color: rgba(0, 217, 255, 0.7) !important;
 }
 
 @layer components {
@@ -183,26 +230,6 @@ body::before {
 
   .tab-button.active::after {
     width: 100%;
-  }
-}
-
-@keyframes scan {
-  0% {
-    transform: translateY(-100%);
-  }
-
-  100% {
-    transform: translateY(100vh);
-  }
-}
-
-@keyframes glow {
-  0% {
-    box-shadow: 0 0 5px #00d9ff, 0 0 10px #00d9ff;
-  }
-
-  100% {
-    box-shadow: 0 0 10px #00d9ff, 0 0 20px #00d9ff, 0 0 30px #0088ff;
   }
 }
 

@@ -43,7 +43,7 @@ export function Header() {
           <nav className="flex items-center gap-1">
             <Link
               href="/"
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${
                 pathname === "/"
                   ? "text-cyber-blue border-b-2 border-cyber-blue"
                   : "text-gray-500 hover:text-gray-300 border-b-2 border-transparent"
@@ -53,7 +53,7 @@ export function Header() {
             </Link>
             <Link
               href="/overview"
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${
                 pathname === "/overview"
                   ? "text-cyber-blue border-b-2 border-cyber-blue"
                   : "text-gray-500 hover:text-gray-300 border-b-2 border-transparent"
@@ -63,7 +63,7 @@ export function Header() {
             </Link>
             <Link
               href="/developer"
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${
                 pathname === "/developer"
                   ? "text-cyber-blue border-b-2 border-cyber-blue"
                   : "text-gray-500 hover:text-gray-300 border-b-2 border-transparent"

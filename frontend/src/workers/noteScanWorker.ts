@@ -257,16 +257,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           txDigest: string;
         }> = [];
 
-        // PHASE 2: Start with cached commitments from previous scan
+        // Collect all commitments for Merkle tree construction
         const allCommitments: Array<{
           commitment: bigint;
           leafIndex: number;
-        }> = request.cachedCommitments
-            ? request.cachedCommitments.map((c) => ({
-              commitment: BigInt(c.commitment),
-              leafIndex: c.leafIndex,
-            }))
-            : [];
+        }> = [];
 
         // ========================================================================
         // OPTIMIZATION 1: Parallel Query + Larger Page Size
@@ -284,15 +279,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         } as WorkerResponse);
 
         // Helper function to query events with pagination
-        // PHASE 2: Now supports starting from a specific cursor for incremental scanning
         async function queryEvents(
           eventType: string,
-          eventName: string,
-          startCursor: string | null | undefined
+          eventName: string
         ): Promise<{ nodes: any[]; lastCursor: string | null }> {
           let allNodes: any[] = [];
           let hasNextPage = true;
-          let cursor: string | null = startCursor || null;
+          let cursor: string | null = null;
           let pageCount = 0;
 
           while (hasNextPage) {
@@ -347,26 +340,50 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           return { nodes: allNodes, lastCursor: cursor };
         }
 
-        // PHASE 2 OPTIMIZATION: Parallel query of Shield and Transfer events with incremental support
-        const [shieldResult, transferResult] = await Promise.all([
+        // Parallel query of Shield, Transfer, and Unshield events
+        const [shieldResult, transferResult, unshieldResult] = await Promise.all([
           queryEvents(
             `${request.packageId}::pool::ShieldEvent`,
-            'ShieldEvents',
-            request.startShieldCursor
+            'ShieldEvents'
           ),
           queryEvents(
             `${request.packageId}::pool::TransferEvent`,
-            'TransferEvents',
-            request.startTransferCursor
+            'TransferEvents'
+          ),
+          queryEvents(
+            `${request.packageId}::pool::UnshieldEvent`,
+            'UnshieldEvents'
           ),
         ]);
 
         const allShieldNodes = shieldResult.nodes;
         const allTransferNodes = transferResult.nodes;
-        const lastShieldCursor = shieldResult.lastCursor;
-        const lastTransferCursor = transferResult.lastCursor;
+        const allUnshieldNodes = unshieldResult.nodes;
 
         const queryTime = Date.now() - queryStart;
+
+        // Calculate total notes in pool: Shield events - Unshield events
+        // IMPORTANT: Filter BOTH shield and unshield events by pool_id to only count events from this pool
+        const shieldEventsInPool = allShieldNodes.filter((node) => {
+          const eventData = node.contents?.json as any;
+          return eventData?.pool_id === request.poolId;
+        });
+        const unshieldEventsInPool = allUnshieldNodes.filter((node) => {
+          const eventData = node.contents?.json as any;
+          return eventData?.pool_id === request.poolId;
+        });
+
+        // DEBUG: Log unshield events to diagnose filtering issue
+        console.log(`[Worker] 🔍 DEBUG Unshield Events:`);
+        console.log(`  - Total unshield events found: ${allUnshieldNodes.length}`);
+        console.log(`  - Target pool ID: ${request.poolId}`);
+        allUnshieldNodes.forEach((node, idx) => {
+          const eventData = node.contents?.json as any;
+          console.log(`  - Unshield #${idx}: pool_id = ${eventData?.pool_id} (match: ${eventData?.pool_id === request.poolId})`);
+        });
+        console.log(`  - Unshield events in pool after filter: ${unshieldEventsInPool.length}`);
+
+        const totalNotesInPool = shieldEventsInPool.length - unshieldEventsInPool.length;
 
         // Progress: Query complete
         postMessage({
@@ -374,7 +391,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           id: request.id,
           current: 30,
           total: 100,
-          message: `Found ${allShieldNodes.length + allTransferNodes.length} events, decrypting notes...`,
+          message: `Found ${allShieldNodes.length + allTransferNodes.length} events, decrypting notes... (This pool: ${shieldEventsInPool.length} shields - ${unshieldEventsInPool.length} unshields = ${totalNotesInPool} notes)`,
         } as WorkerResponse);
 
         const shieldQueryTime = queryTime; // For backward compatibility
@@ -414,7 +431,17 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           } else if (Array.isArray(encrypted_note)) {
             encryptedNoteBytes = encrypted_note;
           } else {
+            console.warn(`[Worker] Shield event ${position}: encrypted_note has unexpected type`, typeof encrypted_note);
             continue;
+          }
+
+          // Log first few attempts for debugging
+          if (shieldNotesAttempted <= 3) {
+            console.log(`[Worker] 🔓 Attempting to decrypt Shield note #${position}`);
+            console.log(`  - Encrypted length: ${encryptedNoteBytes.length} bytes`);
+            console.log(`  - Pool ID: ${eventData.pool_id}`);
+            console.log(`  - Commitment: ${commitment}`);
+            console.log(`  - Your MPK: ${request.masterPublicKey.substring(0, 20)}...`);
           }
 
           // Try to decrypt
@@ -432,6 +459,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               leafIndex
             );
 
+            console.log(`[Worker] ✅ Successfully decrypted Shield note #${position}!`);
+            console.log(`  - NSK: ${note.nsk.substring(0, 20)}...`);
+            console.log(`  - Token: ${note.token}`);
+            console.log(`  - Value: ${note.value}`);
+            console.log(`  - Nullifier: ${nullifier.substring(0, 20)}...`);
+
             ownedNotes.push({
               note,
               leafIndex,
@@ -439,6 +472,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               nullifier,
               txDigest: (node.transaction as any)?.digest || "",
             });
+          } else if (shieldNotesAttempted <= 3) {
+            console.log(`[Worker] ❌ Failed to decrypt Shield note #${position} (not owned by this keypair)`);
           }
 
           // Collect all commitments for Merkle tree
@@ -535,13 +570,44 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
         const decryptTime = Date.now() - decryptStart;
 
-        // Progress: Decryption complete
+        // DIAGNOSTIC: Log scan statistics
+        const totalEventsScanned = shieldNotesAttempted + transferNotesAttempted;
+        const totalNotesDecrypted = shieldNotesDecrypted + transferNotesDecrypted;
+
+        console.log('\n[Worker] 📊 === SCAN STATISTICS ===');
+        console.log(`Shield Events:`);
+        console.log(`  - Total found: ${allShieldNodes.length}`);
+        console.log(`  - Attempted to decrypt: ${shieldNotesAttempted}`);
+        console.log(`  - Successfully decrypted: ${shieldNotesDecrypted}`);
+        console.log(`  - Skipped (no data): ${shieldNotesSkippedNoData}`);
+        console.log(`  - Skipped (wrong pool): ${shieldNotesSkippedWrongPool}`);
+        console.log(`Transfer Events:`);
+        console.log(`  - Total found: ${allTransferNodes.length}`);
+        console.log(`  - Attempted to decrypt: ${transferNotesAttempted}`);
+        console.log(`  - Successfully decrypted: ${transferNotesDecrypted}`);
+        console.log(`  - Skipped (no data): ${transferNotesSkippedNoData}`);
+        console.log(`  - Skipped (wrong pool): ${transferNotesSkippedWrongPool}`);
+        console.log(`Unshield Events:`);
+        console.log(`  - Total found: ${allUnshieldNodes.length}`);
+        console.log(`  - In this pool: ${unshieldEventsInPool.length}`);
+        console.log(`Pool Statistics:`);
+        console.log(`  - Shield events in pool: ${shieldEventsInPool.length}`);
+        console.log(`  - Unshield events in pool: ${unshieldEventsInPool.length}`);
+        console.log(`  - Total notes in pool: ${totalNotesInPool} (Shield - Unshield)`);
+        console.log(`Results:`);
+        console.log(`  - Owned notes found: ${ownedNotes.length}`);
+        console.log(`  - Total commitments: ${allCommitments.length}`);
+        console.log(`  - Target Pool ID: ${request.poolId}`);
+        console.log(`  - Your MPK: ${request.masterPublicKey}`);
+        console.log('================================\n');
+
+        // Progress: Decryption complete with detailed statistics
         postMessage({
           type: "progress",
           id: request.id,
           current: 60,
           total: 100,
-          message: `Decrypted ${ownedNotes.length} notes, building Merkle tree...`,
+          message: `Scanned ${totalEventsScanned} events (${shieldNotesAttempted} Shield, ${transferNotesAttempted} Transfer) → Decrypted ${totalNotesDecrypted} notes (${shieldNotesDecrypted} Shield, ${transferNotesDecrypted} Transfer)`,
         } as WorkerResponse);
 
         // ========================================================================
@@ -587,17 +653,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           message: `Scan complete! Found ${ownedNotes.length} notes.`,
         } as WorkerResponse);
 
-        // PHASE 2: Include cursors and all commitments for next incremental scan
         const response: WorkerResponse = {
           type: "scan_notes_result",
           id: request.id,
           notes: ownedNotes,
-          lastShieldCursor,
-          lastTransferCursor,
-          allCommitments: allCommitments.map((c) => ({
-            commitment: c.commitment.toString(),
-            leafIndex: c.leafIndex,
-          })),
+          totalNotesInPool, // Total notes in pool = Shield - Unshield
         };
         postMessage(response);
         break;

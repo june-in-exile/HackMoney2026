@@ -12,6 +12,7 @@ import { TransferForm } from "@/components/TransferForm";
 import { SwapForm } from "@/components/SwapForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
 import { useNotes } from "@/hooks/useNotes";
+import { usePoolInfo } from "@/hooks/usePoolInfo";
 import { PACKAGE_ID, POOL_ID, NETWORK } from "@/lib/constants";
 import { initPoseidon } from "@/lib/poseidon";
 
@@ -47,7 +48,12 @@ export default function Home() {
     error: notesError,
     refresh: refreshNotes,
     markNoteSpent,
+    lastScanStats,
+    totalNotesInPool,
   } = useNotes(keypair, isLoading);
+
+  // Fetch pool information from blockchain
+  const { poolInfo, loading: isLoadingPoolInfo } = usePoolInfo();
 
   // Calculate balance and note count from loaded notes
   const unspentNotes = notes.filter((n) => !n.spent);
@@ -168,11 +174,38 @@ export default function Home() {
                     href={`https://${NETWORK}.suivision.xyz/object/${POOL_ID}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-cyber-blue hover:text-cyber-blue/80 transition-colors truncate max-w-md"
+                    className="text-cyber-blue hover:text-cyber-blue/80 transition-colors"
                     title={POOL_ID}
                   >
                     {POOL_ID.slice(0, 8)}...{POOL_ID.slice(-6)}
                   </a>
+                  <span className="text-gray-500">
+                    (Type:
+                    <span className="text-cyber-blue ml-1">
+                      {isLoadingPoolInfo ? (
+                        "..."
+                      ) : poolInfo ? (
+                        poolInfo.tokenType.split("::").pop()?.toUpperCase() || "Unknown"
+                      ) : (
+                        "Unknown"
+                      )}
+                    </span>
+                    {" / "}Balance:
+                    <span className="text-cyber-blue ml-1">
+                      {isLoadingPoolInfo ? (
+                        "..."
+                      ) : poolInfo ? (
+                        `${Number(poolInfo.balance)}`
+                      ) : (
+                        "Unknown"
+                      )}
+                    </span>
+                    {" / "}Total Notes:
+                    <span className="text-cyber-blue ml-1">
+                      {totalNotesInPool.toLocaleString()}
+                    </span>
+                    )
+                  </span>
                 </div>
               </div>
             </div>
@@ -220,6 +253,7 @@ export default function Home() {
                 notes={notes}
                 loading={isLoadingNotes}
                 error={notesError}
+                lastScanStats={lastScanStats}
               />
             </div>
 

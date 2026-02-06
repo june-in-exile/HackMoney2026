@@ -3,8 +3,8 @@
  */
 
 // Deployed contract addresses (from environment variables)
-export const PACKAGE_ID = "0x44ab3164acc0ff5a09aafed10f75829d9fabef23da18667dd6f99d72b23f00d6";
-export const POOL_ID = "0x1a1ff24c1f50aa4b768d2efcdc2c5f3df353817da790ea0e8fe0f9b21a5de6d9";
+export const PACKAGE_ID = "0xf4c4f37ff7cb19a9ebabdae4c528d56deb53826ced98ef45b171cfe0266c0c0b";
+export const POOL_ID = "0x58b93f340913c696f0b2682da634e3aaddaf2a66eb09b0c669dbae6619a7e966";
 
 // Token type for SUI
 export const SUI_COIN_TYPE = "0x2::sui::SUI";

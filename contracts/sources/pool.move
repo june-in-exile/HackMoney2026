@@ -75,6 +75,8 @@ module octopus::pool {
 
     /// Event emitted when tokens are unshielded (withdrawn) from the pool
     public struct UnshieldEvent has copy, drop {
+        /// Pool ID where the unshield occurred
+        pool_id: ID,
         /// Nullifier that was spent
         nullifier: vector<u8>,
         /// Recipient address
@@ -653,6 +655,7 @@ module octopus::pool {
 
         // 9. Emit event
         event::emit(UnshieldEvent {
+            pool_id: object::id(pool),
             nullifier: nullifier_bytes,
             recipient,
             amount,
