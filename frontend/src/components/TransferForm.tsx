@@ -79,15 +79,16 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       // - Pool deployed with transfer VK
       // ============================================
 
-      // 0. Refresh notes to get latest Merkle paths
+      // 0. Refresh notes to get latest Merkle paths and spent status
+      setState("refreshing");
       if (onRefresh) {
-        setState("refreshing");
         await onRefresh();
-        // Wait for notes to be refetched (useNotes hook triggers async fetch)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Wait longer for notes to be refetched with latest on-chain state
+        // This prevents using stale notes that might have been spent
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
 
-      // 1. Get unspent notes
+      // 1. Get unspent notes (after refresh to ensure we have latest on-chain status)
       const unspentNotes = notes.filter((n: OwnedNote) => !n.spent);
 
       if (unspentNotes.length === 0) {
@@ -98,8 +99,20 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
 
       // 2. Select notes to cover amount
       const amountNano = BigInt(Math.floor(parseFloat(amount) * 1_000_000_000)); // Convert SUI to nanoSUI
+
+      // Extra safety check: Ensure we only use notes with Merkle proofs
+      const notesWithProofs = unspentNotes.filter(
+        (n) => n.pathElements && n.pathElements.length > 0
+      );
+
+      if (notesWithProofs.length === 0) {
+        setState("error");
+        setError("No notes with Merkle proofs available. Please refresh and try again.");
+        return;
+      }
+
       const selectedNotes = selectNotesForTransfer(
-        unspentNotes.map((n) => ({
+        notesWithProofs.map((n) => ({
           note: n.note,
           leafIndex: n.leafIndex,
           pathElements: n.pathElements || [], // Merkle proof
@@ -109,7 +122,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
 
       if (!selectedNotes || selectedNotes.length === 0) {
         setState("error");
-        setError("Insufficient balance or notes don't have Merkle proofs yet!");
+        setError("Insufficient balance or unable to select appropriate notes!");
         return;
       }
 
@@ -200,6 +213,14 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       console.error("Transfer failed:", err);
       setState("error");
       setError(err instanceof Error ? err.message : "Transfer failed");
+
+      // CRITICAL FIX: If transaction fails, trigger refresh to reconcile state
+      // This will clean up any incorrect localStorage entries via the cleanup logic in useNotes
+      if (onRefresh) {
+        setTimeout(() => {
+          onRefresh();
+        }, 1000);
+      }
     }
   };
 

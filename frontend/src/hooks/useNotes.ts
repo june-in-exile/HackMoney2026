@@ -81,6 +81,7 @@ export function useNotes(
     current: number;
     total: number;
     message: string;
+    totalNotesInPool?: number;
   } | null>(null);
   const [lastScanStats, setLastScanStats] = useState<{
     eventsScanned: number;
@@ -407,10 +408,37 @@ export function useNotes(
     return () => clearInterval(intervalId);
   }, [keypair, notes, batchCheckNullifierStatus]);
 
+  // CRITICAL FIX: On-chain state is the source of truth
+  // LocalStorage is only used for optimistic updates during transaction submission
+  // Clean up localStorage entries that contradict on-chain state
+  useEffect(() => {
+    if (!keypair) return;
+
+    // Find notes that are unspent on-chain but marked as spent in localStorage
+    const incorrectlyMarkedSpent = notes.filter(
+      (note) => !note.spent && localSpentSet.has(note.nullifier.toString())
+    );
+
+    if (incorrectlyMarkedSpent.length > 0) {
+      // Clean up localStorage - on-chain state is authoritative
+      setLocalSpentSet((prev) => {
+        const newSet = new Set(prev);
+        incorrectlyMarkedSpent.forEach((note) => {
+          newSet.delete(note.nullifier.toString());
+        });
+        saveSpentNullifiers(keypair.masterPublicKey, newSet);
+        return newSet;
+      });
+    }
+  }, [notes, localSpentSet, keypair]);
+
   // Merge local spent status with on-chain spent status
+  // Only use localStorage for notes not yet confirmed on-chain
   const notesWithLocalSpent = notes.map((note) => ({
     ...note,
-    spent: note.spent || localSpentSet.has(note.nullifier.toString()),
+    // On-chain spent status takes precedence
+    // LocalStorage only used if note is unspent on-chain (optimistic update)
+    spent: note.spent || (!note.spent && localSpentSet.has(note.nullifier.toString())),
   }));
 
   return {
