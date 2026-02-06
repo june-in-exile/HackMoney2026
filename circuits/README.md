@@ -16,11 +16,12 @@ The following scripts, located in the `circuits/scripts/` directory, are used fo
 
 ### Compilation Scripts
 
-| Script                        | Purpose                    | When to Use                                                                                             |
-| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `scripts/compile_unshield.sh` | Compiles `unshield.circom`.  | Run when `unshield.circom` is modified or to regenerate its proving/verification keys.                   |
-| `scripts/compile_transfer.sh` | Compiles `transfer.circom`.  | Run when `transfer.circom` is modified or to regenerate its proving/verification keys.                   |
-| `scripts/compile_swap.sh`     | Compiles `swap.circom`.      | Run when `swap.circom` is modified or to regenerate its proving/verification keys.                       |
+| Script                        | Purpose                                                        | When to Use                                                                                                                 |
+| ----------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/compile_all.sh`      | Compiles all circuits in sequence (unshield, transfer, swap). | Run when setting up the project for the first time or when all circuits need to be recompiled. |
+| `scripts/compile_unshield.sh` | Compiles `unshield.circom`.                                    | Run when `unshield.circom` is modified or to regenerate its proving/verification keys.                                      |
+| `scripts/compile_transfer.sh` | Compiles `transfer.circom`.                                    | Run when `transfer.circom` is modified or to regenerate its proving/verification keys.                                      |
+| `scripts/compile_swap.sh`     | Compiles `swap.circom`.                                        | Run when `swap.circom` is modified or to regenerate its proving/verification keys.                                          |
 
 ### Test Input Generation Scripts
 
