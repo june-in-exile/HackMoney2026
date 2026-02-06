@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd frontend && npm install",
+  "installCommand": "rm -f package.json package-lock.json && cd frontend && npm install",
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/.next"
 }
