@@ -30,6 +30,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 - **Proof Generation:** Works in browser (30-60 seconds)
 
 **What It Proves:**
+
 1. User owns both input notes (spending key verification)
 2. Input notes exist in Merkle tree (2 Merkle proofs)
 3. Correct nullifier computation for both inputs
@@ -38,6 +39,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 6. Output/change commitments correctly computed
 
 **Public Inputs (192 bytes):**
+
 - `merkle_root` (32 bytes)
 - `input_nullifiers[2]` (64 bytes)
 - `output_commitment` (32 bytes) - uses token_out
@@ -49,6 +51,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 **Status:** ✅ FULLY FUNCTIONAL (test version with mock swap)
 
 **Test Function:** `swap<TokenIn, TokenOut>()`
+
 - All 27 tests passing (100% success rate)
 - Mock 1:1 swap execution via `execute_mock_swap()`
 - Full proof verification logic present (currently commented out for testing)
@@ -59,12 +62,14 @@ This document provides an accurate assessment of the Swap functionality's curren
 - Change note handling works correctly
 
 **Production Function:** `swap_production<TokenIn, TokenOut>()` (lines 460-582)
+
 - ⚠️ Scaffolded but deliberately aborts with TODO
 - Proof verification logic ready
 - Cetus imports commented out (lines 11-14)
 - Actual DEX integration not implemented
 
 **Test Coverage:**
+
 - ✅ Pool creation for two token types
 - ✅ Mock swap execution (1:1 ratio)
 - ✅ Double-spend prevention via nullifiers
@@ -104,6 +109,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 **Status:** ✅ UI COMPLETE (display only)
 
 **Working Features:**
+
 - Cyberpunk-styled interface with consistent design
 - Token selection dropdowns (SUI ↔ USDC)
 - Amount input with validation
@@ -115,6 +121,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 - Form validation logic
 
 **Mock Implementation:**
+
 - Hardcoded price: `SUI_USDC: 3.0` (1 SUI = 3 USDC) at line 40
 - Mock price impact calculation
 - 500ms debounce on amount changes
@@ -126,6 +133,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 **CRITICAL BLOCKER:** Lines 193-222 in [SwapForm.tsx](../../frontend/src/components/SwapForm.tsx#L193-L222) are completely commented out.
 
 **Missing Components:**
+
 1. Merkle tree building from ShieldEvents
 2. Note leaf index computation
 3. Merkle proof generation for input notes
@@ -141,6 +149,7 @@ This document provides an accurate assessment of the Swap functionality's curren
 **Issue:** Uses hardcoded mock prices instead of real DEX data
 
 **Current Implementation:** (lines 82-132)
+
 ```typescript
 const MOCK_PRICES = {
   SUI_USDC: 3.0,  // Fixed ratio
@@ -148,6 +157,7 @@ const MOCK_PRICES = {
 ```
 
 **What Should Happen:**
+
 - Call `estimateCetusSwap()` from SDK
 - Fetch real pool data from blockchain
 - Calculate actual price impact based on liquidity
@@ -160,6 +170,7 @@ const MOCK_PRICES = {
 **Issue:** Placeholder values that prevent real functionality
 
 **Current State:** (lines 43-56)
+
 ```typescript
 const TOKENS = {
   SUI: {
@@ -178,6 +189,7 @@ const TOKENS = {
 ```
 
 **Problems:**
+
 - USDC token type is invalid placeholder
 - Pool IDs are placeholder strings
 - Token type conversion is broken: `BigInt(type.slice(0, 10))` is incorrect
@@ -189,6 +201,7 @@ const TOKENS = {
 **Current State:** Only UNSHIELD and TRANSFER circuits defined
 
 **Required:**
+
 ```typescript
 SWAP: {
   WASM: "/circuits/swap_js/swap.wasm",
@@ -202,11 +215,13 @@ SWAP: {
 **Issue:** Production contract deliberately aborts
 
 **Current State:** [pool.move:539](../../contracts/sources/pool.move#L539)
+
 ```move
 abort E_INSUFFICIENT_BALANCE  // TODO: Implement Cetus integration
 ```
 
 **Blockers:**
+
 - Cetus imports commented out (lines 11-14)
 - `execute_mock_swap()` used instead of real DEX call
 - No actual `flash_swap()` implementation
@@ -218,14 +233,17 @@ abort E_INSUFFICIENT_BALANCE  // TODO: Implement Cetus integration
 ### 2.1 Misleading Claims in README.md
 
 #### Line 3: Status Badge
+
 **Claim:** "🚧 Frontend Integrated | Backend Mock Implementation"
 **Reality:** Should be "🚧 UI Complete | Transaction Logic Incomplete"
 
 #### Lines 37-41: "Now accessible in main UI"
+
 **Claim:** Implies functionality works
 **Reality:** UI is accessible but proof generation is commented out
 
 #### Lines 49-53: "How to Use (Frontend)"
+
 **Claim:** Provides working instructions
 **Reality:** These steps don't work - proof generation never executes
 
@@ -235,6 +253,7 @@ abort E_INSUFFICIENT_BALANCE  // TODO: Implement Cetus integration
 ```
 
 #### Lines 150-157: "What's Working ✅"
+
 **Claim:** "Swap transaction building and submission"
 **Reality:** Commented out, does not work
 
@@ -245,15 +264,18 @@ abort E_INSUFFICIENT_BALANCE  // TODO: Implement Cetus integration
 **Reality:** Should clarify "UI only, transaction logic incomplete"
 
 #### Line 173: "Price Oracle"
+
 **Claim:** "Fetch live prices from Cetus pools"
 **Reality:** Uses hardcoded mock prices, real function exists but unused
 
 ### 2.2 Issues in ISSUE.md
 
 #### Lines 6-27: Root Cause Analysis
+
 **Missing:** The CRITICAL blocker (proof generation commented out) is not mentioned
 
 **Should Add:**
+
 ```markdown
 0. **Transaction Logic Disabled** (CRITICAL BLOCKER)
    - Lines 193-222 in SwapForm.tsx are commented out
@@ -262,10 +284,12 @@ abort E_INSUFFICIENT_BALANCE  // TODO: Implement Cetus integration
 ```
 
 #### Lines 67-72: "Long-Term Solution"
+
 **Claim:** "SDK already has complete Cetus integration"
 **Reality:** Functions exist but are NEVER USED in the swap flow
 
 #### Line 115: Status
+
 **Claim:** "Mock implementation acceptable for testing"
 **Reality:** Cannot test without proof generation - mock UI only
 
@@ -278,6 +302,7 @@ abort E_INSUFFICIENT_BALANCE  // TODO: Implement Cetus integration
 **Goal:** Make swap work end-to-end with mock 1:1 prices
 
 #### Task 1.1: Add Swap Circuit URLs
+
 **File:** [frontend/src/lib/constants.ts:47](../../frontend/src/lib/constants.ts#L47)
 
 ```typescript
@@ -295,10 +320,13 @@ export const CIRCUIT_URLS = {
 **Verification:** Artifacts exist in `frontend/public/circuits/`
 
 #### Task 1.2: Fix Price Estimation
+
 **File:** [frontend/src/components/SwapForm.tsx:37-56](../../frontend/src/components/SwapForm.tsx#L37-L56)
 
 **Changes:**
+
 1. Update mock price to realistic value:
+
    ```typescript
    const MOCK_PRICES = {
      SUI_USDC: 2.5,  // More realistic estimate
@@ -306,6 +334,7 @@ export const CIRCUIT_URLS = {
    ```
 
 2. Fix decimal conversion:
+
    ```typescript
    // SUI: 9 decimals, USDC: 6 decimals
    const amountInSui = Number(amountIn) / 1e9;
@@ -316,9 +345,11 @@ export const CIRCUIT_URLS = {
 3. Add user-visible error messages
 
 #### Task 1.3: Implement Merkle Tree Building
+
 **New File:** `frontend/src/lib/merkle-tree.ts`
 
 **Required Functions:**
+
 ```typescript
 export async function scanShieldEvents(
   client: SuiClient,
@@ -345,17 +376,20 @@ export function computeMerkleProof(
 ```
 
 #### Task 1.4: Complete Transaction Logic
+
 **File:** [frontend/src/components/SwapForm.tsx:193-229](../../frontend/src/components/SwapForm.tsx#L193-L229)
 
 **Uncomment and complete:**
 
 1. Build Merkle tree:
+
    ```typescript
    const events = await scanShieldEvents(suiClient, POOL_ID);
    const tree = buildMerkleTree(events);
    ```
 
 2. Find user's notes and compute proofs:
+
    ```typescript
    const inputNotes = selectNotesForSwap(notes, amountInBigInt);
    const merkleProofs = inputNotes.map(note =>
@@ -364,6 +398,7 @@ export function computeMerkleProof(
    ```
 
 3. Build SwapInput:
+
    ```typescript
    const swapInput: SwapInput = {
      keypair,
@@ -379,6 +414,7 @@ export function computeMerkleProof(
    ```
 
 4. Generate proof and execute:
+
    ```typescript
    const { proof, publicSignals } = await generateSwapProof(swapInput);
    const suiProof = convertSwapProofToSui(proof, publicSignals);
@@ -400,17 +436,21 @@ export function computeMerkleProof(
    ```
 
 #### Task 1.5: Fix Token Configuration
+
 **File:** [frontend/src/lib/constants.ts](../../frontend/src/lib/constants.ts)
 
 **Changes:**
+
 1. Get real USDC token type from Sui testnet
 2. Update pool IDs with deployed values
 3. Fix token type conversion in SwapForm
 
 #### Task 1.6: Enable Proof Verification
+
 **File:** [contracts/sources/pool.move:379-382](../../contracts/sources/pool.move#L379-L382)
 
 **Uncomment:**
+
 ```move
 let is_valid = groth16::verify_proof(
     &swap_vk_bytes,
@@ -421,6 +461,7 @@ assert!(is_valid, E_INVALID_PROOF);
 ```
 
 **Verification:**
+
 - Re-run `sui move test`
 - Ensure all 27 tests still pass
 - Proof generation works correctly
@@ -449,22 +490,29 @@ assert!(is_valid, E_INVALID_PROOF);
 **Goal:** Replace mock swap with real Cetus DEX routing
 
 #### Task 2.1: Configure Cetus Dependencies
+
 **File:** [contracts/Move.toml](../../contracts/Move.toml)
 
 **Changes:**
+
 1. Verify Cetus package availability on testnet
 2. Add dependencies:
+
    ```toml
    [dependencies]
    Cetus = { git = "https://github.com/CetusProtocol/...", rev = "..." }
    ```
+
 3. Document Cetus package addresses
 
 #### Task 2.2: Enable Contract DEX Integration
+
 **File:** [contracts/sources/pool.move](../../contracts/sources/pool.move)
 
 **Changes:**
+
 1. Uncomment Cetus imports (lines 11-14):
+
    ```move
    use cetus_clmm::pool::{Self as cetus_pool, Pool as CetusPool};
    use cetus_clmm::config::{GlobalConfig as CetusGlobalConfig};
@@ -473,6 +521,7 @@ assert!(is_valid, E_INVALID_PROOF);
 2. Remove abort in `swap_production()` (line 539)
 
 3. Implement real swap logic:
+
    ```move
    // Extract from pool_in
    let coin_in = balance::split(&mut pool_in.reserve, amount_in);
@@ -491,15 +540,19 @@ assert!(is_valid, E_INVALID_PROOF);
    ```
 
 #### Task 2.3: Integrate Real Price Estimation
+
 **File:** [frontend/src/components/SwapForm.tsx:82-132](../../frontend/src/components/SwapForm.tsx#L82-L132)
 
 **Changes:**
+
 1. Import Cetus function:
+
    ```typescript
    import { estimateCetusSwap } from "@june_zk/octopus-sdk/dex";
    ```
 
 2. Replace mock estimation:
+
    ```typescript
    const { amountOut, priceImpact } = await estimateCetusSwap(
      suiClient,
@@ -512,13 +565,16 @@ assert!(is_valid, E_INVALID_PROOF);
 3. Handle decimal conversions properly
 
 #### Task 2.4: Multi-Pool Deployment
+
 **New Files:** Deployment scripts
 
 **Steps:**
+
 1. Deploy `PrivacyPool<SUI>` contract
 2. Deploy `PrivacyPool<USDC>` contract
 3. Fund pools with initial liquidity
 4. Update frontend constants with pool IDs:
+
    ```typescript
    export const POOLS = {
      SUI: "0x...",  // Real pool ID
@@ -527,7 +583,9 @@ assert!(is_valid, E_INVALID_PROOF);
    ```
 
 #### Task 2.5: Test Slippage Protection
+
 **Verification:**
+
 1. Test with 0.1% slippage - should succeed
 2. Test with too-tight slippage - should revert
 3. Verify `amount_out >= min_amount_out` check works
@@ -581,6 +639,7 @@ assert!(is_valid, E_INVALID_PROOF);
 ### Unit Tests (Already Passing)
 
 ✅ All 27 contract tests pass:
+
 - Pool creation
 - Mock swap execution
 - Nullifier double-spend prevention
@@ -610,47 +669,7 @@ assert!(is_valid, E_INVALID_PROOF);
 
 ---
 
-## 6. Risk Assessment
-
-### High Risk
-
-1. **Merkle Tree Synchronization**
-   - Frontend must scan all ShieldEvents to build tree
-   - Missing events → invalid Merkle proofs
-   - **Mitigation:** Implement robust event scanning with pagination
-
-2. **Proof Generation Failures**
-   - 30-60 second wait time
-   - Browser memory constraints
-   - **Mitigation:** Add progress indicator, handle errors gracefully
-
-3. **Token Decimal Mismatches**
-   - SUI uses 9 decimals, USDC uses 6
-   - Incorrect conversion → wrong amounts
-   - **Mitigation:** Careful testing of all decimal conversions
-
-### Medium Risk
-
-1. **Cetus Integration Complexity**
-   - Requires understanding CLMM math
-   - Pool state changes affect prices
-   - **Mitigation:** Use Cetus SDK helper functions
-
-2. **Multi-Pool Deployment**
-   - Needs separate pools for each token
-   - Liquidity management
-   - **Mitigation:** Start with test deployments, small liquidity
-
-### Low Risk
-
-1. **UI/UX Polish**
-   - Error messages
-   - Loading states
-   - **Mitigation:** Straightforward frontend work
-
----
-
-## 7. Success Criteria
+## 6. Success Criteria
 
 ### Phase 1 Success
 

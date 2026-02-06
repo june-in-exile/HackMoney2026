@@ -509,12 +509,16 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
 
   while (notes.length < 2) {
     // Create dummy note with zero value
+    // IMPORTANT: NSK must satisfy circuit constraint: NSK = Poseidon(MPK, random)
+    // We use random=0 for simplicity, so NSK = Poseidon(MPK, 0)
+    const dummyRandom = 0n;
+    const dummyNSK = poseidonHash([keypair.masterPublicKey, dummyRandom]);
     const dummyNote: Note = {
-      nsk: 0n,
+      nsk: dummyNSK,  // Correctly derived NSK
       token: swapParams.tokenIn,
       value: 0n,
-      random: 0n,
-      commitment: poseidonHash([0n, swapParams.tokenIn, 0n]),
+      random: dummyRandom,
+      commitment: poseidonHash([dummyNSK, swapParams.tokenIn, 0n]),
     };
     notes.push(dummyNote);
     leafIndices.push(0);
@@ -547,19 +551,38 @@ export function buildSwapInput(swapInput: SwapInput): SwapCircuitInput {
     swapParams.dexPoolId,
   ]);
 
-  // Compute Merkle root from first input note
-  let root = notes[0].commitment;
-  const indices0 = BigInt(leafIndices[0]);
-  for (let i = 0; i < MERKLE_TREE_DEPTH; i++) {
-    const sibling = pathElements[0][i];
-    // Check if index bit is 0 or 1
-    const isLeft = (indices0 >> BigInt(i)) & 1n;
-    if (isLeft === 0n) {
-      root = poseidonHash([root, sibling]);
-    } else {
-      root = poseidonHash([sibling, root]);
+  // Compute Merkle root from both input notes and verify they match
+  const roots: bigint[] = [];
+
+  for (let noteIdx = 0; noteIdx < 2; noteIdx++) {
+    let root = notes[noteIdx].commitment;
+    const indices = BigInt(leafIndices[noteIdx]);
+
+    for (let level = 0; level < MERKLE_TREE_DEPTH; level++) {
+      const sibling = pathElements[noteIdx][level];
+      // Check if index bit is 0 or 1
+      const isRight = (indices >> BigInt(level)) & 1n;
+      if (isRight === 0n) {
+        root = poseidonHash([root, sibling]);
+      } else {
+        root = poseidonHash([sibling, root]);
+      }
     }
+
+    roots.push(root);
   }
+
+  // Verify both notes compute the same Merkle root
+  if (roots[0] !== roots[1]) {
+    throw new Error(
+      `Merkle root mismatch! ` +
+      `Note 0 (leafIndex=${leafIndices[0]}): ${roots[0].toString()} ` +
+      `Note 1 (leafIndex=${leafIndices[1]}): ${roots[1].toString()}. ` +
+      `This usually means the notes have stale Merkle proofs. Try refreshing your notes.`
+    );
+  }
+
+  const root = roots[0];
 
   return {
     // Private inputs - Keypair

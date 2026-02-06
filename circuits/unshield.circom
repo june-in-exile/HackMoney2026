@@ -37,12 +37,15 @@ template Unshield(levels) {
 
     // ============ Public Inputs ============
     signal input unshield_amount;         // Amount to unshield to public address
+
+    // ============ Public Outputs ============
     signal output nullifier;              // Nullifier for input note
-    signal output merkle_root;            // Merkle root
     signal output change_commitment;      // Commitment for change note (0 if no change)
+    signal output merkle_root;            // Merkle root
 
     // ============ Step 1: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)
+    // Proves sender knows the private keys
     signal mpk <== Poseidon(2)([spending_key, nullifying_key]);
 
     // ============ Step 2: Compute NSK ============

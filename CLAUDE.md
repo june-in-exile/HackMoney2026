@@ -44,9 +44,7 @@ The circuits must be compiled first, as their artifacts (WASM, proving keys, ver
 cd circuits
 npm install
 cd scripts
-./compile_unshield.sh
-./compile_transfer.sh
-./compile_swap.sh
+./compile_all.sh
 ```
 
 *This process is slow and generates large `_final.zkey` files.*
@@ -63,9 +61,15 @@ sui move test
 
 *Expect around 27 tests to pass.*
 
-### Step 3: Run the Frontend Application
+### 3. Build SDK (Required for Frontend)
 
-The frontend ties everything together for a user-facing experience.
+```bash
+cd sdk
+npm install
+npm run build
+```
+
+### 4. Run Frontend (Web UI)
 
 ```bash
 cd frontend
@@ -135,7 +139,7 @@ nullifier = Poseidon(nullifying_key, leaf_index)
 
 Detailed implementation plans are available in the [milestones/](milestones/) directory:
 
-1. **[Private Transfers](milestones/01-private-transfers.md)** (Fixing)
+1. **[Private Transfers](milestones/01-private-transfers.md)** (Optimize)
    * Extends utility beyond entry/exit
    * Foundation for all other features
    * 2-input, 2-output transfer circuit

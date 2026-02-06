@@ -295,6 +295,7 @@ export default function Home() {
                       error={notesError}
                       onSuccess={handleOperationSuccess}
                       onRefresh={refreshNotes}
+                      markNoteSpent={markNoteSpent}
                     />
                   )}
                   {activeTab === "unshield" && (

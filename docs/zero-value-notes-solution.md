@@ -5,6 +5,7 @@
 ### Current Behavior
 
 The Octopus transfer circuit implements a fixed **2-input, 2-output** UTXO model. Every transfer creates exactly 2 output notes:
+
 1. **Recipient note**: Amount being transferred
 2. **Change note**: Remaining balance back to sender
 
@@ -21,6 +22,7 @@ const outputs = createTransferOutputs(recipientMpk, senderMpk, 100n, 100n, token
 ```
 
 **Problems**:
+
 1. 🗄️ **Storage waste**: Zero-value notes get inserted into the Merkle tree
 2. 🗑️ **UTXO pollution**: These notes cannot be spent and clutter the note set
 3. 💸 **Gas waste**: Inserting, storing, and emitting events for unusable notes
@@ -46,6 +48,7 @@ change_commitment <== real_change_commitment * (1 - no_change);
 ```
 
 When `change_value = 0`:
+
 - `no_change = 1`
 - `change_commitment = 0` (all zero bytes)
 
@@ -109,6 +112,7 @@ for (var i = 0; i < 2; i++) {
 ```
 
 **Behavior**:
+
 - `output_values[i] = 0` → `output_commitments[i] = 0x000...000` (32 zero bytes)
 - `output_values[i] > 0` → `output_commitments[i] = Poseidon(nsk, token, value)` (normal)
 
@@ -165,6 +169,7 @@ event::emit(TransferEvent {
 ```
 
 **Behavior**:
+
 - Both outputs have value → Insert 2 commitments (current behavior) ✅
 - One output is zero → Insert 1 commitment (new behavior) 🆕
 - Both outputs zero → Insert 0 commitments (prevented by balance equation) ❌
@@ -179,6 +184,7 @@ cd circuits/scripts
 ```
 
 **Expected outputs**:
+
 - `circuits/build/transfer_js/transfer.wasm` (~2MB)
 - `circuits/build/transfer_final.zkey` (~200MB)
 - `circuits/build/transfer_vk.json` (~2KB)
@@ -196,6 +202,7 @@ cd circuits/scripts
 **Test cases**:
 
 1. **Transfer with no change**
+
    ```move
    #[test]
    fun test_transfer_no_change() {
@@ -206,6 +213,7 @@ cd circuits/scripts
    ```
 
 2. **Transfer with change**
+
    ```move
    #[test]
    fun test_transfer_with_change() {
@@ -216,6 +224,7 @@ cd circuits/scripts
    ```
 
 3. **Transfer with minimal change**
+
    ```move
    #[test]
    fun test_transfer_minimal_change() {
@@ -226,6 +235,7 @@ cd circuits/scripts
    ```
 
 **Run tests**:
+
 ```bash
 cd contracts
 sui move test
@@ -263,12 +273,14 @@ const proof = await generateTransferProof({
 ### Phase 5: Deployment
 
 1. **Build contracts**:
+
    ```bash
    cd contracts
    sui move build
    ```
 
 2. **Deploy to testnet**:
+
    ```bash
    sui client publish --gas-budget 500000000
    ```
@@ -312,10 +324,12 @@ After implementation:
 ### Privacy Analysis
 
 **What's revealed**:
+
 - ✅ Whether an output exists (1 bit of information)
 - ✅ Number of notes created (0, 1, or 2)
 
 **What's hidden**:
+
 - ✅ Actual amounts of inputs and outputs
 - ✅ Which output is recipient vs change
 - ✅ Sender and recipient identities
@@ -325,24 +339,28 @@ After implementation:
 ## Alternative Approaches Considered
 
 ### Option A: SDK-Level Workaround ❌
+
 Force minimum 1-token change in SDK.
 
 **Pros**: No circuit/contract changes
 **Cons**: Wasteful, doesn't solve root problem
 
 ### Option B: Variable-Output Circuit ❌
+
 Redesign circuit to support 1 or 2 outputs with flag.
 
 **Pros**: More flexible
 **Cons**: Major redesign, backward incompatible, adds complexity
 
 ### Option C: Post-Creation Nullification ❌
+
 Allow nullifying zero-value notes after creation.
 
 **Pros**: No circuit changes
 **Cons**: Complex, requires tracking leaf indices, still wastes storage initially
 
 ### Option D: Conditional Commitments ✅ (Selected)
+
 Set commitment to zero when value is zero.
 
 **Pros**: Clean, follows existing pattern, privacy-preserving
@@ -353,11 +371,13 @@ Set commitment to zero when value is zero.
 ### Gas Costs
 
 **Before**:
+
 - Insert 2 commitments: ~2,000 gas per commitment = 4,000 gas
 - Emit 2 encrypted notes: ~500 gas per note = 1,000 gas
 - **Total**: ~5,000 gas per transfer
 
 **After** (transfer with no change):
+
 - Insert 1 commitment: ~2,000 gas
 - Emit 1 encrypted note: ~500 gas
 - **Total**: ~2,500 gas per transfer (50% savings)
@@ -365,10 +385,12 @@ Set commitment to zero when value is zero.
 ### Storage Costs
 
 **Before**:
+
 - 2 notes × 32 bytes = 64 bytes per transfer
 - 100,000 transfers = 6.4 MB
 
 **After** (50% no-change scenario):
+
 - 1.5 notes average × 32 bytes = 48 bytes per transfer
 - 100,000 transfers = 4.8 MB (25% savings)
 

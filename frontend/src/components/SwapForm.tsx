@@ -8,7 +8,7 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
+import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -17,8 +17,15 @@ import {
   calculateMinOutput,
   estimateCetusSwap,
   buildSwapTransaction,
+  selectNotesForTransfer,
+  createNote,
+  randomFieldElement,
+  encryptNote,
+  deriveViewingPublicKey,
+  poseidonHash,
   type SwapParams,
   type SwapInput,
+  type SelectableNote,
 } from "@june_zk/octopus-sdk";
 import { initPoseidon } from "@/lib/poseidon";
 import { NumberInput } from "@/components/NumberInput";
@@ -30,6 +37,7 @@ interface SwapFormProps {
   error: string | null;
   onSuccess?: () => void | Promise<void>;
   onRefresh?: () => void | Promise<void>;
+  markNoteSpent?: (nullifier: bigint) => void;
 }
 
 // Mock price oracle (for demo purposes)
@@ -55,7 +63,7 @@ const TOKENS = {
   },
 };
 
-export function SwapForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess, onRefresh }: SwapFormProps) {
+export function SwapForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess, onRefresh, markNoteSpent }: SwapFormProps) {
   const [amountIn, setAmountIn] = useState("");
   const [amountOut, setAmountOut] = useState("");
   const [tokenIn, setTokenIn] = useState<"SUI" | "USDC">("SUI");
@@ -174,55 +182,222 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
         return;
       }
 
-      // Build swap parameters
+      // 1. Select notes for swap (use transfer selection logic)
+      const selectableNotes: SelectableNote[] = unspentNotes.map((ownedNote: OwnedNote) => ({
+        note: ownedNote.note,
+        leafIndex: ownedNote.leafIndex,
+        pathElements: ownedNote.pathElements,
+      }));
+
+      const selectedNotes = selectNotesForTransfer(selectableNotes, amountInBigInt);
+
+      if (selectedNotes.some(n => !n.pathElements || n.pathElements.length === 0)) {
+        throw new Error("Selected notes missing Merkle proofs. Please refresh your notes.");
+      }
+
+      // Mark selected notes as spent locally to prevent double-spending during proof generation
+      const selectedOwnedNotes = unspentNotes.filter((ownedNote: OwnedNote) =>
+        selectedNotes.some(sn => sn.leafIndex === ownedNote.leafIndex)
+      );
+      selectedOwnedNotes.forEach((ownedNote: OwnedNote) => {
+        markNoteSpent?.(ownedNote.nullifier);
+      });
+
+      // 2. Get token IDs from selected notes
+      const inputTokenId = selectedNotes[0].note.token;
+      // For output token, we use a simple hash for now (TODO: proper token registry)
+      // For SUI->USDC swap, output should be USDC token ID
+      // For now, we'll use a placeholder that matches the mock implementation
+      const outputTokenId = tokenIn === "SUI"
+        ? poseidonHash([BigInt(0x3)]) // Mock USDC token ID
+        : poseidonHash([BigInt(0x2)]); // SUI token ID
+
+      // 3. Build swap parameters
       const swapParams: SwapParams = {
-        tokenIn: BigInt(TOKENS[tokenIn].type.slice(0, 10)),
-        tokenOut: BigInt(TOKENS[tokenOut].type.slice(0, 10)),
+        tokenIn: inputTokenId,
+        tokenOut: outputTokenId,
         amountIn: amountInBigInt,
         minAmountOut,
-        dexPoolId: 1n, // TODO: Get real Cetus pool ID
+        dexPoolId: 1n, // Mock DEX pool ID for testing
         slippageBps: slippage,
       };
 
-      // TODO: Build complete swap input with Merkle proofs
-      // This requires:
-      // 1. Scanning ShieldEvents to build Merkle tree
-      // 2. Finding user's notes and their leaf indices
-      // 3. Computing Merkle proofs for each input note
+      // 4. Create output note (swapped tokens for recipient - self)
+      const outputRandom = randomFieldElement();
+      const outputNote = createNote(
+        keypair.masterPublicKey,
+        outputTokenId,
+        amountOutBigInt,
+        outputRandom
+      );
 
-      // Generate ZK proof
-      // const swapInput: SwapInput = { ... };
-      // const { proof, publicSignals } = await generateSwapProof(swapInput);
-      // const suiProof = convertSwapProofToSui(proof, publicSignals);
+      // 5. Calculate change amount (remaining input tokens)
+      const totalInputValue = selectedNotes.reduce((sum, n) => sum + n.note.value, 0n);
+      const changeAmount = totalInputValue - amountInBigInt;
 
-      // Build transaction
-      // const tx = buildSwapTransaction(
-      //   PACKAGE_ID,
-      //   TOKENS[tokenIn].poolId,
-      //   TOKENS[tokenOut].poolId,
-      //   TOKENS[tokenIn].type,
-      //   TOKENS[tokenOut].type,
-      //   suiProof,
-      //   amountInBigInt,
-      //   minAmountOut,
-      //   encryptedOutputNote,
-      //   encryptedChangeNote
-      // );
+      const changeRandom = randomFieldElement();
+      const changeNote = createNote(
+        keypair.masterPublicKey,
+        inputTokenId,
+        changeAmount,
+        changeRandom
+      );
 
-      // Execute transaction
-      // const result = await signAndExecute({
-      //   transaction: tx,
-      //   options: {
-      //     showEffects: true,
-      //     showObjectChanges: true,
-      //   },
-      // });
+      // 6. Build swap input for proof generation
+      // Debug: Verify NSK derivation and Merkle proofs for each input note
+      console.log("=== Swap Input Verification ===");
+      const MERKLE_TREE_DEPTH = 16;
+      const computedRoots: bigint[] = [];
 
-      // setSuccess(`Swap successful! TX: ${result.digest}`);
-      // if (onSuccess) await onSuccess();
+      for (let i = 0; i < selectedNotes.length; i++) {
+        const note = selectedNotes[i].note;
+        const expectedNSK = poseidonHash([keypair.masterPublicKey, note.random]);
+        const matches = expectedNSK === note.nsk;
+
+        // Compute Merkle root from this note's proof
+        let root = note.commitment;
+        const leafIndex = BigInt(selectedNotes[i].leafIndex);
+        const pathElements = selectedNotes[i].pathElements!;
+
+        for (let level = 0; level < MERKLE_TREE_DEPTH; level++) {
+          const sibling = pathElements[level];
+          const isRight = (leafIndex >> BigInt(level)) & 1n;
+          if (isRight === 0n) {
+            root = poseidonHash([root, sibling]);
+          } else {
+            root = poseidonHash([sibling, root]);
+          }
+        }
+
+        computedRoots.push(root);
+
+        console.log(`Input Note ${i}:`, {
+          token: note.token.toString(),
+          value: note.value.toString(),
+          nsk: note.nsk.toString(),
+          random: note.random.toString(),
+          expectedNSK: expectedNSK.toString(),
+          nskMatches: matches,
+          leafIndex: selectedNotes[i].leafIndex,
+          commitment: note.commitment.toString(),
+          merkleRoot: root.toString(),
+        });
+
+        if (!matches) {
+          throw new Error(`Input note ${i} has invalid NSK! Expected ${expectedNSK} but got ${note.nsk}`);
+        }
+      }
+
+      // Verify both notes have the same Merkle root
+      if (computedRoots.length === 2 && computedRoots[0] !== computedRoots[1]) {
+        throw new Error(
+          `Merkle root mismatch detected!\n` +
+          `Note 0 root: ${computedRoots[0].toString()}\n` +
+          `Note 1 root: ${computedRoots[1].toString()}\n` +
+          `Your notes have stale Merkle proofs. Please refresh your notes and try again.`
+        );
+      }
+
+      // Verify computed root matches on-chain root
+      const onChainRootResult = await client.devInspectTransactionBlock({
+        transactionBlock: (() => {
+          const tx = new Transaction();
+          tx.moveCall({
+            target: `${PACKAGE_ID}::pool::get_merkle_root`,
+            typeArguments: [SUI_COIN_TYPE],
+            arguments: [tx.object(POOL_ID)],
+          });
+          return tx;
+        })(),
+        sender: account?.address || "0x0",
+      });
+
+      if (onChainRootResult.results?.[0]?.returnValues?.[0]) {
+        const [rootBytes] = onChainRootResult.results[0].returnValues[0];
+        // Convert bytes to bigint (LE format)
+        let onChainRoot = 0n;
+        for (let i = 0; i < rootBytes.length; i++) {
+          onChainRoot |= BigInt(rootBytes[i]) << BigInt(8 * i);
+        }
+
+        const localRoot = computedRoots[0];
+        console.log("On-chain Merkle Root:", onChainRoot.toString());
+        console.log("Local Merkle Root:", localRoot.toString());
+
+        if (onChainRoot !== localRoot) {
+          throw new Error(
+            `Your notes have outdated Merkle proofs!\n` +
+            `Local root: ${localRoot.toString()}\n` +
+            `On-chain root: ${onChainRoot.toString()}\n\n` +
+            `New notes have been added to the pool since you last scanned. ` +
+            `Please refresh your notes and try again.`
+          );
+        }
+
+        console.log("✓ Merkle proof validation passed!");
+      }
+
+      console.log("MPK:", keypair.masterPublicKey.toString());
+      console.log("Token In:", inputTokenId.toString());
+      console.log("Token Out:", outputTokenId.toString());
+      console.log("Merkle Root (verified):", computedRoots[0]?.toString());
+
+      const swapInput: SwapInput = {
+        keypair,
+        inputNotes: selectedNotes.map(n => n.note),
+        inputLeafIndices: selectedNotes.map(n => n.leafIndex),
+        inputPathElements: selectedNotes.map(n => n.pathElements!),
+        swapParams,
+        outputNSK: outputNote.nsk,
+        outputRandom: outputNote.random,
+        outputValue: outputNote.value,
+        changeNSK: changeNote.nsk,
+        changeRandom: changeNote.random,
+        changeValue: changeNote.value,
+      };
+
+      // 7. Generate ZK proof (30-60 seconds)
+      const { proof, publicSignals } = await generateSwapProof(swapInput, {
+        wasmPath: CIRCUIT_URLS.SWAP.WASM,
+        zkeyPath: CIRCUIT_URLS.SWAP.ZKEY,
+      });
+
+      // 8. Convert proof to Sui format
+      const suiProof = convertSwapProofToSui(proof, publicSignals);
+
+      // 9. Encrypt notes for recipient (self)
+      const myViewingPk = deriveViewingPublicKey(keypair.spendingKey);
+      const encryptedOutputNote = encryptNote(outputNote, myViewingPk);
+      const encryptedChangeNote = encryptNote(changeNote, myViewingPk);
+
+      // 10. Build and execute transaction
+      const tx = buildSwapTransaction(
+        PACKAGE_ID,
+        POOL_ID, // Pool for tokenIn (SUI pool for now)
+        POOL_ID, // Pool for tokenOut (TODO: separate USDC pool)
+        SUI_COIN_TYPE, // TokenIn type
+        SUI_COIN_TYPE, // TokenOut type (TODO: USDC type)
+        suiProof,
+        amountInBigInt,
+        minAmountOut,
+        encryptedOutputNote,
+        encryptedChangeNote
+      );
+
+      const result = await signAndExecute({ transaction: tx });
+
+      setSuccess(`Swap successful! TX: ${result.digest}`);
+      if (onSuccess) await onSuccess();
     } catch (err) {
       console.error("Swap failed:", err);
       setError(err instanceof Error ? err.message : "Swap failed");
+
+      // If transaction fails, trigger refresh to reconcile state
+      if (onRefresh) {
+        setTimeout(() => {
+          onRefresh();
+        }, 1000);
+      }
     } finally {
       setIsSubmitting(false);
     }

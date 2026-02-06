@@ -255,6 +255,94 @@ module octopus::pool {
         });
     }
 
+    /// Unshield tokens from the privacy pool with ZK proof verification and automatic change handling.
+    ///
+    /// The ZK proof proves:
+    /// 1. Knowledge of spending_key and nullifying_key (ownership)
+    /// 2. Input note commitment exists in Merkle tree
+    /// 3. Correct nullifier computation: nullifier = Poseidon(nullifying_key, leaf_index)
+    /// 4. Balance conservation: input_value = unshield_amount + change_value
+    /// 5. Correct change commitment computation (if change exists)
+    ///
+    /// Public inputs format (128 bytes total):
+    /// - nullifier (32 bytes): Unique identifier preventing double-spend
+    /// - merkle_root (32 bytes): Merkle tree root
+    /// - change_commitment (32 bytes): Commitment for change note (0 if no change)
+    /// - unshield_amount (32 bytes): Amount to withdraw (as field element)
+    public fun unshield<T>(
+        pool: &mut PrivacyPool<T>,
+        proof_bytes: vector<u8>,
+        public_inputs_bytes: vector<u8>,
+        recipient: address,
+        encrypted_change_note: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        // Validate public inputs length (4 field elements × 32 bytes = 128 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 128, E_INVALID_PUBLIC_INPUTS);
+
+        // 1. Parse public inputs [nullifier, merkle_root, change_commitment, unshield_amount]
+        let (merkle_root, nullifier_bytes, unshield_amount_bytes, change_commitment) =
+            parse_unshield_public_inputs(&public_inputs_bytes);
+
+        // 2. Convert unshield_amount from field element to u64
+        let amount = field_element_to_u64(&unshield_amount_bytes);
+
+        // 3. Verify merkle root is valid (current or in history)
+        assert!(is_valid_root(pool, &merkle_root), E_INVALID_ROOT);
+
+        // 4. Check nullifier has not been spent (prevent double-spend)
+        assert!(!nullifier::is_spent(&pool.nullifiers, nullifier_bytes), E_DOUBLE_SPEND);
+
+        // 5. Verify Groth16 ZK proof
+        let pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool.vk_bytes);
+        let public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
+        let proof_points = groth16::proof_points_from_bytes(proof_bytes);
+
+        assert!(
+            groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
+            E_INVALID_PROOF
+        );
+
+        // 6. Mark nullifier as spent
+        nullifier::mark_spent(&mut pool.nullifiers, nullifier_bytes);
+
+        // 7. Transfer tokens to recipient
+        assert!(balance::value(&pool.balance) >= amount, E_INSUFFICIENT_BALANCE);
+        let withdrawn = coin::take(&mut pool.balance, amount, ctx);
+        transfer::public_transfer(withdrawn, recipient);
+
+        // 8. Handle change note (if any)
+        let mut change_position = 0u64;
+        if (!is_zero_commitment(&change_commitment)) {
+            // Save current root to history before inserting change
+            save_historical_root(pool);
+
+            // Get position before inserting (next_index is the position where leaf will be inserted)
+            change_position = merkle_tree::get_next_index(&pool.merkle_tree);
+
+            // Insert change commitment into Merkle tree
+            merkle_tree::insert(&mut pool.merkle_tree, change_commitment);
+
+            // Emit shield event for change note (so user can scan it)
+            event::emit(ShieldEvent {
+                pool_id: object::id(pool),
+                position: change_position,
+                commitment: change_commitment,
+                encrypted_note: encrypted_change_note,
+            });
+        };
+
+        // 9. Emit event
+        event::emit(UnshieldEvent {
+            pool_id: object::id(pool),
+            nullifier: nullifier_bytes,
+            recipient,
+            amount,
+            change_commitment,
+            change_position,
+        });
+    }
+
     /// Transfer tokens privately within the pool (0zk-to-0zk transfer).
     ///
     /// The ZK proof proves:
@@ -524,50 +612,48 @@ module octopus::pool {
         // let amount_out = coin::value(&coin_out);
 
         // ============================================================
-        // CETUS INTEGRATION REQUIRED
+        // PHASE 1: MOCK SWAP (1:1 ratio)
         // ============================================================
-        // This function is ready for Cetus integration. To complete:
-        // 1. Uncomment Cetus imports at top of file
-        // 2. Add cetus_pool and cetus_config parameters
-        // 3. Uncomment Cetus flash swap code above
-        // 4. Comment out or remove this abort block
-        // 5. Uncomment the implementation below
+        // Using simplified 1:1 swap for initial testing
+        // TODO Phase 2: Replace with real Cetus DEX integration
         // ============================================================
 
-        // Return borrowed coins and abort until Cetus is integrated
+        // Mock 1:1 swap - in production this would call Cetus DEX
+        let amount_out = amount_in; // 1:1 ratio for Phase 1 testing
+
+        // Destroy input coin (would go to DEX in production)
         balance::join(&mut pool_in.balance, coin::into_balance(coin_in));
-        abort E_INSUFFICIENT_BALANCE
 
-        // ============================================================
-        // IMPLEMENTATION (Uncomment when Cetus is integrated)
-        // ============================================================
-        /*
+        // Mint output coin from pool_out (would come from DEX in production)
+        assert!(balance::value(&_pool_out.balance) >= amount_out, E_INSUFFICIENT_BALANCE);
+        let _coin_out = coin::take(&mut _pool_out.balance, amount_out, ctx);
+
+        // Shield output back into pool_out (simulating DEX output -> pool)
+        balance::join(&mut _pool_out.balance, coin::into_balance(_coin_out));
+
         // 7. Verify slippage protection
-        assert!(amount_out >= min_amount_out, E_INSUFFICIENT_BALANCE);
+        assert!(amount_out >= _min_amount_out, E_INSUFFICIENT_BALANCE);
 
-        // 8. Shield output into pool_out
-        balance::join(&mut pool_out.balance, coin::into_balance(coin_out));
-
-        // 9. Mark both nullifiers as spent
+        // 8. Mark both nullifiers as spent
         nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
         nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
 
-        // 10. Add output commitment to pool_out Merkle tree
-        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
-        merkle_tree::insert(&mut pool_out.merkle_tree, _output_commitment);
+        // 9. Add output commitment to pool_out Merkle tree
+        let output_position = merkle_tree::get_next_index(&_pool_out.merkle_tree);
+        merkle_tree::insert(&mut _pool_out.merkle_tree, _output_commitment);
 
-        // 11. Add change commitment to pool_in Merkle tree
+        // 10. Add change commitment to pool_in Merkle tree
         let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
         merkle_tree::insert(&mut pool_in.merkle_tree, _change_commitment);
 
-        // 12. Save updated roots to history
+        // 11. Save updated roots to history
         save_historical_root(pool_in);
-        save_historical_root(pool_out);
+        save_historical_root(_pool_out);
 
-        // 13. Emit event for wallet scanning
+        // 12. Emit event for wallet scanning
         event::emit(SwapEvent {
             pool_in_id: object::id(pool_in),
-            pool_out_id: object::id(pool_out),
+            pool_out_id: object::id(_pool_out),
             input_nullifiers: vector[nullifier1, nullifier2],
             output_commitment: _output_commitment,
             change_commitment: _change_commitment,
@@ -575,97 +661,8 @@ module octopus::pool {
             change_position,
             amount_in,
             amount_out,
-            encrypted_output_note,
-            encrypted_change_note,
-        });
-        */
-    }
-
-    /// Unshield tokens from the privacy pool with ZK proof verification and automatic change handling.
-    ///
-    /// The ZK proof proves:
-    /// 1. Knowledge of spending_key and nullifying_key (ownership)
-    /// 2. Input note commitment exists in Merkle tree
-    /// 3. Correct nullifier computation: nullifier = Poseidon(nullifying_key, leaf_index)
-    /// 4. Balance conservation: input_value = unshield_amount + change_value
-    /// 5. Correct change commitment computation (if change exists)
-    ///
-    /// Public inputs format (128 bytes total):
-    /// - nullifier (32 bytes): Unique identifier preventing double-spend
-    /// - merkle_root (32 bytes): Merkle tree root
-    /// - change_commitment (32 bytes): Commitment for change note (0 if no change)
-    /// - unshield_amount (32 bytes): Amount to withdraw (as field element)
-    public fun unshield<T>(
-        pool: &mut PrivacyPool<T>,
-        proof_bytes: vector<u8>,
-        public_inputs_bytes: vector<u8>,
-        recipient: address,
-        encrypted_change_note: vector<u8>,
-        ctx: &mut TxContext,
-    ) {
-        // Validate public inputs length (4 field elements × 32 bytes = 128 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 128, E_INVALID_PUBLIC_INPUTS);
-
-        // 1. Parse public inputs [nullifier, merkle_root, change_commitment, unshield_amount]
-        let (merkle_root, nullifier_bytes, unshield_amount_bytes, change_commitment) =
-            parse_unshield_public_inputs(&public_inputs_bytes);
-
-        // 2. Convert unshield_amount from field element to u64
-        let amount = field_element_to_u64(&unshield_amount_bytes);
-
-        // 3. Verify merkle root is valid (current or in history)
-        assert!(is_valid_root(pool, &merkle_root), E_INVALID_ROOT);
-
-        // 4. Check nullifier has not been spent (prevent double-spend)
-        assert!(!nullifier::is_spent(&pool.nullifiers, nullifier_bytes), E_DOUBLE_SPEND);
-
-        // 5. Verify Groth16 ZK proof
-        let pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool.vk_bytes);
-        let public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
-        let proof_points = groth16::proof_points_from_bytes(proof_bytes);
-
-        assert!(
-            groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
-            E_INVALID_PROOF
-        );
-
-        // 6. Mark nullifier as spent
-        nullifier::mark_spent(&mut pool.nullifiers, nullifier_bytes);
-
-        // 7. Transfer tokens to recipient
-        assert!(balance::value(&pool.balance) >= amount, E_INSUFFICIENT_BALANCE);
-        let withdrawn = coin::take(&mut pool.balance, amount, ctx);
-        transfer::public_transfer(withdrawn, recipient);
-
-        // 8. Handle change note (if any)
-        let mut change_position = 0u64;
-        if (!is_zero_commitment(&change_commitment)) {
-            // Save current root to history before inserting change
-            save_historical_root(pool);
-
-            // Get position before inserting (next_index is the position where leaf will be inserted)
-            change_position = merkle_tree::get_next_index(&pool.merkle_tree);
-
-            // Insert change commitment into Merkle tree
-            merkle_tree::insert(&mut pool.merkle_tree, change_commitment);
-
-            // Emit shield event for change note (so user can scan it)
-            event::emit(ShieldEvent {
-                pool_id: object::id(pool),
-                position: change_position,
-                commitment: change_commitment,
-                encrypted_note: encrypted_change_note,
-            });
-        };
-
-        // 9. Emit event
-        event::emit(UnshieldEvent {
-            pool_id: object::id(pool),
-            nullifier: nullifier_bytes,
-            recipient,
-            amount,
-            change_commitment,
-            change_position,
+            encrypted_output_note: _encrypted_output_note,
+            encrypted_change_note: _encrypted_change_note,
         });
     }
 

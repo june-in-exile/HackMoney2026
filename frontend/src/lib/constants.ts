@@ -44,4 +44,9 @@ export const CIRCUIT_URLS = {
     ZKEY: "/circuits/transfer_final.zkey",
     VK: "/circuits/transfer_vk.json",
   },
+  SWAP: {
+    WASM: "/circuits/swap_js/swap.wasm",
+    ZKEY: "/circuits/swap_final.zkey",
+    VK: "/circuits/swap_vk.json",
+  },
 } as const;
