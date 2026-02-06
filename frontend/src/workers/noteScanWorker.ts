@@ -18,7 +18,7 @@ import {
   initPoseidon as sdkInitPoseidon,
   bytesToBigIntLE_BN254,
   type Note,
-} from "@octopus/sdk";
+} from "@june_zk/octopus-sdk";
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
 import { graphql } from "@mysten/sui/graphql/schemas/latest";
 import type {

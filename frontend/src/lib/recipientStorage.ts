@@ -5,7 +5,7 @@
  * to/from browser localStorage.
  */
 
-import type { RecipientProfileStored } from "@octopus/sdk";
+import type { RecipientProfileStored } from "@june_zk/octopus-sdk";
 
 const STORAGE_KEY_PREFIX = "octopus_recipients";
 

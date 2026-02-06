@@ -1,5 +1,5 @@
 {
-  "name": "@octopus/sdk",
+  "name": "@june_zk/octopus-sdk",
   "version": "0.1.0",
   "description": "TypeScript SDK for Octopus privacy protocol on Sui",
   "main": "dist/index.js",

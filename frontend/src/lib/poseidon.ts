@@ -7,7 +7,7 @@
  * Uses globalThis to ensure singleton across all module contexts.
  */
 
-import { initPoseidon as sdkInitPoseidon } from "@octopus/sdk";
+import { initPoseidon as sdkInitPoseidon } from "@june_zk/octopus-sdk";
 
 // Use globalThis to ensure singleton across all bundles/contexts
 declare global {

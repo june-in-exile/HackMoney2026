@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { isValidViewingPublicKey, type RecipientProfile, type RecipientProfileStored } from "@octopus/sdk";
+import { isValidViewingPublicKey, type RecipientProfile, type RecipientProfileStored } from "@june_zk/octopus-sdk";
 import {
   saveRecipient,
   getRecipients,

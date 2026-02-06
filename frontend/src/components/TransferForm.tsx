@@ -15,7 +15,7 @@ import {
   importViewingPublicKey,
   encryptNote,
   type RecipientProfile,
-} from "@octopus/sdk";
+} from "@june_zk/octopus-sdk";
 import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
 import { NumberInput } from "@/components/NumberInput";
 import { RecipientInput } from "@/components/RecipientInput";

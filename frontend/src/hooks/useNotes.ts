@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import type { OctopusKeypair } from "./useLocalKeypair";
-import type { Note } from "@octopus/sdk";
+import type { Note } from "@june_zk/octopus-sdk";
 import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
-import { bigIntToBE32 } from "@octopus/sdk";
+import { bigIntToBE32 } from "@june_zk/octopus-sdk";
 import { getWorkerManager } from "@/lib/workerManager";
 
 /**

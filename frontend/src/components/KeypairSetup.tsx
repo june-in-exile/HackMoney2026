@@ -4,7 +4,7 @@ import { useState } from "react";
 import { truncateAddress, bigIntToHex } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { StoredKeypair } from "@/lib/keypairStorage";
-import { exportViewingPublicKey } from "@octopus/sdk";
+import { exportViewingPublicKey } from "@june_zk/octopus-sdk";
 
 interface KeypairSetupProps {
   keypair: OctopusKeypair | null;

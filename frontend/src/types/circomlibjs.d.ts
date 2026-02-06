@@ -1,7 +1,7 @@
 /**
  * Type declarations for circomlibjs
  *
- * NOTE: This file mirrors the type definition in @octopus/sdk/src/circomlibjs.d.ts
+ * NOTE: This file mirrors the type definition in @june_zk/octopus-sdk/src/circomlibjs.d.ts
  * Keep both files in sync when making changes.
  */
 declare module "circomlibjs" {

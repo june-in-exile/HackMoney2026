@@ -100,7 +100,7 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     }
 
     try {
-      const { poseidonHash, randomFieldElement } = await import("@octopus/sdk");
+      const { poseidonHash, randomFieldElement } = await import("@june_zk/octopus-sdk");
 
       // Generate random spending key using SDK's secure random generator
       const spendingKey = randomFieldElement();

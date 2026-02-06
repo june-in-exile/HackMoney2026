@@ -6,7 +6,7 @@ import { resolve } from "path";
 dotenvConfig({ path: resolve(__dirname, "../.env") });
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@octopus/sdk"],
+  transpilePackages: ["@june_zk/octopus-sdk"],
   turbopack: {},
   webpack: (config) => {
     config.resolve.fallback = {

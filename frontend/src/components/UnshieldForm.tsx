@@ -14,7 +14,7 @@ import {
   generateUnshieldProof,
   convertUnshieldProofToSui,
   deriveViewingPublicKey,
-} from "@octopus/sdk";
+} from "@june_zk/octopus-sdk";
 import { NumberInput } from "@/components/NumberInput";
 
 interface UnshieldFormProps {

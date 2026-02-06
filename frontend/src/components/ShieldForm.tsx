@@ -16,7 +16,7 @@ import {
   bigIntToLE32,
   poseidonHash,
   deriveViewingPublicKey
-} from "@octopus/sdk";
+} from "@june_zk/octopus-sdk";
 import { initPoseidon } from "@/lib/poseidon";
 import { NumberInput } from "@/components/NumberInput";
 

@@ -19,7 +19,7 @@ import {
   buildSwapTransaction,
   type SwapParams,
   type SwapInput,
-} from "@octopus/sdk";
+} from "@june_zk/octopus-sdk";
 import { initPoseidon } from "@/lib/poseidon";
 import { NumberInput } from "@/components/NumberInput";
 
