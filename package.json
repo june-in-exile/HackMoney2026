@@ -1,0 +1,12 @@
+{
+  "name": "octopus-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "sdk",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=sdk && npm run build --workspace=frontend"
+  }
+}
