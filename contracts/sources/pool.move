@@ -25,6 +25,8 @@ module octopus::pool {
     const E_INSUFFICIENT_BALANCE: u64 = 4;
     /// Invalid public inputs format
     const E_INVALID_PUBLIC_INPUTS: u64 = 5;
+    /// Cannot shield zero amount
+    const E_ZERO_AMOUNT: u64 = 6;
 
     // ============ Constants ============
 
@@ -229,6 +231,9 @@ module octopus::pool {
         encrypted_note: vector<u8>,
         _ctx: &mut TxContext,
     ) {
+        // 0. Validate amount is greater than zero
+        assert!(coin::value(&coin) > 0, E_ZERO_AMOUNT);
+
         // 1. Record position before insert
         let position = merkle_tree::get_next_index(&pool.merkle_tree);
 

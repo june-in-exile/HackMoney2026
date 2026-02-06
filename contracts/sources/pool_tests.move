@@ -261,4 +261,34 @@ module octopus::pool_tests {
 
         ts::end(scenario);
     }
+
+    #[test]
+    #[expected_failure(abort_code = 6, location = octopus::pool)] // E_ZERO_AMOUNT
+    fun test_shield_zero_amount_fails() {
+        let mut scenario = ts::begin(ADMIN);
+        create_test_pool(&mut scenario);
+
+        // Try to shield with zero amount
+        ts::next_tx(&mut scenario, ALICE);
+        {
+            let mut pool = ts::take_shared<PrivacyPool<SUI>>(&scenario);
+            let ctx = ts::ctx(&mut scenario);
+
+            // Create a coin with zero value
+            let zero_coin = coin::mint_for_testing<SUI>(0, ctx);
+
+            // This should fail with E_ZERO_AMOUNT
+            pool::shield(
+                &mut pool,
+                zero_coin,
+                TEST_COMMITMENT,
+                x"01020304", // Valid hex string with even length
+                ctx
+            );
+
+            ts::return_shared(pool);
+        };
+
+        ts::end(scenario);
+    }
 }

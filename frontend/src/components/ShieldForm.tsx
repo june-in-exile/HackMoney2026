@@ -80,7 +80,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
 
     // Pro-actively parse amount to enable robust checks
     const numericAmount = parseFloat(amount);
-    if (amount.trim() === '' || isNaN(numericAmount) || numericAmount < 0) {
+    if (amount.trim() === '' || isNaN(numericAmount) || numericAmount <= 0) {
       setError("Please enter a valid amount");
       return;
     }
