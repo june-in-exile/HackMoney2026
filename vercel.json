@@ -1,7 +1,6 @@
 {
-  "buildCommand": "cd sdk && npm install && npm run build && cd ../frontend && npm install && npm run build",
-  "outputDirectory": "frontend/.next",
-  "installCommand": "echo 'Skipping default install'",
-  "framework": null,
-  "devCommand": "cd frontend && npm run dev"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../sdk && npm install && npm run build && cd ../frontend && npm install && npm run build",
+  "installCommand": "npm install",
+  "rootDirectory": "frontend"
 }
