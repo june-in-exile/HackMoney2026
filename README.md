@@ -66,9 +66,7 @@ nullifier = Poseidon(nullifying_key, leaf_index) // Prevents double-spend
 cd circuits
 npm install
 cd scripts
-./compile_unshield.sh   # Unshield circuit
-./compile_transfer.sh   # Transfer circuit
-./compile_swap.sh       # Swap circuit
+./compile_all.sh
 ```
 
 This generates for each circuit:
@@ -85,11 +83,21 @@ sui move build
 sui move test
 ```
 
-Expected output: **26 tests passing**
+Expected output: **27 tests passing**
 
 Reference [contracts/README.md](contracts/README.md) for deployment guides.
 
-### 3. Run Frontend (Web UI)
+### 3. Build SDK (Required for Frontend)
+
+```bash
+cd sdk
+npm install
+npm run build
+```
+
+This generates the SDK TypeScript library that the frontend depends on.
+
+### 4. Run Frontend (Web UI)
 
 ```bash
 cd frontend
