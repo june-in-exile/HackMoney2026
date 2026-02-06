@@ -392,7 +392,7 @@ export async function decryptTransactionHistory(
       const note = decryptNoteWithViewKey(encryptedNote, viewKey);
 
       // Check if note belongs to this view key (matches MPK)
-      if (note.npk === viewKey.mpk) {
+      if (note.nsk === viewKey.mpk) {
         transactions.push({
           timestamp: event.timestampMs,
           type: event.type,

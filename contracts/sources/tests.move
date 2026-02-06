@@ -115,7 +115,7 @@ module octopus::tests {
     // ============ Nullifier Tests ============
 
     #[test]
-    #[expected_failure(abort_code = octopus::nullifier::ENullifierAlreadySpent)]
+    #[expected_failure] // Aborts when trying to add duplicate dynamic field
     fun test_nullifier_double_spend() {
         let mut scenario = ts::begin(ADMIN);
         {

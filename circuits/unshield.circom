@@ -2,78 +2,79 @@ pragma circom 2.0.0;
 
 include "node_modules/circomlib/circuits/poseidon.circom";
 include "node_modules/circomlib/circuits/bitify.circom";
+include "node_modules/circomlib/circuits/comparators.circom";
 include "./lib/merkle_proof.circom";
 
 /// Unshield circuit for Octopus on Sui
-/// Simplified version of a privacy circuit (1 input, no EdDSA)
+/// Implements 1-input, 1-output (change note) private unshield with automatic change handling
 ///
 /// Proves:
 /// 1. Knowledge of spending_key and nullifying_key (ownership)
-/// 2. Correct commitment computation
+/// 2. Input note exists in Merkle tree
 /// 3. Correct nullifier computation
-/// 4. Commitment exists in Merkle tree
+/// 4. Balance conservation: value = unshield_amount + change_value
+/// 5. Correct change commitment computation
 ///
 /// Based on cryptographic formulas:
 /// - MPK = Poseidon(spending_key, nullifying_key)
-/// - NPK = Poseidon(MPK, random)
-/// - Commitment = Poseidon(NPK, token, value)
+/// - NSK = Poseidon(MPK, random)
+/// - Commitment = Poseidon(NSK, token, value)
 /// - Nullifier = Poseidon(nullifying_key, leaf_index)
 template Unshield(levels) {
     // ============ Private Inputs ============
+
+    // Keypair
     signal input spending_key;           // User's secret spending key (256-bit)
     signal input nullifying_key;         // Secret key for nullifier generation (256-bit)
-    signal input random;                 // Random blinding factor (256-bit)
-    signal input value;                  // Note amount (120-bit max)
+
+    // Input note (note being spent/unshielded)
+    signal input random;                 // Random blinding factor
+    signal input value;                  // Note amount
     signal input token;                  // Token identifier (address hash)
+    signal input leaf_index;             // Leaf position in tree
     signal input path_elements[levels];  // Merkle proof siblings
-    signal input path_indices;           // Leaf position in tree (as integer)
+    signal input change_random;          // Random blinding factor for change
 
     // ============ Public Inputs ============
-    signal input merkle_root;            // Expected Merkle root
-    signal input nullifier;              // Nullifier to prevent double-spend
-    signal input commitment;             // Note commitment being spent
+    signal input unshield_amount;         // Amount to unshield to public address
+    signal output nullifier;              // Nullifier for input note
+    signal output merkle_root;            // Merkle root
+    signal output change_commitment;      // Commitment for change note (0 if no change)
 
     // ============ Step 1: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)
-    // Simplified: MPK = Poseidon(spending_key, nullifying_key)
-    component mpkHasher = Poseidon(2);
-    mpkHasher.inputs[0] <== spending_key;
-    mpkHasher.inputs[1] <== nullifying_key;
-    signal mpk <== mpkHasher.out;
+    signal mpk <== Poseidon(2)([spending_key, nullifying_key]);
 
-    // ============ Step 2: Compute NPK ============
-    // NPK = Poseidon(MPK, random)
-    component npkHasher = Poseidon(2);
-    npkHasher.inputs[0] <== mpk;
-    npkHasher.inputs[1] <== random;
-    signal npk <== npkHasher.out;
+    // ============ Step 2: Compute NSK ============
+    // NSK = Poseidon(MPK, random)
+    signal nsk <== Poseidon(2)([mpk, random]);
 
-    // ============ Step 3: Verify Commitment ============
-    // commitment === Poseidon(NPK, token, value)
-    component commitmentHasher = Poseidon(3);
-    commitmentHasher.inputs[0] <== npk;
-    commitmentHasher.inputs[1] <== token;
-    commitmentHasher.inputs[2] <== value;
-    commitment === commitmentHasher.out;
+    // ============ Step 3: Compute Commitment ============
+    // commitment = Poseidon(NSK, token, value)
+    signal commitment <== Poseidon(3)([nsk, token, value]);
 
     // ============ Step 4: Verify Nullifier ============
-    // nullifier === Poseidon(nullifying_key, path_indices)
-    component nullifierHasher = Poseidon(2);
-    nullifierHasher.inputs[0] <== nullifying_key;
-    nullifierHasher.inputs[1] <== path_indices;
-    nullifier === nullifierHasher.out;
+    // nullifier = Poseidon(nullifying_key, leaf_index)
+    nullifier <== Poseidon(2)([nullifying_key, leaf_index]);
 
     // ============ Step 5: Verify Merkle Proof ============
-    // Prove that commitment exists in the Merkle tree at path_indices
-    component merkleProof = MerkleProof(levels);
-    merkleProof.leaf <== commitment;
-    merkleProof.path_indices <== path_indices;
-    for (var i = 0; i < levels; i++) {
-        merkleProof.path_elements[i] <== path_elements[i];
-    }
-    merkle_root === merkleProof.root;
+    // Prove that input commitment exists in the Merkle tree
+    merkle_root <== MerkleProof(levels)(commitment, leaf_index, path_elements);
+
+    // ============ Step 6: Range Check ============
+    // Ensure unshield_amount <= value
+    signal rangeCheck <== LessEqThan(120)([unshield_amount, value]);
+    rangeCheck === 1;
+
+    // ============ Step 7: Calculate Change Value ============
+    signal change_value <== value - unshield_amount;
+
+    // ============ Step 8: Compute Change Commitment ============
+    signal change_nsk <== Poseidon(2)([mpk, change_random]);
+    signal real_change_commitment <== Poseidon(3)([change_nsk, token, change_value]);
+    signal no_change <== IsZero()(change_value);
+    change_commitment <== real_change_commitment * (1 - no_change);
 }
 
 // Main circuit with 16 levels (supports 2^16 = 65,536 notes)
-// Public inputs: merkle_root, nullifier, commitment
-component main {public [merkle_root, nullifier, commitment]} = Unshield(16);
+component main {public [unshield_amount]} = Unshield(16);

@@ -29,7 +29,7 @@ template Swap(levels) {
     signal input nullifying_key;         // Secret key for nullifier generation (256-bit)
 
     // Input notes (notes being spent - same token type)
-    signal input input_npks[2];          // Note public keys for input notes
+    signal input input_nsks[2];          // Note secret keys for input notes
     signal input input_values[2];        // Note amounts (can be 0 for dummy)
     signal input input_randoms[2];       // Random blinding factors
     signal input input_leaf_indices[2];  // Leaf positions in tree
@@ -43,12 +43,12 @@ template Swap(levels) {
     signal input dex_pool_id;            // DEX pool identifier hash
 
     // Output note (single output with swapped tokens)
-    signal input output_npk;             // Note public key for recipient
+    signal input output_nsk;             // Note secret key for recipient
     signal input output_value;           // Output amount (actual swap result)
     signal input output_random;          // Random blinding factor for output
 
     // Change note (if input > amount_in, return change with token_in)
-    signal input change_npk;             // Note public key for change
+    signal input change_nsk;             // Note secret key for change
     signal input change_value;           // Change amount
     signal input change_random;          // Random blinding factor for change
 
@@ -69,8 +69,8 @@ template Swap(levels) {
 
     // ============ Step 2: Verify Input Notes ============
     // For each input note:
-    // 1. Verify NPK = Poseidon(MPK, random)
-    // 2. Compute commitment = Poseidon(NPK, token_in, value)
+    // 1. Verify NSK = Poseidon(MPK, random)
+    // 2. Compute commitment = Poseidon(NSK, token_in, value)
     // 3. Verify nullifier = Poseidon(nullifying_key, leaf_index)
     // 4. Verify commitment exists in Merkle tree
 
@@ -80,16 +80,16 @@ template Swap(levels) {
     component inputMerkleProofs[2];
 
     for (var i = 0; i < 2; i++) {
-        // Verify NPK ownership: NPK = Poseidon(MPK, random)
+        // Verify NSK ownership: NSK = Poseidon(MPK, random)
         inputNpkHashers[i] = Poseidon(2);
         inputNpkHashers[i].inputs[0] <== mpk;
         inputNpkHashers[i].inputs[1] <== input_randoms[i];
-        input_npks[i] === inputNpkHashers[i].out;
+        input_nsks[i] === inputNpkHashers[i].out;
 
-        // Compute commitment = Poseidon(NPK, token_in, value)
+        // Compute commitment = Poseidon(NSK, token_in, value)
         // All input notes must have same token type (token_in)
         inputCommitmentHashers[i] = Poseidon(3);
-        inputCommitmentHashers[i].inputs[0] <== input_npks[i];
+        inputCommitmentHashers[i].inputs[0] <== input_nsks[i];
         inputCommitmentHashers[i].inputs[1] <== token_in;
         inputCommitmentHashers[i].inputs[2] <== input_values[i];
 
@@ -130,20 +130,20 @@ template Swap(levels) {
     swap_data_hash === swapHasher.out;
 
     // ============ Step 5: Verify Output Commitment ============
-    // Output note commitment = Poseidon(NPK, token_out, output_value)
+    // Output note commitment = Poseidon(NSK, token_out, output_value)
     // Note: Output uses token_out (swapped token)
     component outputCommitmentHasher = Poseidon(3);
-    outputCommitmentHasher.inputs[0] <== output_npk;
+    outputCommitmentHasher.inputs[0] <== output_nsk;
     outputCommitmentHasher.inputs[1] <== token_out;
     outputCommitmentHasher.inputs[2] <== output_value;
     output_commitment === outputCommitmentHasher.out;
 
     // ============ Step 6: Verify Change Commitment ============
-    // Change note commitment = Poseidon(NPK, token_in, change_value)
+    // Change note commitment = Poseidon(NSK, token_in, change_value)
     // Note: Change uses token_in (original token)
     // If no change, commitment will be for value=0 note
     component changeCommitmentHasher = Poseidon(3);
-    changeCommitmentHasher.inputs[0] <== change_npk;
+    changeCommitmentHasher.inputs[0] <== change_nsk;
     changeCommitmentHasher.inputs[1] <== token_in;
     changeCommitmentHasher.inputs[2] <== change_value;
     change_commitment === changeCommitmentHasher.out;

@@ -17,7 +17,7 @@ export interface SelectableNote {
 }
 
 /**
- * Select optimal notes to cover transfer amount.
+ * Select notes to cover transfer amount.
  *
  * Strategy:
  * 1. Try to find a single note >= amount (minimize inputs)

@@ -18,11 +18,12 @@ module octopus::pool_tests {
     // Test proof (valid proof for the test input)
     const TEST_PROOF: vector<u8> = x"aca940a9ad7c4beb620beb1b67cd111a2ff32b2f33945bd12cc017c721ec1b91083135faffb3ff4b3cfdcdd0a075154e80b245fa42d14655880096b4ef29fe13f274371b7b8b1d8382f61ba9b61d2901b3557944195ee34771eaee3f0019571cba7b3a4b43ffdd48945edd122d141734a262be4b49e6baf28abeea0c1484050a";
 
-    // Test public inputs [merkle_root, nullifier, commitment]
-    const TEST_PUBLIC_INPUTS: vector<u8> = x"2fcfefda413c3b48e0806fb76f38678760d9dc9e23eaecaec3c5c6265298202350c899e811771f3b5b77a50bcde42ab8822a6c8b41b57e4cea8f0c00645da926589b6f5789efc87da100ca0b91394f7454370d77d4f64569e64bca988b98be2c";
+    // Test public inputs [merkle_root, nullifier]
+    // New 128-byte format: [nullifier, merkle_root, change_commitment, unshield_amount]
+    const TEST_PUBLIC_INPUTS: vector<u8> = x"50c899e811771f3b5b77a50bcde42ab8822a6c8b41b57e4cea8f0c00645da9262fcfefda413c3b48e0806fb76f38678760d9dc9e23eaecaec3c5c62652982023054567511fffb1f0d4a306850419bc74ff3c12d24dbab06b01a454534b625a2a0046c32300000000000000000000000000000000000000000000000000000000";
 
     // Test commitment (from test input generation)
-    // commitment = Poseidon(NPK, token, value)
+    // commitment = Poseidon(NSK, token, value)
     const TEST_COMMITMENT: vector<u8> = x"589b6f5789efc87da100ca0b91394f7454370d77d4f64569e64bca988b98be2c";
 
     // Test nullifier
@@ -170,8 +171,8 @@ module octopus::pool_tests {
                 &mut pool,
                 TEST_PROOF,
                 TEST_PUBLIC_INPUTS,
-                1_000_000_000,
                 BOB,
+                vector::empty<u8>(), // No change note for this test
                 ctx
             );
 
@@ -196,9 +197,9 @@ module octopus::pool_tests {
             pool::unshield(
                 &mut pool,
                 TEST_PROOF,
-                x"0102030405", // Invalid length (5 bytes, should be 96)
-                1_000_000_000,
+                x"0102030405", // Invalid length (5 bytes, should be 128)
                 BOB,
+                vector::empty<u8>(),
                 ctx
             );
 

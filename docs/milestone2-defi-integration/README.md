@@ -88,7 +88,7 @@ User receives encrypted output note
 
 **Private Inputs:**
 
-- Input notes (NPK, value, token)
+- Input notes (NSK, value, token)
 - Spending key (for nullifier generation)
 - Merkle proofs (path elements, indices)
 - Output randomness
@@ -178,4 +178,4 @@ public entry fun swap_production<TokenIn, TokenOut>(
 4. **Note Management**
    - Scan blockchain for user's encrypted notes
    - Build Merkle proofs for input notes
-   - Select optimal notes to cover swap amount
+   - Select notes to cover swap amount

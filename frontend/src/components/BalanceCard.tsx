@@ -2,7 +2,6 @@
 
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { formatSui } from "@/lib/utils";
-import { DEMO_MODE } from "@/lib/constants";
 
 interface BalanceCardProps {
   shieldedBalance: bigint;
@@ -66,11 +65,6 @@ export function BalanceCard({
                 </svg>
               </button>
             )}
-            {DEMO_MODE && (
-              <span className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase border border-yellow-600 text-yellow-500 clip-corner font-mono">
-                DEMO
-              </span>
-            )}
           </div>
         </div>
 
@@ -80,17 +74,21 @@ export function BalanceCard({
           </div>
         ) : (
           <>
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className={`text-5xl font-black text-cyber-blue text-cyber tabular-nums ${isRefreshing ? "opacity-40" : ""}`}>
-                {formatSui(shieldedBalance)}
-              </span>
-              <span className={`text-xl text-gray-500 font-mono uppercase tracking-wider ${isRefreshing ? "opacity-40" : ""}`}>
-                SUI
-              </span>
+            <div className="mb-3 relative min-h-[60px]">
+              {!isRefreshing && (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-5xl font-black text-cyber-blue text-cyber tabular-nums">
+                    {formatSui(shieldedBalance)}
+                  </span>
+                  <span className="text-xl text-gray-500 font-mono uppercase tracking-wider">
+                    SUI
+                  </span>
+                </div>
+              )}
               {isRefreshing && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pt-1">
                   <svg
-                    className="animate-spin h-5 w-5 text-cyber-blue"
+                    className="animate-spin h-8 w-8 text-cyber-blue flex-shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                   >
@@ -109,16 +107,20 @@ export function BalanceCard({
                     />
                   </svg>
                   <span className="text-sm text-cyber-blue font-mono font-bold animate-pulse">
-                    SCANNING BLOCKCHAIN...
+                    SEARCHING FOR NOTES UNDER THE SEA...
                   </span>
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />
-              <p className="text-xs text-gray-500 font-mono">
-                [{noteCount} {noteCount === 1 ? "NOTE" : "NOTES"}]
-              </p>
+            <div className="flex items-center gap-2 min-h-[20px]">
+              {!isRefreshing && (
+                <>
+                  <div className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />
+                  <p className="text-xs text-gray-500 font-mono">
+                    [{noteCount} {noteCount === 1 ? "NOTE" : "NOTES"}]
+                  </p>
+                </>
+              )}
             </div>
           </>
         )}

@@ -29,7 +29,10 @@ export {
   computeZeroHashes,
   computeMerkleRoot,
   deriveViewingPublicKey,
-  mpkToViewingPublicKeyUnsafe,
+  exportViewingPublicKey,
+  importViewingPublicKey,
+  isValidViewingPublicKey,
+  encryptNoteExplicit,
   encryptNote,
   decryptNote,
 } from "./crypto.js";

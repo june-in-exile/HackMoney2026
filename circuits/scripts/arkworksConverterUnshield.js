@@ -116,7 +116,7 @@ const vkBytes = Buffer.concat([
 console.log("Verifying Key (hex):");
 console.log(vkBytes.toString("hex"));
 console.log(`\nVK length: ${vkBytes.length} bytes`);
-console.log(`IC points: ${ic_points.length} (expected: 4 for 3 public inputs)`);
+console.log(`IC points: ${ic_points.length} (expected: 3 for 2 public inputs)`);
 
 // === Proof ===
 const pi_a = compressG1(proof.pi_a);
@@ -130,12 +130,12 @@ console.log(proofBytes.toString("hex"));
 console.log(`\nProof length: ${proofBytes.length} bytes`);
 
 // === Public Inputs ===
-// Order: merkle_root, nullifier, commitment
+// Order: merkle_root, nullifier (commitment is now computed inside circuit)
 const publicInputsBytes = Buffer.concat(publicInputs.map(p => convertPublicInput(p)));
 
 console.log("\nPublic Inputs (hex):");
 console.log(publicInputsBytes.toString("hex"));
-console.log(`\nPublic inputs length: ${publicInputsBytes.length} bytes (${publicInputs.length} inputs)`);
+console.log(`\nPublic inputs length: ${publicInputsBytes.length} bytes (${publicInputs.length} inputs, expected: 2)`);
 
 // === Write outputs ===
 fs.writeFileSync(path.join(baseDir, "../build/unshield_vk_bytes.hex"), vkBytes.toString("hex"));
@@ -157,4 +157,3 @@ console.log(`\nconst TEST_PUBLIC_INPUTS: vector<u8> = x"${publicInputsBytes.toSt
 console.log("\n=== Individual Public Inputs ===");
 console.log(`merkle_root: ${publicInputs[0]}`);
 console.log(`nullifier: ${publicInputs[1]}`);
-console.log(`commitment: ${publicInputs[2]}`);

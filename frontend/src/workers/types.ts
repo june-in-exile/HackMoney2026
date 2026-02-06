@@ -28,6 +28,10 @@ export interface InitRequest {
 
 /**
  * Scan notes from blockchain (query events + decrypt + build tree)
+ *
+ * PHASE 2 OPTIMIZATION: Incremental Scanning
+ * - Supports resuming from last scan position via cursors
+ * - Accepts cached commitments to avoid rebuilding entire Merkle tree
  */
 export interface ScanNotesRequest {
   type: "scan_notes";
@@ -121,6 +125,9 @@ export interface ScanNotesResponse {
     nullifier: string; // BigInt as string
     txDigest: string;
   }>;
+
+  // Total notes in pool (ShieldEvents - UnshieldEvents)
+  totalNotesInPool?: number;
 }
 
 /**
@@ -181,6 +188,7 @@ export interface ProgressResponse {
   current: number;
   total: number;
   message: string;
+  totalNotesInPool?: number; // Available after event query completes
 }
 
 // ============================================================================
@@ -191,7 +199,7 @@ export interface ProgressResponse {
  * Serialized note with BigInt → string conversion
  */
 export interface SerializedNote {
-  npk: string; // BigInt as string
+  nsk: string; // BigInt as string
   token: string; // BigInt as string
   value: string; // BigInt as string
   random: string; // BigInt as string

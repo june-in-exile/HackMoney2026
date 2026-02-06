@@ -16,6 +16,7 @@ import {
   decryptNote as sdkDecryptNote,
   computeNullifier as sdkComputeNullifier,
   initPoseidon as sdkInitPoseidon,
+  bytesToBigIntLE_BN254,
   type Note,
 } from "@octopus/sdk";
 import { SuiGraphQLClient } from "@mysten/sui/graphql";
@@ -84,7 +85,7 @@ function decryptNote(
     if (!note) return null;
 
     return {
-      npk: note.npk.toString(),
+      nsk: note.nsk.toString(),
       token: note.token.toString(),
       value: note.value.toString(),
       random: note.random.toString(),
@@ -136,14 +137,22 @@ class ClientMerkleTree {
 
   /**
    * Compute zero hashes for empty nodes
-   * zeros[0] = Poseidon(0, 0)
-   * zeros[i] = Poseidon(zeros[i-1], zeros[i-1])
+   * MUST match Move contract logic (merkle_tree.move:compute_zeros)!
+   *
+   * zeros[0] = 0 (32 zero bytes, not a hash)
+   * zeros[1] = Poseidon(0, 0)
+   * zeros[i] = Poseidon(zeros[i-1], zeros[i-1]) for i = 2..depth
+   *
+   * Returns array of length depth + 1 (17 elements for depth 16)
    */
   private computeZeroHashes(): bigint[] {
     const zeros: bigint[] = [];
-    zeros[0] = hash([0n, 0n]);
 
-    for (let i = 1; i < this.depth; i++) {
+    // Level 0: empty leaf (32 zero bytes → 0)
+    zeros[0] = 0n;
+
+    // Compute hash for each level: zeros[1] to zeros[depth]
+    for (let i = 1; i <= this.depth; i++) {
       zeros[i] = hash([zeros[i - 1], zeros[i - 1]]);
     }
 
@@ -248,67 +257,173 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           txDigest: string;
         }> = [];
 
+        // Collect all commitments for Merkle tree construction
         const allCommitments: Array<{
           commitment: bigint;
           leafIndex: number;
         }> = [];
 
-        // Query ShieldEvents using GraphQL with timeout
-        const shieldQueryStart = Date.now();
-        const shieldQuery = await withTimeout(
-          client.query({
-            query: graphql(`
-              query ShieldEvents($eventType: String!, $first: Int) {
-                events(first: $first, filter: { type: $eventType }) {
-                  pageInfo {
-                    hasNextPage
-                    endCursor
-                  }
-                  nodes {
-                    transactionModule {
-                      package { address }
-                    }
-                    contents {
-                      json
-                    }
-                    transaction {
-                      digest
-                    }
-                  }
-                }
-              }
-            `),
-            variables: {
-              eventType: `${request.packageId}::pool::ShieldEvent`,
-              first: 10,
-            },
-          }),
-          30000, // 30 second timeout for GraphQL query
-          'ShieldEvents GraphQL query'
-        ).catch(err => {
-          console.error('[Worker] ShieldEvents query failed:', err.message);
-          throw err;
-        });
+        // ========================================================================
+        // OPTIMIZATION 1: Parallel Query + Larger Page Size
+        // Query Shield and Transfer events in parallel (50% faster)
+        // ========================================================================
+        const queryStart = Date.now();
 
-        const shieldQueryTime = Date.now() - shieldQueryStart;
-        if (shieldQueryTime > 10000) {
-          console.warn(`[Worker] ShieldEvents query took ${shieldQueryTime}ms`);
+        // Send initial progress
+        postMessage({
+          type: "progress",
+          id: request.id,
+          current: 0,
+          total: 100,
+          message: "Starting to scan blockchain events...",
+        } as WorkerResponse);
+
+        // Helper function to query events with pagination
+        async function queryEvents(
+          eventType: string,
+          eventName: string
+        ): Promise<{ nodes: any[]; lastCursor: string | null }> {
+          let allNodes: any[] = [];
+          let hasNextPage = true;
+          let cursor: string | null = null;
+          let pageCount = 0;
+
+          while (hasNextPage) {
+            pageCount++;
+            const query: any = await withTimeout(
+              client.query({
+                query: graphql(`
+                  query Events($eventType: String!, $first: Int, $after: String) {
+                    events(first: $first, after: $after, filter: { type: $eventType }) {
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                      nodes {
+                        transactionModule {
+                          package { address }
+                        }
+                        contents {
+                          json
+                        }
+                        transaction {
+                          digest
+                        }
+                      }
+                    }
+                  }
+                `),
+                variables: {
+                  eventType,
+                  first: 50, // Maximum allowed by Sui GraphQL
+                  after: cursor,
+                },
+              }),
+              30000,
+              `${eventName} GraphQL query`
+            ).catch(err => {
+              throw err;
+            });
+
+            const nodes = query.data?.events?.nodes || [];
+            allNodes.push(...nodes);
+
+            hasNextPage = query.data?.events?.pageInfo?.hasNextPage || false;
+            cursor = query.data?.events?.pageInfo?.endCursor || null;
+
+            // Safety limit: stop after 10 pages (500 events total)
+            if (pageCount >= 10) {
+              break;
+            }
+          }
+
+          return { nodes: allNodes, lastCursor: cursor };
         }
 
-        // Process Shield events
-        let shieldNotesDecrypted = 0;
-        for (const node of shieldQuery.data?.events?.nodes || []) {
+        // Parallel query of Shield, Transfer, and Unshield events
+        const [shieldResult, transferResult, unshieldResult] = await Promise.all([
+          queryEvents(
+            `${request.packageId}::pool::ShieldEvent`,
+            'ShieldEvents'
+          ),
+          queryEvents(
+            `${request.packageId}::pool::TransferEvent`,
+            'TransferEvents'
+          ),
+          queryEvents(
+            `${request.packageId}::pool::UnshieldEvent`,
+            'UnshieldEvents'
+          ),
+        ]);
+
+        const allShieldNodes = shieldResult.nodes;
+        const allTransferNodes = transferResult.nodes;
+        const allUnshieldNodes = unshieldResult.nodes;
+
+        const queryTime = Date.now() - queryStart;
+
+        // Calculate total notes in pool: Shield events - Unshield events
+        // IMPORTANT: Filter BOTH shield and unshield events by pool_id to only count events from this pool
+        const shieldEventsInPool = allShieldNodes.filter((node) => {
           const eventData = node.contents?.json as any;
-          if (!eventData) continue; // Skip if no event data
+          return eventData?.pool_id === request.poolId;
+        });
+        const unshieldEventsInPool = allUnshieldNodes.filter((node) => {
+          const eventData = node.contents?.json as any;
+          return eventData?.pool_id === request.poolId;
+        });
+
+        // DEBUG: Log unshield events to diagnose filtering issue
+        console.log(`[Worker] 🔍 DEBUG Unshield Events:`);
+        console.log(`  - Total unshield events found: ${allUnshieldNodes.length}`);
+        console.log(`  - Target pool ID: ${request.poolId}`);
+        allUnshieldNodes.forEach((node, idx) => {
+          const eventData = node.contents?.json as any;
+          console.log(`  - Unshield #${idx}: pool_id = ${eventData?.pool_id} (match: ${eventData?.pool_id === request.poolId})`);
+        });
+        console.log(`  - Unshield events in pool after filter: ${unshieldEventsInPool.length}`);
+
+        const totalNotesInPool = shieldEventsInPool.length - unshieldEventsInPool.length;
+
+        // Progress: Query complete - send totalNotesInPool immediately
+        postMessage({
+          type: "progress",
+          id: request.id,
+          current: 30,
+          total: 100,
+          message: `Found ${allShieldNodes.length + allTransferNodes.length} events, decrypting notes... (This pool: ${shieldEventsInPool.length} shields - ${unshieldEventsInPool.length} unshields = ${totalNotesInPool} notes)`,
+          totalNotesInPool, // Send immediately after event query
+        } as WorkerResponse);
+
+        const shieldQueryTime = queryTime; // For backward compatibility
+
+        // ========================================================================
+        // Process Shield events
+        // ========================================================================
+        const decryptStart = Date.now();
+        let shieldNotesDecrypted = 0;
+        let shieldNotesAttempted = 0;
+        let shieldNotesSkippedNoData = 0;
+        let shieldNotesSkippedWrongPool = 0;
+
+        for (const node of allShieldNodes) {
+          const eventData = node.contents?.json as any;
+          if (!eventData) {
+            shieldNotesSkippedNoData++;
+            continue; // Skip if no event data
+          }
 
           // Filter by pool_id - only process events from the target pool
           if (eventData.pool_id && eventData.pool_id !== request.poolId) {
+            shieldNotesSkippedWrongPool++;
             continue; // Skip events from other pools
           }
 
           const encrypted_note = eventData.encrypted_note;
           const position = eventData.position;
           const commitment = eventData.commitment;
+
+          shieldNotesAttempted++;
 
           // Decode encrypted_note from Base64 if needed
           let encryptedNoteBytes: number[];
@@ -317,7 +432,17 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           } else if (Array.isArray(encrypted_note)) {
             encryptedNoteBytes = encrypted_note;
           } else {
+            console.warn(`[Worker] Shield event ${position}: encrypted_note has unexpected type`, typeof encrypted_note);
             continue;
+          }
+
+          // Log first few attempts for debugging
+          if (shieldNotesAttempted <= 3) {
+            console.log(`[Worker] 🔓 Attempting to decrypt Shield note #${position}`);
+            console.log(`  - Encrypted length: ${encryptedNoteBytes.length} bytes`);
+            console.log(`  - Pool ID: ${eventData.pool_id}`);
+            console.log(`  - Commitment: ${commitment}`);
+            console.log(`  - Your MPK: ${request.masterPublicKey.substring(0, 20)}...`);
           }
 
           // Try to decrypt
@@ -335,6 +460,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               leafIndex
             );
 
+            console.log(`[Worker] ✅ Successfully decrypted Shield note #${position}!`);
+            console.log(`  - NSK: ${note.nsk.substring(0, 20)}...`);
+            console.log(`  - Token: ${note.token}`);
+            console.log(`  - Value: ${note.value}`);
+            console.log(`  - Nullifier: ${nullifier.substring(0, 20)}...`);
+
             ownedNotes.push({
               note,
               leafIndex,
@@ -342,12 +473,19 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
               nullifier,
               txDigest: (node.transaction as any)?.digest || "",
             });
+          } else if (shieldNotesAttempted <= 3) {
+            console.log(`[Worker] ❌ Failed to decrypt Shield note #${position} (not owned by this keypair)`);
           }
 
           // Collect all commitments for Merkle tree
           try {
+            // Decode commitment from Base64 (if string) and convert using LE + BN254 modulus
+            const commitmentBytes = typeof commitment === 'string'
+              ? Array.from(Buffer.from(commitment, 'base64'))
+              : commitment;
+
             allCommitments.push({
-              commitment: bytesToBigInt(commitment),
+              commitment: bytesToBigIntLE_BN254(commitmentBytes),
               leafIndex: Number(position),
             });
           } catch (err) {
@@ -355,56 +493,23 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           }
         }
 
-        // Query TransferEvents using GraphQL with timeout
-        const transferQueryStart = Date.now();
-        const transferQuery = await withTimeout(
-          client.query({
-            query: graphql(`
-              query TransferEvents($eventType: String!, $first: Int) {
-                events(first: $first, filter: { type: $eventType }) {
-                  pageInfo {
-                    hasNextPage
-                    endCursor
-                  }
-                  nodes {
-                    transactionModule {
-                      package { address }
-                    }
-                    contents {
-                      json
-                    }
-                    transaction {
-                      digest
-                    }
-                  }
-                }
-              }
-            `),
-            variables: {
-              eventType: `${request.packageId}::pool::TransferEvent`,
-              first: 10,
-            },
-          }),
-          30000, // 30 second timeout for GraphQL query
-          'TransferEvents GraphQL query'
-        ).catch(err => {
-          console.error('[Worker] TransferEvents query failed:', err.message);
-          throw err;
-        });
 
-        const transferQueryTime = Date.now() - transferQueryStart;
-        if (transferQueryTime > 10000) {
-          console.warn(`[Worker] TransferEvents query took ${transferQueryTime}ms`);
-        }
-
-        // Process Transfer events
+        // Process Transfer events (already fetched in parallel above)
         let transferNotesDecrypted = 0;
-        for (const node of transferQuery.data?.events?.nodes || []) {
+        let transferNotesAttempted = 0;
+        let transferNotesSkippedNoData = 0;
+        let transferNotesSkippedWrongPool = 0;
+
+        for (const node of allTransferNodes) {
           const eventData = node.contents?.json as any;
-          if (!eventData) continue; // Skip if no event data
+          if (!eventData) {
+            transferNotesSkippedNoData++;
+            continue; // Skip if no event data
+          }
 
           // Filter by pool_id - only process events from the target pool
           if (eventData.pool_id && eventData.pool_id !== request.poolId) {
+            transferNotesSkippedWrongPool++;
             continue; // Skip events from other pools
           }
 
@@ -413,6 +518,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           const output_commitments = eventData.output_commitments;
 
           for (let i = 0; i < encrypted_notes.length; i++) {
+            transferNotesAttempted++;
             // Decode encrypted_note from Base64 if needed
             let encryptedNoteBytes: number[];
             if (typeof encrypted_notes[i] === 'string') {
@@ -448,8 +554,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
             // Collect all commitments
             try {
+              // Decode commitment from Base64 (if string) and convert using LE + BN254 modulus
+              const commitmentBytes = typeof output_commitments[i] === 'string'
+                ? Array.from(Buffer.from(output_commitments[i], 'base64'))
+                : output_commitments[i];
+
               allCommitments.push({
-                commitment: bytesToBigInt(output_commitments[i]),
+                commitment: bytesToBigIntLE_BN254(commitmentBytes),
                 leafIndex: Number(output_positions[i]),
               });
             } catch (err) {
@@ -458,12 +569,62 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           }
         }
 
+        const decryptTime = Date.now() - decryptStart;
+
+        // DIAGNOSTIC: Log scan statistics
+        const totalEventsScanned = shieldNotesAttempted + transferNotesAttempted;
+        const totalNotesDecrypted = shieldNotesDecrypted + transferNotesDecrypted;
+
+        console.log('\n[Worker] 📊 === SCAN STATISTICS ===');
+        console.log(`Shield Events:`);
+        console.log(`  - Total found: ${allShieldNodes.length}`);
+        console.log(`  - Attempted to decrypt: ${shieldNotesAttempted}`);
+        console.log(`  - Successfully decrypted: ${shieldNotesDecrypted}`);
+        console.log(`  - Skipped (no data): ${shieldNotesSkippedNoData}`);
+        console.log(`  - Skipped (wrong pool): ${shieldNotesSkippedWrongPool}`);
+        console.log(`Transfer Events:`);
+        console.log(`  - Total found: ${allTransferNodes.length}`);
+        console.log(`  - Attempted to decrypt: ${transferNotesAttempted}`);
+        console.log(`  - Successfully decrypted: ${transferNotesDecrypted}`);
+        console.log(`  - Skipped (no data): ${transferNotesSkippedNoData}`);
+        console.log(`  - Skipped (wrong pool): ${transferNotesSkippedWrongPool}`);
+        console.log(`Unshield Events:`);
+        console.log(`  - Total found: ${allUnshieldNodes.length}`);
+        console.log(`  - In this pool: ${unshieldEventsInPool.length}`);
+        console.log(`Pool Statistics:`);
+        console.log(`  - Shield events in pool: ${shieldEventsInPool.length}`);
+        console.log(`  - Unshield events in pool: ${unshieldEventsInPool.length}`);
+        console.log(`  - Total notes in pool: ${totalNotesInPool} (Shield - Unshield)`);
+        console.log(`Results:`);
+        console.log(`  - Owned notes found: ${ownedNotes.length}`);
+        console.log(`  - Total commitments: ${allCommitments.length}`);
+        console.log(`  - Target Pool ID: ${request.poolId}`);
+        console.log(`  - Your MPK: ${request.masterPublicKey}`);
+        console.log('================================\n');
+
+        // Progress: Decryption complete with detailed statistics
+        postMessage({
+          type: "progress",
+          id: request.id,
+          current: 60,
+          total: 100,
+          message: `Scanned ${totalEventsScanned} events (${shieldNotesAttempted} Shield, ${transferNotesAttempted} Transfer) → Decrypted ${totalNotesDecrypted} notes (${shieldNotesDecrypted} Shield, ${transferNotesDecrypted} Transfer)`,
+        } as WorkerResponse);
+
+        // ========================================================================
         // Build Merkle tree
+        // ========================================================================
+        const merkleStart = Date.now();
         if (allCommitments.length > 0) {
+          // Sort commitments by leafIndex to ensure proper insertion order
+          allCommitments.sort((a, b) => a.leafIndex - b.leafIndex);
+
           const tree = new ClientMerkleTree();
           for (const { commitment, leafIndex } of allCommitments) {
             tree.insert(leafIndex, commitment);
           }
+
+          const merkleRoot = tree.getRoot();
 
           // Generate proofs for owned notes
           for (const ownedNote of ownedNotes) {
@@ -484,10 +645,20 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           }
         }
 
+        // Progress: Complete
+        postMessage({
+          type: "progress",
+          id: request.id,
+          current: 100,
+          total: 100,
+          message: `Scan complete! Found ${ownedNotes.length} notes.`,
+        } as WorkerResponse);
+
         const response: WorkerResponse = {
           type: "scan_notes_result",
           id: request.id,
           notes: ownedNotes,
+          totalNotesInPool, // Total notes in pool = Shield - Unshield
         };
         postMessage(response);
         break;
@@ -604,101 +775,4 @@ function decodeBase64(input: string): number[] {
   } catch (err) {
     throw new Error(`Failed to decode Base64 string: ${input}`);
   }
-}
-
-/**
- * Utility: Convert byte array to BigInt (little-endian as used by Move)
- * Handles multiple input formats:
- * - number[] (direct byte array)
- * - string (hex string with or without 0x prefix, or Base64)
- * - object with nested structure
- */
-function bytesToBigInt(input: any): bigint {
-  let bytes: number[];
-
-  // Handle different input formats
-  if (Array.isArray(input)) {
-    // Already a byte array
-    bytes = input;
-  } else if (typeof input === 'string') {
-    // Check if it's Base64 (contains +, /, or = characters, or non-hex characters)
-    const isBase64 = /[+/=]/.test(input) || !/^(0x)?[0-9a-fA-F]+$/.test(input);
-
-    if (isBase64) {
-      // Base64 string - decode it
-      try {
-        // Use built-in atob (browser) or Buffer (Node.js)
-        const binaryString = typeof atob !== 'undefined'
-          ? atob(input)
-          : Buffer.from(input, 'base64').toString('binary');
-
-        bytes = Array.from(binaryString, char => char.charCodeAt(0));
-      } catch (err) {
-        throw new Error(`Failed to decode Base64 string: ${input}`);
-      }
-    } else {
-      // Hex string (with or without 0x prefix)
-      const hexStr = input.startsWith('0x') ? input.slice(2) : input;
-
-      // Validate hex string
-      if (!/^[0-9a-fA-F]+$/.test(hexStr)) {
-        throw new Error(`Invalid hex string: ${input}`);
-      }
-
-      // Convert hex to bytes (big-endian first, as hex strings are typically big-endian)
-      bytes = [];
-      for (let i = 0; i < hexStr.length; i += 2) {
-        bytes.push(parseInt(hexStr.slice(i, i + 2), 16));
-      }
-    }
-  } else if (typeof input === 'object' && input !== null) {
-    // Try to extract bytes from object (might have nested structure)
-    console.warn('[bytesToBigInt] Received object, attempting to extract bytes:', input);
-
-    // Try common field names
-    if ('bytes' in input) {
-      return bytesToBigInt(input.bytes);
-    } else if ('data' in input) {
-      return bytesToBigInt(input.data);
-    } else if ('value' in input) {
-      return bytesToBigInt(input.value);
-    } else {
-      throw new Error(`Unsupported object format: ${JSON.stringify(input)}`);
-    }
-  } else {
-    throw new Error(`Cannot convert ${typeof input} to BigInt: ${input}`);
-  }
-
-  // Validate byte array
-  if (!Array.isArray(bytes) || bytes.length === 0) {
-    throw new Error(`Invalid byte array: ${bytes}`);
-  }
-
-  // Ensure all elements are valid numbers
-  for (let i = 0; i < bytes.length; i++) {
-    if (typeof bytes[i] !== 'number' || bytes[i] < 0 || bytes[i] > 255) {
-      throw new Error(`Invalid byte at index ${i}: ${bytes[i]} (type: ${typeof bytes[i]})`);
-    }
-  }
-
-  // Pad or trim to exactly 32 bytes
-  while (bytes.length < 32) {
-    bytes.push(0);
-  }
-  if (bytes.length > 32) {
-    bytes = bytes.slice(0, 32);
-  }
-
-  // Convert byte array to BigInt
-  // Base64-decoded bytes are in big-endian order (most significant byte first)
-  // So we read from index 0 (MSB) to index 31 (LSB)
-  let result = 0n;
-  for (let i = 0; i < 32; i++) {
-    result = (result << 8n) | BigInt(bytes[i]);
-  }
-
-  const SCALAR_MODULUS = BigInt(
-    "21888242871839275222246405745257275088548364400416034343698204186575808495617"
-  );
-  return result % SCALAR_MODULUS;
 }

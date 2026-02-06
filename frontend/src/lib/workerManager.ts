@@ -19,6 +19,7 @@ import type {
 type PendingRequest = {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
+  onProgress?: (progress: { current: number; total: number; message: string }) => void;
 };
 
 class NoteScanWorkerManager {
@@ -105,7 +106,16 @@ class NoteScanWorkerManager {
       }
 
       case "progress": {
-        // TODO: Implement progress callback system
+        // Call progress callback if registered
+        const request = this.pendingRequests.get(response.id);
+        if (request?.onProgress) {
+          request.onProgress({
+            current: response.current,
+            total: response.total,
+            message: response.message,
+            totalNotesInPool: response.totalNotesInPool, // Pass through immediately
+          });
+        }
         break;
       }
     }
@@ -114,7 +124,15 @@ class NoteScanWorkerManager {
   /**
    * Send request to worker
    */
-  private sendRequest<T>(request: WorkerRequest): Promise<T> {
+  private sendRequest<T>(
+    request: WorkerRequest,
+    onProgress?: (progress: {
+      current: number;
+      total: number;
+      message: string;
+      totalNotesInPool?: number;
+    }) => void
+  ): Promise<T> {
     if (!this.worker) {
       return Promise.reject(new Error("Worker not initialized"));
     }
@@ -122,7 +140,7 @@ class NoteScanWorkerManager {
     const id = "id" in request ? request.id : "init";
 
     return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject });
+      this.pendingRequests.set(id, { resolve, reject, onProgress });
       this.worker!.postMessage(request);
 
       // Timeout after 90s (allows for 2x 30s GraphQL queries + processing time)
@@ -151,37 +169,52 @@ class NoteScanWorkerManager {
     poolId: string,
     spendingKey: bigint,
     nullifyingKey: bigint,
-    masterPublicKey: bigint
-  ): Promise<
-    Array<{
+    masterPublicKey: bigint,
+    options?: {
+      onProgress?: (progress: {
+        current: number;
+        total: number;
+        message: string;
+        totalNotesInPool?: number;
+      }) => void;
+    }
+  ): Promise<{
+    notes: Array<{
       note: SerializedNote;
       leafIndex: number;
       pathElements: bigint[];
       nullifier: bigint;
       txDigest: string;
-    }>
-  > {
+    }>;
+    totalNotesInPool?: number;
+  }> {
     // Ensure worker is initialized before sending request
     await this.initialize();
 
-    const response = await this.sendRequest<ScanNotesResponse>({
-      type: "scan_notes",
-      id: this.generateId(),
-      graphqlUrl,
-      packageId,
-      poolId,
-      spendingKey: spendingKey.toString(),
-      nullifyingKey: nullifyingKey.toString(),
-      masterPublicKey: masterPublicKey.toString(),
-    });
+    const response = await this.sendRequest<ScanNotesResponse>(
+      {
+        type: "scan_notes",
+        id: this.generateId(),
+        graphqlUrl,
+        packageId,
+        poolId,
+        spendingKey: spendingKey.toString(),
+        nullifyingKey: nullifyingKey.toString(),
+        masterPublicKey: masterPublicKey.toString(),
+      },
+      options?.onProgress
+    );
 
-    return response.notes.map((n) => ({
-      note: n.note,
-      leafIndex: n.leafIndex,
-      pathElements: n.pathElements.map((p) => BigInt(p)),
-      nullifier: BigInt(n.nullifier),
-      txDigest: n.txDigest,
-    }));
+    return {
+      notes: response.notes.map((n) => ({
+        note: n.note,
+        leafIndex: n.leafIndex,
+        pathElements: n.pathElements.map((p) => BigInt(p)),
+        nullifier: BigInt(n.nullifier),
+        txDigest: n.txDigest,
+      })),
+      totalNotesInPool: response.totalNotesInPool,
+    };
   }
 
   /**

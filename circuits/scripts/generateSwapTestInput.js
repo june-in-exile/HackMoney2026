@@ -36,12 +36,12 @@ async function main() {
     const input1_value = "5000000000"; // 5 SUI (9 decimals)
     const input1_leaf_index = "0"; // First leaf position
 
-    const input1_npk = hash([mpk, input1_random]);
-    const input1_commitment = hash([input1_npk, token_in, input1_value]);
+    const input1_nsk = hash([mpk, input1_random]);
+    const input1_commitment = hash([input1_nsk, token_in, input1_value]);
     const input1_nullifier = hash([nullifying_key, input1_leaf_index]);
 
     console.log("\nInput Note 1 (SUI):");
-    console.log("  NPK:", input1_npk);
+    console.log("  NSK:", input1_nsk);
     console.log("  Value:", input1_value, "(5 SUI)");
     console.log("  Commitment:", input1_commitment);
     console.log("  Nullifier:", input1_nullifier);
@@ -51,12 +51,12 @@ async function main() {
     const input2_value = "3000000000"; // 3 SUI (9 decimals)
     const input2_leaf_index = "1"; // Second leaf position
 
-    const input2_npk = hash([mpk, input2_random]);
-    const input2_commitment = hash([input2_npk, token_in, input2_value]);
+    const input2_nsk = hash([mpk, input2_random]);
+    const input2_commitment = hash([input2_nsk, token_in, input2_value]);
     const input2_nullifier = hash([nullifying_key, input2_leaf_index]);
 
     console.log("\nInput Note 2 (SUI):");
-    console.log("  NPK:", input2_npk);
+    console.log("  NSK:", input2_nsk);
     console.log("  Value:", input2_value, "(3 SUI)");
     console.log("  Commitment:", input2_commitment);
     console.log("  Nullifier:", input2_nullifier);
@@ -82,11 +82,11 @@ async function main() {
     const output_random = "33333333333333333333333333333333333333333333333333";
     const output_value = "6000000";        // Actual swap result: 6 USDC (6 decimals)
 
-    const output_npk = hash([mpk, output_random]); // Send to self (or recipient's MPK)
-    const output_commitment = hash([output_npk, token_out, output_value]);
+    const output_nsk = hash([mpk, output_random]); // Send to self (or recipient's MPK)
+    const output_commitment = hash([output_nsk, token_out, output_value]);
 
     console.log("\nOutput Note (USDC):");
-    console.log("  NPK:", output_npk);
+    console.log("  NSK:", output_nsk);
     console.log("  Value:", output_value, "(6 USDC)");
     console.log("  Commitment:", output_commitment);
 
@@ -94,11 +94,11 @@ async function main() {
     const change_value = (total_input - BigInt(amount_in)).toString(); // 8 - 6 = 2 SUI
     const change_random = "44444444444444444444444444444444444444444444444444";
 
-    const change_npk = hash([mpk, change_random]);
-    const change_commitment = hash([change_npk, token_in, change_value]);
+    const change_nsk = hash([mpk, change_random]);
+    const change_commitment = hash([change_nsk, token_in, change_value]);
 
     console.log("\nChange Note (SUI):");
-    console.log("  NPK:", change_npk);
+    console.log("  NSK:", change_nsk);
     console.log("  Value:", change_value, "(2 SUI)");
     console.log("  Commitment:", change_commitment);
 
@@ -117,7 +117,7 @@ async function main() {
     const zeros = [];
     zeros[0] = hash(["0", "0"]);
     for (let i = 1; i < LEVELS; i++) {
-        zeros[i] = hash([zeros[i-1], zeros[i-1]]);
+        zeros[i] = hash([zeros[i - 1], zeros[i - 1]]);
     }
     console.log("\nZero hashes computed");
 
@@ -151,7 +151,7 @@ async function main() {
         nullifying_key,
 
         // Input notes
-        input_npks: [input1_npk, input2_npk],
+        input_nsks: [input1_nsk, input2_nsk],
         input_values: [input1_value, input2_value],
         input_randoms: [input1_random, input2_random],
         input_leaf_indices: [input1_leaf_index, input2_leaf_index],
@@ -165,12 +165,12 @@ async function main() {
         dex_pool_id,
 
         // Output note
-        output_npk,
+        output_nsk,
         output_value,
         output_random,
 
         // Change note
-        change_npk,
+        change_nsk,
         change_value,
         change_random,
 

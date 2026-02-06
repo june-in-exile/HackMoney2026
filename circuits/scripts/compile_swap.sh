@@ -6,6 +6,7 @@ CIRCUIT_NAME="swap"
 CIRCUIT_NAME_UPPER=$(echo "$CIRCUIT_NAME" | tr 'a-z' 'A-Z')
 BUILD_DIR="build"
 PTAU_FILE="$BUILD_DIR/pot15_final.ptau"
+FRONTEND="../frontend/public/circuits"
 
 echo "=== Compiling $CIRCUIT_NAME circuit ==="
 
@@ -100,10 +101,10 @@ node scripts/arkworksConverterSwap.js
 
 # Step 11: Copy artifacts to frontend
 echo "[11/12] Copying artifacts to frontend..."
-mkdir -p ../frontend/public/circuits/${CIRCUIT_NAME}_js
-cp ${BUILD_DIR}/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm ../frontend/public/circuits/${CIRCUIT_NAME}_js/
-cp ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ../frontend/public/circuits/
-cp ${BUILD_DIR}/${CIRCUIT_NAME}_vk.json ../frontend/public/circuits/
+mkdir -p ${FRONTEND}/${CIRCUIT_NAME}_js
+cp ${BUILD_DIR}/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm ${FRONTEND}/${CIRCUIT_NAME}_js/
+cp ${BUILD_DIR}/${CIRCUIT_NAME}_final.zkey ${FRONTEND}
+cp ${BUILD_DIR}/${CIRCUIT_NAME}_vk.json ${FRONTEND}
 echo "✓ Artifacts copied to frontend/public/circuits/"
 
 # Step 12: Final summary
@@ -114,7 +115,7 @@ echo ""
 echo "  For FIRST-TIME deployment:"
 echo "    1. Compile all three circuits (unshield, transfer, swap)"
 echo "    2. Deploy the Move package:"
-echo "       cd ../contracts/scripts && ./deploy_package.sh"
+echo "       cd ../../contracts/scripts && ./deploy_package.sh"
 echo "    3. Create the privacy pool with verification keys:"
 echo "       ./create_pool.sh"
 echo ""

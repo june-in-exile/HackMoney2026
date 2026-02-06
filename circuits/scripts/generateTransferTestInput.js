@@ -31,12 +31,12 @@ async function main() {
     const input1_leaf_index = "0"; // First leaf position
     const token = "123456789"; // Token identifier (same for all notes)
 
-    const input1_npk = hash([mpk, input1_random]);
-    const input1_commitment = hash([input1_npk, token, input1_value]);
+    const input1_nsk = hash([mpk, input1_random]);
+    const input1_commitment = hash([input1_nsk, token, input1_value]);
     const input1_nullifier = hash([nullifying_key, input1_leaf_index]);
 
     console.log("\nInput Note 1:");
-    console.log("  NPK:", input1_npk);
+    console.log("  NSK:", input1_nsk);
     console.log("  Value:", input1_value, "(5 SUI)");
     console.log("  Commitment:", input1_commitment);
     console.log("  Nullifier:", input1_nullifier);
@@ -46,12 +46,12 @@ async function main() {
     const input2_value = "3000000000"; // 3 SUI (9 decimals)
     const input2_leaf_index = "1"; // Second leaf position
 
-    const input2_npk = hash([mpk, input2_random]);
-    const input2_commitment = hash([input2_npk, token, input2_value]);
+    const input2_nsk = hash([mpk, input2_random]);
+    const input2_commitment = hash([input2_nsk, token, input2_value]);
     const input2_nullifier = hash([nullifying_key, input2_leaf_index]);
 
     console.log("\nInput Note 2:");
-    console.log("  NPK:", input2_npk);
+    console.log("  NSK:", input2_nsk);
     console.log("  Value:", input2_value, "(3 SUI)");
     console.log("  Commitment:", input2_commitment);
     console.log("  Nullifier:", input2_nullifier);
@@ -63,11 +63,11 @@ async function main() {
     const output1_random = "33333333333333333333333333333333333333333333333333";
     const output1_value = "6000000000"; // 6 SUI to recipient
 
-    const output1_npk = hash([recipient_mpk, output1_random]);
-    const output1_commitment = hash([output1_npk, token, output1_value]);
+    const output1_nsk = hash([recipient_mpk, output1_random]);
+    const output1_commitment = hash([output1_nsk, token, output1_value]);
 
     console.log("\nOutput Note 1 (Recipient):");
-    console.log("  NPK:", output1_npk);
+    console.log("  NSK:", output1_nsk);
     console.log("  Value:", output1_value, "(6 SUI)");
     console.log("  Commitment:", output1_commitment);
 
@@ -75,11 +75,11 @@ async function main() {
     const output2_random = "44444444444444444444444444444444444444444444444444";
     const output2_value = "2000000000"; // 2 SUI change back to sender
 
-    const output2_npk = hash([mpk, output2_random]); // Change note uses sender's MPK
-    const output2_commitment = hash([output2_npk, token, output2_value]);
+    const output2_nsk = hash([mpk, output2_random]); // Change note uses sender's MPK
+    const output2_commitment = hash([output2_nsk, token, output2_value]);
 
     console.log("\nOutput Note 2 (Change):");
-    console.log("  NPK:", output2_npk);
+    console.log("  NSK:", output2_nsk);
     console.log("  Value:", output2_value, "(2 SUI)");
     console.log("  Commitment:", output2_commitment);
 
@@ -100,7 +100,7 @@ async function main() {
     const zeros = [];
     zeros[0] = hash(["0", "0"]);
     for (let i = 1; i < LEVELS; i++) {
-        zeros[i] = hash([zeros[i-1], zeros[i-1]]);
+        zeros[i] = hash([zeros[i - 1], zeros[i - 1]]);
     }
     console.log("\nZero hashes computed");
 
@@ -144,14 +144,14 @@ async function main() {
         nullifying_key,
 
         // Input notes
-        input_npks: [input1_npk, input2_npk],
+        input_nsks: [input1_nsk, input2_nsk],
         input_values: [input1_value, input2_value],
         input_randoms: [input1_random, input2_random],
         input_leaf_indices: [input1_leaf_index, input2_leaf_index],
         input_path_elements: [input1_path_elements, input2_path_elements],
 
         // Output notes
-        output_npks: [output1_npk, output2_npk],
+        output_nsks: [output1_nsk, output2_nsk],
         output_values: [output1_value, output2_value],
         output_randoms: [output1_random, output2_random],
 

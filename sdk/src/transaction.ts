@@ -56,13 +56,16 @@ export function buildShieldTransaction<T extends string>(
 
 /**
  * Build an unshield transaction (for manual signing)
+ *
+ * Note: The amount is NOT a separate parameter - it's embedded in the public inputs.
+ * The contract extracts it from bytes 96-127 of public_inputs_bytes.
+ * To see the actual amount, check the UnshieldEvent in the transaction events.
  */
 export function buildUnshieldTransaction<T extends string>(
   packageId: string,
   poolId: string,
   coinType: T,
   proof: SuiUnshieldProof,
-  amount: bigint,
   recipient: string
 ): Transaction {
   const tx = new Transaction();
@@ -74,8 +77,8 @@ export function buildUnshieldTransaction<T extends string>(
       tx.object(poolId),
       tx.pure.vector("u8", Array.from(proof.proofBytes)),
       tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
-      tx.pure.u64(amount),
       tx.pure.address(recipient),
+      tx.pure.vector("u8", Array.from(proof.encryptedChangeNote)),
     ],
   });
 

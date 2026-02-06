@@ -15,7 +15,7 @@ import {
   type OctopusKeypair,
   type Note,
 } from "./types.js";
-import { bigIntToBE32, bytesToBigIntBE } from "./utils/bytes.js";
+import { bigIntToBE32, bytesToBigIntBE, bytesToHex, hexToBytes } from "./utils/bytes.js";
 
 let poseidonInstance: Poseidon | null = null;
 
@@ -91,8 +91,8 @@ export function generateKeypair(): OctopusKeypair {
  * Create a new note (UTXO)
  *
  * Formula:
- * - NPK = Poseidon(MPK, random)
- * - commitment = Poseidon(NPK, token, value)
+ * - NSK = Poseidon(MPK, random)
+ * - commitment = Poseidon(NSK, token, value)
  */
 export function createNote(
   recipientMpk: bigint,
@@ -101,11 +101,11 @@ export function createNote(
   random?: bigint
 ): Note {
   const r = random ?? randomFieldElement();
-  const npk = poseidonHash([recipientMpk, r]);
-  const commitment = poseidonHash([npk, token, value]);
+  const nsk = poseidonHash([recipientMpk, r]);
+  const commitment = poseidonHash([nsk, token, value]);
 
   return {
-    npk,
+    nsk,
     token,
     value,
     random: r,
@@ -127,14 +127,22 @@ export function computeNullifier(
 
 /**
  * Compute zero hashes for empty Merkle tree nodes
- * zeros[0] = Poseidon(0, 0)
- * zeros[i] = Poseidon(zeros[i-1], zeros[i-1])
+ * MUST match Move contract logic (merkle_tree.move:compute_zeros)!
+ *
+ * zeros[0] = 0 (32 zero bytes, not a hash)
+ * zeros[1] = Poseidon(0, 0)
+ * zeros[i] = Poseidon(zeros[i-1], zeros[i-1]) for i = 2..TREE_DEPTH
+ *
+ * Returns array of length TREE_DEPTH + 1 (17 elements for depth 16)
  */
 export function computeZeroHashes(): bigint[] {
   const zeros: bigint[] = [];
-  zeros[0] = poseidonHash([0n, 0n]);
 
-  for (let i = 1; i < MERKLE_TREE_DEPTH; i++) {
+  // Level 0: empty leaf (32 zero bytes → 0)
+  zeros[0] = 0n;
+
+  // Compute hash for each level: zeros[1] to zeros[TREE_DEPTH]
+  for (let i = 1; i <= MERKLE_TREE_DEPTH; i++) {
     zeros[i] = poseidonHash([zeros[i - 1], zeros[i - 1]]);
   }
 
@@ -206,32 +214,101 @@ export function deriveViewingPublicKey(spendingKey: bigint): Uint8Array {
 }
 
 /**
- * TEMPORARY: Derive viewing public key from MPK (for MVP testing only)
+ * Export viewing public key in shareable hex format
  *
- * ⚠️ WARNING: This is NOT secure for production use!
- * This function deterministically derives a viewing public key from MPK.
- * The problem is that anyone with MPK can compute this public key, but only
- * the owner (with spending key) can derive the matching private key to decrypt.
+ * Converts the X25519 viewing public key to a 64-character hex string
+ * that can be shared with others for encrypted note sending.
  *
- * For production, recipients should explicitly share their viewing public key.
- * This function exists only to enable MVP testing without complex key sharing.
+ * @param spendingKey - User's spending key
+ * @returns 64-character hex string (no "0x" prefix)
  *
- * @deprecated Use proper viewing public key sharing instead
+ * @example
+ * const viewingKeyHex = exportViewingPublicKey(keypair.spendingKey);
+ * // Share viewingKeyHex with senders via secure channel
  */
-export function mpkToViewingPublicKeyUnsafe(mpk: bigint): Uint8Array {
-  // Hash MPK to create a deterministic seed
-  const seed = sha256(bigIntToBE32(mpk));
+export function exportViewingPublicKey(spendingKey: bigint): string {
+  const viewingPk = deriveViewingPublicKey(spendingKey);
+  return bytesToHex(viewingPk);
+}
 
-  // Treat seed as X25519 private scalar
-  const privateKey = new Uint8Array(32);
-  privateKey.set(seed);
+/**
+ * Import viewing public key from hex string format
+ *
+ * Converts a 64-character hex string back to a Uint8Array viewing public key
+ * for use in note encryption.
+ *
+ * @param hexString - 64-character hex string (with or without "0x" prefix)
+ * @returns Viewing public key as Uint8Array (32 bytes)
+ * @throws Error if format is invalid
+ *
+ * @example
+ * const recipientViewingPk = importViewingPublicKey("a1b2c3d4...");
+ * const encrypted = encryptNote(note, recipientViewingPk);
+ */
+export function importViewingPublicKey(hexString: string): Uint8Array {
+  const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
 
-  // Clamp to valid X25519 scalar
-  privateKey[0] &= 248;
-  privateKey[31] &= 127;
-  privateKey[31] |= 64;
+  if (cleanHex.length !== 64) {
+    throw new Error(
+      `Invalid viewing public key format: expected 64 hex characters, got ${cleanHex.length}`
+    );
+  }
 
-  return x25519.getPublicKey(privateKey);
+  if (!/^[0-9a-fA-F]{64}$/.test(cleanHex)) {
+    throw new Error(
+      'Invalid viewing public key format: must contain only hex characters (0-9, a-f, A-F)'
+    );
+  }
+
+  return hexToBytes(cleanHex);
+}
+
+/**
+ * Validate viewing public key hex string format
+ *
+ * Checks if a string is a valid 64-character hex representation
+ * of a viewing public key.
+ *
+ * @param hexString - String to validate
+ * @returns true if valid format, false otherwise
+ *
+ * @example
+ * if (isValidViewingPublicKey(userInput)) {
+ *   const viewingPk = importViewingPublicKey(userInput);
+ * }
+ */
+export function isValidViewingPublicKey(hexString: string): boolean {
+  const cleanHex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
+  return /^[0-9a-fA-F]{64}$/.test(cleanHex);
+}
+
+/**
+ * Encrypt note with explicitly provided viewing public key
+ *
+ * Production-ready encryption that accepts an explicit viewing public key
+ * instead of deriving it from MPK. This is the recommended approach for
+ * cross-user transfers.
+ *
+ * @param note - Note to encrypt
+ * @param recipientViewingPk - Recipient's viewing public key (Uint8Array or hex string)
+ * @returns Encrypted note data (188 bytes)
+ *
+ * @example
+ * // Option 1: Use Uint8Array directly
+ * const encrypted = encryptNoteExplicit(note, recipientViewingPkBytes);
+ *
+ * // Option 2: Use hex string
+ * const encrypted = encryptNoteExplicit(note, "a1b2c3d4...");
+ */
+export function encryptNoteExplicit(
+  note: Note,
+  recipientViewingPk: Uint8Array | string
+): Uint8Array {
+  const viewingPk = typeof recipientViewingPk === 'string'
+    ? importViewingPublicKey(recipientViewingPk)
+    : recipientViewingPk;
+
+  return encryptNote(note, viewingPk);
 }
 
 /**
@@ -267,9 +344,9 @@ export function encryptNote(
   const info = new TextEncoder().encode("octopus-note-encryption-v1");
   const encryptionKey = hkdf(sha256, sharedSecret, undefined, info, 32);
 
-  // 4. Serialize note data (npk || token || value || random, each 32 bytes)
+  // 4. Serialize note data (nsk || token || value || random, each 32 bytes)
   const noteData = new Uint8Array(128);
-  noteData.set(bigIntToBE32(note.npk), 0);
+  noteData.set(bigIntToBE32(note.nsk), 0);
   noteData.set(bigIntToBE32(note.token), 32);
   noteData.set(bigIntToBE32(note.value), 64);
   noteData.set(bigIntToBE32(note.random), 96);
@@ -301,7 +378,7 @@ export function encryptNote(
  * 2. Compute shared secret via ECDH with our viewing private key
  * 3. Derive decryption key using HKDF-SHA256
  * 4. Decrypt with ChaCha20-Poly1305
- * 5. Verify note ownership by recomputing NPK
+ * 5. Verify note ownership by recomputing NSK
  *
  * @param encryptedData - Encrypted note (ephemeral_pk || nonce || ciphertext)
  * @param mySpendingKey - Our spending key (to derive viewing private key)
@@ -331,7 +408,7 @@ export function decryptNote(
     const ciphertext = data.slice(44);
 
     // 2. Derive our viewing private key
-    const { privateKey: myViewingSk } = deriveViewingKeypair(mySpendingKey);
+    const { privateKey: myViewingSk, publicKey: myViewingPk } = deriveViewingKeypair(mySpendingKey);
 
     // 3. Perform ECDH to get shared secret
     const sharedSecret = x25519.getSharedSecret(myViewingSk, ephemeralPk);
@@ -345,23 +422,23 @@ export function decryptNote(
     const noteData = cipher.decrypt(ciphertext);
 
     // 6. Parse decrypted data
-    const npk = bytesToBigIntBE(noteData.slice(0, 32));
+    const nsk = bytesToBigIntBE(noteData.slice(0, 32));
     const token = bytesToBigIntBE(noteData.slice(32, 64));
     const value = bytesToBigIntBE(noteData.slice(64, 96));
     const random = bytesToBigIntBE(noteData.slice(96, 128));
 
-    // 7. Verify ownership by recomputing NPK
-    // If this note belongs to us, NPK should equal Poseidon(myMpk, random)
+    // 7. Verify ownership by recomputing NSK
+    // If this note belongs to us, NSK should equal Poseidon(myMpk, random)
     const expectedNpk = poseidonHash([myMpk, random]);
-    if (expectedNpk !== npk) {
+    if (expectedNpk !== nsk) {
       return null; // Not our note
     }
 
     // 8. Recompute commitment to verify data integrity
-    const commitment = poseidonHash([npk, token, value]);
+    const commitment = poseidonHash([nsk, token, value]);
 
     return {
-      npk,
+      nsk,
       token,
       value,
       random,

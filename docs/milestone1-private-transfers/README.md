@@ -19,32 +19,6 @@ Enable private peer-to-peer transfers between shielded addresses without exiting
 - Enables privacy-preserving payments and commerce
 - Foundation for all other privacy features (DeFi, relayer network)
 
-## ⚠️ MVP Limitations & Warnings
-
-### 1. Viewing Key Derivation from MPK (Temporary)
-
-**Problem:**
-In production, users should share their viewing public key explicitly. However, for MVP testing simplicity, we use `mpkToViewingPublicKeyUnsafe(mpk)` which deterministically derives a viewing public key from MPK.
-
-**Why This is NOT Secure:**
-
-- Anyone with recipient's MPK can compute their viewing public key
-- However, only the owner (with spending key) can derive the matching private key to decrypt
-- This creates a chicken-and-egg problem for proper ECDH
-
-**For Production:**
-
-- Recipients should export and share their viewing public key: `deriveViewingPublicKey(spendingKey)`
-- Senders use the explicitly shared viewing PK for encryption
-- Update UI to accept viewing PK as input (64-char hex string)
-
-**Current Code:**
-
-```typescript
-// ⚠️ TEMPORARY - MVP only!
-const recipientViewingPk = mpkToViewingPublicKeyUnsafe(recipientMpkBigInt);
-```
-
 ### 2. Decryption Requires Spending Key
 
 **Current Behavior:**

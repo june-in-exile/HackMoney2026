@@ -75,12 +75,18 @@ module octopus::pool {
 
     /// Event emitted when tokens are unshielded (withdrawn) from the pool
     public struct UnshieldEvent has copy, drop {
+        /// Pool ID where the unshield occurred
+        pool_id: ID,
         /// Nullifier that was spent
         nullifier: vector<u8>,
         /// Recipient address
         recipient: address,
         /// Amount withdrawn
         amount: u64,
+        /// Change commitment (0 if no change)
+        change_commitment: vector<u8>,
+        /// Position of change commitment in Merkle tree (0 if no change)
+        change_position: u64,
     }
 
     /// Event emitted when tokens are transferred privately within the pool
@@ -212,8 +218,8 @@ module octopus::pool {
     ///
     /// The commitment is computed off-chain using the following formulas:
     /// - MPK = Poseidon(spending_key, nullifying_key)
-    /// - NPK = Poseidon(MPK, random)
-    /// - commitment = Poseidon(NPK, token, value)
+    /// - NSK = Poseidon(MPK, random)
+    /// - commitment = Poseidon(NSK, token, value)
     ///
     /// The encrypted_note allows the recipient to scan and identify their notes.
     public fun shield<T>(
@@ -570,39 +576,45 @@ module octopus::pool {
         */
     }
 
-    /// Unshield tokens from the privacy pool with ZK proof verification.
+    /// Unshield tokens from the privacy pool with ZK proof verification and automatic change handling.
     ///
     /// The ZK proof proves:
     /// 1. Knowledge of spending_key and nullifying_key (ownership)
-    /// 2. Correct commitment computation
+    /// 2. Input note commitment exists in Merkle tree
     /// 3. Correct nullifier computation: nullifier = Poseidon(nullifying_key, leaf_index)
-    /// 4. Commitment exists in Merkle tree at the claimed position
+    /// 4. Balance conservation: input_value = unshield_amount + change_value
+    /// 5. Correct change commitment computation (if change exists)
     ///
-    /// Public inputs format (96 bytes total):
-    /// - merkle_root (32 bytes): Merkle tree root
+    /// Public inputs format (128 bytes total):
     /// - nullifier (32 bytes): Unique identifier preventing double-spend
-    /// - commitment (32 bytes): The note commitment being spent
+    /// - merkle_root (32 bytes): Merkle tree root
+    /// - change_commitment (32 bytes): Commitment for change note (0 if no change)
+    /// - unshield_amount (32 bytes): Amount to withdraw (as field element)
     public fun unshield<T>(
         pool: &mut PrivacyPool<T>,
         proof_bytes: vector<u8>,
         public_inputs_bytes: vector<u8>,
-        amount: u64,
         recipient: address,
+        encrypted_change_note: vector<u8>,
         ctx: &mut TxContext,
     ) {
-        // Validate public inputs length (3 field elements × 32 bytes = 96 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 96, E_INVALID_PUBLIC_INPUTS);
+        // Validate public inputs length (4 field elements × 32 bytes = 128 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 128, E_INVALID_PUBLIC_INPUTS);
 
-        // 1. Parse public inputs [merkle_root, nullifier, commitment]
-        let (merkle_root, nullifier_bytes, _commitment) = parse_public_inputs(&public_inputs_bytes);
+        // 1. Parse public inputs [nullifier, merkle_root, change_commitment, unshield_amount]
+        let (merkle_root, nullifier_bytes, unshield_amount_bytes, change_commitment) =
+            parse_unshield_public_inputs(&public_inputs_bytes);
 
-        // 2. Verify merkle root is valid (current or in history)
+        // 2. Convert unshield_amount from field element to u64
+        let amount = field_element_to_u64(&unshield_amount_bytes);
+
+        // 3. Verify merkle root is valid (current or in history)
         assert!(is_valid_root(pool, &merkle_root), E_INVALID_ROOT);
 
-        // 3. Check nullifier has not been spent (prevent double-spend)
+        // 4. Check nullifier has not been spent (prevent double-spend)
         assert!(!nullifier::is_spent(&pool.nullifiers, nullifier_bytes), E_DOUBLE_SPEND);
 
-        // 4. Verify Groth16 ZK proof
+        // 5. Verify Groth16 ZK proof
         let pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool.vk_bytes);
         let public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
         let proof_points = groth16::proof_points_from_bytes(proof_bytes);
@@ -612,19 +624,43 @@ module octopus::pool {
             E_INVALID_PROOF
         );
 
-        // 5. Mark nullifier as spent
+        // 6. Mark nullifier as spent
         nullifier::mark_spent(&mut pool.nullifiers, nullifier_bytes);
 
-        // 6. Transfer tokens to recipient
+        // 7. Transfer tokens to recipient
         assert!(balance::value(&pool.balance) >= amount, E_INSUFFICIENT_BALANCE);
         let withdrawn = coin::take(&mut pool.balance, amount, ctx);
         transfer::public_transfer(withdrawn, recipient);
 
-        // 7. Emit event
+        // 8. Handle change note (if any)
+        let mut change_position = 0u64;
+        if (!is_zero_commitment(&change_commitment)) {
+            // Save current root to history before inserting change
+            save_historical_root(pool);
+
+            // Get position before inserting (next_index is the position where leaf will be inserted)
+            change_position = merkle_tree::get_next_index(&pool.merkle_tree);
+
+            // Insert change commitment into Merkle tree
+            merkle_tree::insert(&mut pool.merkle_tree, change_commitment);
+
+            // Emit shield event for change note (so user can scan it)
+            event::emit(ShieldEvent {
+                pool_id: object::id(pool),
+                position: change_position,
+                commitment: change_commitment,
+                encrypted_note: encrypted_change_note,
+            });
+        };
+
+        // 9. Emit event
         event::emit(UnshieldEvent {
+            pool_id: object::id(pool),
             nullifier: nullifier_bytes,
             recipient,
-            amount
+            amount,
+            change_commitment,
+            change_position,
         });
     }
 
@@ -683,33 +719,80 @@ module octopus::pool {
         false
     }
 
-    /// Parse public inputs from concatenated bytes (for unshield).
-    /// Returns (merkle_root, nullifier, commitment) each as 32-byte vectors.
-    fun parse_public_inputs(bytes: &vector<u8>): (vector<u8>, vector<u8>, vector<u8>) {
-        let mut merkle_root = vector::empty<u8>();
+    /// Parse unshield public inputs from concatenated bytes (for unshield with change).
+    /// Returns (merkle_root, nullifier, unshield_amount, change_commitment) each as 32-byte vectors.
+    ///
+    /// Public signals from circuit (128 bytes total):
+    /// - nullifier (32 bytes): Output signal - Unique identifier preventing double-spend
+    /// - merkle_root (32 bytes): Output signal - Merkle tree root
+    /// - change_commitment (32 bytes): Output signal - Commitment for change note (0 if no change)
+    /// - unshield_amount (32 bytes): Public input - Amount to unshield (as field element)
+    fun parse_unshield_public_inputs(bytes: &vector<u8>): (vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
         let mut nullifier = vector::empty<u8>();
-        let mut commitment = vector::empty<u8>();
+        let mut merkle_root = vector::empty<u8>();
+        let mut change_commitment = vector::empty<u8>();
+        let mut unshield_amount_bytes = vector::empty<u8>();
 
-        // Extract merkle_root (bytes 0-31)
+        // Extract nullifier (bytes 0-31)
         let mut i = 0;
         while (i < 32) {
-            vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        // Extract nullifier (bytes 32-63)
-        while (i < 64) {
             vector::push_back(&mut nullifier, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
-        // Extract commitment (bytes 64-95)
-        while (i < 96) {
-            vector::push_back(&mut commitment, *vector::borrow(bytes, i));
+        // Extract merkle_root (bytes 32-63)
+        while (i < 64) {
+            vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
-        (merkle_root, nullifier, commitment)
+        // Extract change_commitment (bytes 64-95)
+        while (i < 96) {
+            vector::push_back(&mut change_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract unshield_amount (bytes 96-127)
+        while (i < 128) {
+            vector::push_back(&mut unshield_amount_bytes, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        (merkle_root, nullifier, unshield_amount_bytes, change_commitment)
+    }
+
+    /// Convert 32-byte field element to u64
+    /// Takes the least significant 8 bytes and converts to u64 (little-endian)
+    fun field_element_to_u64(bytes: &vector<u8>): u64 {
+        let mut result = 0u64;
+        let mut multiplier = 1u64;
+
+        // Take first 8 bytes (little-endian)
+        let mut i = 0;
+        while (i < 8) {
+            let byte_val = (*vector::borrow(bytes, i) as u64);
+            result = result + (byte_val * multiplier);
+            // Only update multiplier if we haven't processed the last byte yet
+            if (i < 7) {
+                multiplier = multiplier * 256;
+            };
+            i = i + 1;
+        };
+
+        result
+    }
+
+    /// Check if a commitment is zero (all bytes are 0)
+    fun is_zero_commitment(commitment: &vector<u8>): bool {
+        let len = vector::length(commitment);
+        let mut i = 0;
+        while (i < len) {
+            if (*vector::borrow(commitment, i) != 0u8) {
+                return false
+            };
+            i = i + 1;
+        };
+        true
     }
 
     /// Parse transfer public inputs from concatenated bytes (for transfer).

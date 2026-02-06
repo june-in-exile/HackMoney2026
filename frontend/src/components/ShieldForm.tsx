@@ -7,8 +7,8 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, DEMO_MODE } from "@/lib/constants";
+import { cn, parseSui, formatSui, truncateAddress } from "@/lib/utils";
+import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   createNote,
@@ -18,6 +18,7 @@ import {
   deriveViewingPublicKey
 } from "@octopus/sdk";
 import { initPoseidon } from "@/lib/poseidon";
+import { NumberInput } from "@/components/NumberInput";
 
 interface ShieldFormProps {
   keypair: OctopusKeypair | null;
@@ -28,7 +29,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ message: string; txDigest?: string } | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
@@ -77,7 +78,9 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
+    // Pro-actively parse amount to enable robust checks
+    const numericAmount = parseFloat(amount);
+    if (amount.trim() === '' || isNaN(numericAmount) || numericAmount < 0) {
       setError("Please enter a valid amount");
       return;
     }
@@ -98,15 +101,6 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       // Initialize Poseidon hash function
       await initPoseidon();
 
-      if (DEMO_MODE) {
-        // Simulate shield in demo mode
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setSuccess(`Demo: Shielded ${formatSui(amountMist)} SUI`);
-        setAmount("");
-        await onSuccess?.();
-        return;
-      }
-
       // Create a token identifier for SUI by hashing the coin type
       const tokenId = poseidonHash([BigInt(0x2)]); // Simplified: use 0x2 for SUI
 
@@ -116,6 +110,16 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         tokenId,
         amountMist
       );
+
+      // Debug log for amount = 0 case
+      if (amountMist === 0n) {
+        console.log('=== SHIELD WITH AMOUNT = 0 ===');
+        console.log('Commitment:', note.commitment.toString());
+        console.log('Token ID:', tokenId.toString());
+        console.log('Amount (mist):', amountMist.toString());
+        console.log('Random:', note.random.toString());
+        console.log('Commitment bytes:', Array.from(bigIntToLE32(note.commitment)));
+      }
 
       // Encrypt the note for the recipient (self in this case)
       // Derive viewing public key from spending key
@@ -146,19 +150,20 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
         transaction: tx,
       });
 
-      setSuccess(
-        `Shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}\n` +
-        `Refreshing balance...`
-      );
+      setSuccess({
+        message: `Shielded ${formatSui(amountMist)} SUI!\nRefreshing balance...`,
+        txDigest: result.digest
+      });
       setAmount("");
 
       // Call onSuccess callback to refresh balance
       await onSuccess?.();
 
       // Update success message after refresh completes
-      setSuccess(
-        `Successfully shielded ${formatSui(amountMist)} SUI! TX: ${result.digest}`
-      );
+      setSuccess({
+        message: `Successfully shielded ${formatSui(amountMist)} SUI!`,
+        txDigest: result.digest
+      });
     } catch (err) {
       console.error("Shield failed:", err);
       setError(err instanceof Error ? err.message : "Shield failed");
@@ -190,15 +195,13 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
               </span>
             )}
           </div>
-          <input
+          <NumberInput
             id="shield-amount"
-            type="number"
-            step="0.001"
-            min="0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.000"
-            className="input"
+            onChange={setAmount}
+            placeholder="0.000000000"
+            step={0.000000001}
+            min={0}
             disabled={isSubmitting}
           />
         </div>
@@ -216,7 +219,23 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
           <div className="p-3 border border-green-600/30 bg-green-900/20 clip-corner">
             <div className="flex items-start gap-2">
               <span className="text-green-500 text-sm">✓</span>
-              <p className="text-xs text-green-400 font-mono leading-relaxed whitespace-pre-wrap">{success}</p>
+              <p className="text-xs text-green-400 font-mono leading-relaxed">
+                {success.message}
+                {success.txDigest && (
+                  <>
+                    {' '}
+                    <a
+                      href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyber-blue hover:text-cyber-blue/80 underline"
+                      title={`View transaction: ${success.txDigest}`}
+                    >
+                      [{truncateAddress(success.txDigest, 6)}]
+                    </a>
+                  </>
+                )}
+              </p>
             </div>
           </div>
         )}
@@ -229,6 +248,11 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
           "btn-primary w-full",
           isSubmitting && "cursor-wait opacity-70"
         )}
+        style={{
+          backgroundColor: 'transparent',
+          color: '#00d9ff',
+          borderColor: '#00d9ff',
+        }}
       >
         {isSubmitting ? (
           <span className="flex items-center justify-center gap-2">
