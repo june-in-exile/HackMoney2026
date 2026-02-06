@@ -1,9 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Header } from "@/components/Header";
 
 export default function DeveloperPage() {
+  const [debugMessage, setDebugMessage] = useState<string | null>(null);
+
+  const handleClearSpentNotes = () => {
+    try {
+      // Find all localStorage keys related to spent nullifiers
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('octopus_spent_nullifiers_')) {
+          keysToRemove.push(key);
+        }
+      }
+
+      // Remove all spent nullifier records
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+
+      setDebugMessage(`✅ Cleared ${keysToRemove.length} spent nullifier record(s). Please refresh the page to re-scan your notes.`);
+    } catch (err) {
+      setDebugMessage(`❌ Error: ${err instanceof Error ? err.message : 'Failed to clear cache'}`);
+    }
+  };
   return (
     <div className="min-h-screen">
       <Header />
@@ -426,7 +450,7 @@ export default function DeveloperPage() {
         </div>
 
         {/* Note Encryption */}
-        <div className="card">
+        <div className="card mb-8">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-1 h-6 bg-gradient-to-b from-cyber-purple to-transparent" />
             <h2 className="text-xl font-black uppercase tracking-wider text-cyber-purple">
@@ -466,6 +490,107 @@ export default function DeveloperPage() {
                   <li>Decrypt with ChaCha20</li>
                   <li>Reconstruct note parameters</li>
                 </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Debug Tools */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 bg-gradient-to-b from-red-500 to-transparent" />
+            <h2 className="text-xl font-black uppercase tracking-wider text-red-400">
+              🔧 DEBUG TOOLS
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded">
+              <h3 className="text-sm font-bold text-yellow-400 mb-2 uppercase">⚠️ Warning</h3>
+              <p className="text-xs text-gray-400 font-mono">
+                These tools are for debugging only. Use with caution in development/testing environments.
+              </p>
+            </div>
+
+            <div className="border border-gray-800 p-4 clip-corner">
+              <h3 className="text-sm font-bold text-red-400 mb-3 uppercase">Clear Spent Notes Cache</h3>
+              <p className="text-xs text-gray-400 font-mono mb-4">
+                If you're encountering E_DOUBLE_SPEND errors or notes appear incorrectly marked as spent,
+                this tool will clear the localStorage cache and force a re-sync with on-chain state.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleClearSpentNotes}
+                  className="btn-primary w-full md:w-auto"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: '#ef4444',
+                    borderColor: '#ef4444',
+                  }}
+                >
+                  🗑️ CLEAR SPENT NOTES CACHE
+                </button>
+
+                {debugMessage && (
+                  <div className={`p-3 border rounded ${
+                    debugMessage.startsWith('✅')
+                      ? 'border-green-500/30 bg-green-500/10'
+                      : 'border-red-500/30 bg-red-500/10'
+                  }`}>
+                    <p className={`text-xs font-mono ${
+                      debugMessage.startsWith('✅') ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {debugMessage}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 p-3 bg-gray-900/50 border border-gray-800 rounded">
+                <h4 className="text-xs font-bold text-gray-300 mb-2 uppercase">What This Does:</h4>
+                <ul className="text-xs text-gray-400 font-mono space-y-1 list-disc list-inside">
+                  <li>Removes all cached spent nullifier records from localStorage</li>
+                  <li>Forces the app to re-query on-chain spent status</li>
+                  <li>Fixes incorrect "already spent" errors</li>
+                  <li>Safe to use - on-chain state is the source of truth</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="border border-gray-800 p-4 clip-corner">
+              <h3 className="text-sm font-bold text-red-400 mb-3 uppercase">Common Issues & Solutions</h3>
+
+              <div className="space-y-3">
+                <div className="bg-gray-900/50 border border-gray-800 rounded p-3">
+                  <h4 className="text-xs font-bold text-yellow-400 mb-1">E_DOUBLE_SPEND Error</h4>
+                  <p className="text-xs text-gray-400 font-mono mb-2">
+                    <span className="text-red-400">Symptom:</span> Transfer fails with "E_DOUBLE_SPEND" error
+                  </p>
+                  <p className="text-xs text-gray-400 font-mono">
+                    <span className="text-green-400">Solution:</span> Clear spent notes cache, then refresh the page
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/50 border border-gray-800 rounded p-3">
+                  <h4 className="text-xs font-bold text-yellow-400 mb-1">No Unspent Notes Available</h4>
+                  <p className="text-xs text-gray-400 font-mono mb-2">
+                    <span className="text-red-400">Symptom:</span> All notes appear spent even after shielding
+                  </p>
+                  <p className="text-xs text-gray-400 font-mono">
+                    <span className="text-green-400">Solution:</span> Clear spent notes cache and wait for re-scan
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/50 border border-gray-800 rounded p-3">
+                  <h4 className="text-xs font-bold text-yellow-400 mb-1">Stale Merkle Proofs</h4>
+                  <p className="text-xs text-gray-400 font-mono mb-2">
+                    <span className="text-red-400">Symptom:</span> "No notes with Merkle proofs available"
+                  </p>
+                  <p className="text-xs text-gray-400 font-mono">
+                    <span className="text-green-400">Solution:</span> Click refresh button in the app to fetch latest proofs
+                  </p>
+                </div>
               </div>
             </div>
           </div>
