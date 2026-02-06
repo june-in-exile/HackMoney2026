@@ -19,7 +19,7 @@ import type {
 type PendingRequest = {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
-  onProgress?: (progress: { current: number; total: number; message: string }) => void;
+  onProgress?: (progress: { current: number; total: number; message: string; totalNotesInPool?: number }) => void;
 };
 
 class NoteScanWorkerManager {

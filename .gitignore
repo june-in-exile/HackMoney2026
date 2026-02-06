@@ -19,3 +19,4 @@ sdk/dist/
 
 # Backup files
 *.backup
+.vercel
