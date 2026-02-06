@@ -267,19 +267,11 @@ export function useNotes(
 
         if (isCancelled) return;
 
-        console.log(`[useNotes] 📦 Received scan results from Worker:`);
-        console.log(`  - Notes received: ${result.notes.length}`);
-        console.log(`  - Total Notes in Pool: ${result.totalNotesInPool ?? 'unknown'}`);
-
         // Collect all nullifiers for batch checking
         const nullifiers = result.notes.map((s) => s.nullifier);
 
-        console.log(`[useNotes] 🔍 Checking spent status for ${nullifiers.length} nullifiers...`);
-
         // Batch check spent status (more efficient than one-by-one)
         const spentMap = await batchCheckNullifierStatus(nullifiers);
-
-        console.log(`[useNotes] ✓ Spent status checked. Found ${Array.from(spentMap.values()).filter(v => v).length} spent notes.`);
 
         // Build OwnedNote array with spent status from batch query
         const newOwnedNotes: OwnedNote[] = [];
@@ -330,10 +322,6 @@ export function useNotes(
           const mergedNotes = Array.from(notesMap.values()).sort(
             (a, b) => a.leafIndex - b.leafIndex
           );
-
-          console.log(`[useNotes] 💾 Updating state with ${mergedNotes.length} notes (merged existing: ${shouldMergeExisting})`);
-          console.log(`  - Unspent notes: ${mergedNotes.filter(n => !n.spent).length}`);
-          console.log(`  - Spent notes: ${mergedNotes.filter(n => n.spent).length}`);
 
           setNotes(mergedNotes);
           // Clear progress after completion
