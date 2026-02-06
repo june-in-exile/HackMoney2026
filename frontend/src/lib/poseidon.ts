@@ -48,18 +48,3 @@ export async function initPoseidon(): Promise<void> {
 
   return globalThis.__OCTOPUS_POSEIDON_INIT_PROMISE__;
 }
-
-/**
- * Check if Poseidon is ready
- */
-export function isPoseidonReady(): boolean {
-  return globalThis.__OCTOPUS_POSEIDON_INITIALIZED__ === true;
-}
-
-/**
- * Reset Poseidon instance (for testing only)
- */
-export function resetPoseidon(): void {
-  globalThis.__OCTOPUS_POSEIDON_INITIALIZED__ = undefined;
-  globalThis.__OCTOPUS_POSEIDON_INIT_PROMISE__ = undefined;
-}

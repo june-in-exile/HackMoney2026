@@ -11,7 +11,6 @@ export const SUI_COIN_TYPE = "0x2::sui::SUI";
 
 // Network configuration
 export const NETWORK = (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
-export const RPC_URL = "https://fullnode.testnet.sui.io:443";
 
 // LocalStorage keys
 export const STORAGE_KEYS = {

@@ -60,50 +60,8 @@ export default function Home() {
   const shieldedBalance = unspentNotes.reduce((sum, n) => sum + n.note.value, 0n);
   const noteCount = unspentNotes.length;
 
-  const handleShieldSuccess = async () => {
-    // Refresh notes and pool info from blockchain after successful shield
-    // Add delay to allow blockchain events to be indexed
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    refreshNotes();
-    refreshPoolInfo();
-
-    // Retry after another delay to ensure we catch the event
-    setTimeout(() => {
-      refreshNotes();
-      refreshPoolInfo();
-    }, 3000);
-  };
-
-  const handleUnshieldSuccess = async () => {
-    // Refresh notes and pool info from blockchain after successful unshield
-    // Add delay to allow blockchain events to be indexed
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    refreshNotes();
-    refreshPoolInfo();
-
-    // Retry after another delay to ensure we catch the event
-    setTimeout(() => {
-      refreshNotes();
-      refreshPoolInfo();
-    }, 3000);
-  };
-
-  const handleTransferSuccess = async () => {
-    // Refresh notes and pool info from blockchain after successful transfer
-    // Add delay to allow blockchain events to be indexed
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    refreshNotes();
-    refreshPoolInfo();
-
-    // Retry after another delay to ensure we catch the event
-    setTimeout(() => {
-      refreshNotes();
-      refreshPoolInfo();
-    }, 3000);
-  };
-
-  const handleSwapSuccess = async () => {
-    // Refresh notes and pool info from blockchain after successful swap
+  const handleOperationSuccess = async () => {
+    // Refresh notes and pool info from blockchain after successful operation
     // Add delay to allow blockchain events to be indexed
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
@@ -316,14 +274,14 @@ export default function Home() {
                 {/* Tab Content */}
                 <div className="p-6">
                   {activeTab === "shield" && (
-                    <ShieldForm keypair={keypair} onSuccess={handleShieldSuccess} />
+                    <ShieldForm keypair={keypair} onSuccess={handleOperationSuccess} />
                   )}
                   {activeTab === "transfer" && (
                     <TransferForm
                       keypair={keypair}
                       notes={notes}
                       loading={isLoadingNotes}
-                      onSuccess={handleTransferSuccess}
+                      onSuccess={handleOperationSuccess}
                       onRefresh={refreshNotes}
                       markNoteSpent={markNoteSpent}
                     />
@@ -334,7 +292,7 @@ export default function Home() {
                       notes={notes}
                       loading={isLoadingNotes}
                       error={notesError}
-                      onSuccess={handleSwapSuccess}
+                      onSuccess={handleOperationSuccess}
                       onRefresh={refreshNotes}
                     />
                   )}
@@ -343,7 +301,7 @@ export default function Home() {
                       keypair={keypair}
                       maxAmount={shieldedBalance}
                       notes={notes}
-                      onSuccess={handleUnshieldSuccess}
+                      onSuccess={handleOperationSuccess}
                       markNoteSpent={markNoteSpent}
                     />
                   )}

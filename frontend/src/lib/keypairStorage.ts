@@ -107,20 +107,6 @@ export function deleteKeypair(
 }
 
 /**
- * Clear all keypairs for a specific wallet address and pool
- */
-export function clearKeypairs(identifier: KeypairIdentifier): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    const key = getStorageKey(identifier);
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error("Failed to clear keypairs:", error);
-  }
-}
-
-/**
  * Get current active keypair for a wallet address and pool
  */
 export function getActiveKeypair(

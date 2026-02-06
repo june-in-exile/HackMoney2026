@@ -354,45 +354,6 @@ export function useNotes(
       }
     }
 
-    // Check if nullifier is spent on-chain
-    async function isNullifierSpent(nullifier: bigint): Promise<boolean> {
-      try {
-        // Query pool object to get nullifier registry ID
-        const poolObject = await client.getObject({
-          id: POOL_ID,
-          options: { showContent: true },
-        });
-
-        if (
-          poolObject.data?.content?.dataType === "moveObject" &&
-          poolObject.data.content.fields
-        ) {
-          const fields = poolObject.data.content.fields as any;
-          const nullifierRegistryId = fields.nullifiers.fields.id.id;
-
-          // Convert nullifier to byte array (big-endian 32 bytes)
-          const nullifierBytes = Array.from(bigIntToBE32(nullifier));
-
-          // Query dynamic field directly from Table
-          const dynamicField = await client.getDynamicFieldObject({
-            parentId: nullifierRegistryId,
-            name: {
-              type: 'vector<u8>',
-              value: nullifierBytes
-            }
-          });
-
-          // If field exists (no error and has data), nullifier is spent
-          return !dynamicField.error && dynamicField.data !== null && dynamicField.data !== undefined;
-        }
-
-        return false;
-      } catch (err) {
-        // If field not found, nullifier is NOT spent (expected for unspent notes)
-        return false; // Assume not spent if check fails
-      }
-    }
-
     scanNotesWithWorker();
 
     return () => {

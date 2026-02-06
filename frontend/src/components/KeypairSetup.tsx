@@ -312,7 +312,7 @@ export function KeypairSetup({
             onClick={() => setShowSecrets(!showSecrets)}
             className="btn-secondary flex-1 text-xs"
           >
-            {showSecrets ? "◄ HIDE" : "► SHOW"} SECRETS
+            {showSecrets ? "▲ HIDE" : "▼ SHOW"} SECRETS
           </button>
           <button
             onClick={onClear}

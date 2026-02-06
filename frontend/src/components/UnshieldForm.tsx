@@ -282,7 +282,7 @@ export function UnshieldForm({
                 TOTAL: {formatSui(maxAmount)}
                 {notes.filter((n: OwnedNote) => !n.spent).length > 1 && (
                   <span className="text-gray-600">
-                    {" "}// {notes.filter((n: OwnedNote) => !n.spent).length} NOTES • Will use multiple if needed
+                    {" "}// {notes.filter((n: OwnedNote) => !n.spent).length} NOTES
                   </span>
                 )}
               </>

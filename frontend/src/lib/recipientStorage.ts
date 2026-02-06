@@ -86,28 +86,3 @@ export function deleteRecipient(walletAddress: string, mpk: string): void {
     localStorage.setItem(key, JSON.stringify(filtered));
   }
 }
-
-/**
- * Find a recipient by MPK
- *
- * @param walletAddress - Current user's wallet address
- * @param mpk - Master Public Key to search for
- * @returns Recipient profile if found, null otherwise
- */
-export function findRecipient(
-  walletAddress: string,
-  mpk: string
-): RecipientProfileStored | null {
-  const recipients = getRecipients(walletAddress);
-  return recipients.find((r) => r.mpk === mpk) || null;
-}
-
-/**
- * Clear all saved recipients for a wallet address
- *
- * @param walletAddress - Current user's wallet address
- */
-export function clearAllRecipients(walletAddress: string): void {
-  const key = getStorageKey(walletAddress);
-  localStorage.removeItem(key);
-}
