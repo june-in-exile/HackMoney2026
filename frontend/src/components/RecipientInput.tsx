@@ -169,7 +169,7 @@ export function RecipientInput({
 
       <div>
         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
-          Recipient Viewing Public Key
+          Recipient Viewing Public Key (VPK)
         </label>
         <input
           type="text"
@@ -229,7 +229,7 @@ export function RecipientInput({
                 className="btn-primary text-xs py-2 px-4"
                 disabled={disabled}
               >
-                Confirm Save
+                Save
               </button>
               <button
                 type="button"
@@ -246,13 +246,6 @@ export function RecipientInput({
           )}
         </div>
       )}
-
-      {/* Info Box */}
-      <div className="p-3 border border-cyber-blue/30 bg-cyber-blue/10 clip-corner">
-        <p className="text-[10px] text-gray-300 font-mono leading-relaxed">
-          <span className="text-cyber-blue font-bold">REQUIRED:</span> Both MPK and Viewing Key are needed for encrypted transfers
-        </p>
-      </div>
     </div>
   );
 }

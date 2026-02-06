@@ -57,12 +57,12 @@ User (Browser) ← TX Confirmation ← Relayer Server
    - Returns transaction hash to user
 
 2. **Fee Mechanism:** User reimburses relayer via:
-   - Additional output note to relayer's NPK
+   - Additional output note to relayer's NSK
    - Fee amount = gas_cost * (1 + fee_premium)
    - Default premium: 10% (configurable per relayer)
 
 3. **Relayer Registry:** On-chain registry of:
-   - Active relayers (address + NPK)
+   - Active relayers (address + NSK)
    - Fee rates
    - Reputation/uptime metrics
    - Stake requirements (anti-spam)
@@ -147,7 +147,7 @@ interface FeeQuoteResponse {
 ```typescript
 interface RelayerInfo {
   address: string;         // Relayer's Sui address
-  npk: string;            // Relayer's note public key (for fee payments)
+  nsk: string;            // Relayer's note secret key (for fee payments)
   feePremium: number;     // Current fee premium
   uptime: number;         // Percentage (0-100)
   totalTransactions: number;
@@ -229,7 +229,7 @@ No contract changes needed! Relayers simply submit transactions on behalf of use
 ```typescript
 export interface RelayerConfig {
   url: string;
-  npk: bigint;
+  nsk: bigint;
   feePremium: number;
 }
 
@@ -260,7 +260,7 @@ export class RelayerClient {
 
     // 2. Create fee payment note to relayer
     const feeNoteToRelayer = createNote(
-      this.config.npk,
+      this.config.nsk,
       transaction.tokenType,
       quote.totalFee
     );
@@ -276,7 +276,7 @@ export class RelayerClient {
         signature,
         feeNote: {
           commitment: feeNoteToRelayer.commitment,
-          encryptedNote: encryptNote(feeNoteToRelayer, this.config.npk),
+          encryptedNote: encryptNote(feeNoteToRelayer, this.config.nsk),
         },
       }),
     });
@@ -354,7 +354,7 @@ module octopus::relayer_registry {
     }
 
     struct RelayerInfo has store {
-        npk: vector<u8>,          // Note public key (32 bytes)
+        nsk: vector<u8>,          // Note secret key (32 bytes)
         fee_premium_bps: u64,     // Basis points (1000 = 10%)
         stake: u64,               // Staked SUI (anti-spam)
         total_txs: u64,
@@ -364,7 +364,7 @@ module octopus::relayer_registry {
 
     public entry fun register_relayer(
         registry: &mut RelayerRegistry,
-        npk: vector<u8>,
+        nsk: vector<u8>,
         fee_premium_bps: u64,
         stake: Coin<SUI>,
         ctx: &mut TxContext
@@ -374,7 +374,7 @@ module octopus::relayer_registry {
 
         let relayer_addr = tx_context::sender(ctx);
         table::add(&mut registry.relayers, relayer_addr, RelayerInfo {
-            npk,
+            nsk,
             fee_premium_bps,
             stake: coin::value(&stake),
             total_txs: 0,
@@ -419,7 +419,7 @@ export async function fetchRelayers(
   return relayers.map(r => ({
     address: r.address,
     url: lookupRelayerUrl(r.address), // From off-chain directory
-    npk: BigInt(r.npk),
+    nsk: BigInt(r.nsk),
     feePremium: r.fee_premium_bps / 10000,
     uptime: calculateUptime(r),
     reputation: calculateReputation(r),

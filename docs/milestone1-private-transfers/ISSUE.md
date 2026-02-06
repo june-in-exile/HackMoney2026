@@ -12,13 +12,13 @@ Transfer failed: Error: Assert Failed. Error in template Transfer_143 line: 82
 **Location:** `circuits/transfer.circom` line 82
 
 ```circom
-input_npks[i] === inputNpkHashers[i].out;
+input_nsks[i] === inputNpkHashers[i].out;
 ```
 
-This constraint verifies that the provided Note Public Key (NPK) matches the computed value:
+This constraint verifies that the provided Note Secret Key (NSK) matches the computed value:
 
 ``` txt
-NPK = Poseidon(MPK, random)
+NSK = Poseidon(MPK, random)
 ```
 
 ### Impact
@@ -37,10 +37,10 @@ When a user selects only 1 note, the SDK (`sdk/src/prover.ts`) creates a "dummy"
 
 ```typescript
 const dummyNote: Note = {
-  npk: 0n,              // ❌ Problem: arbitrary value
+  nsk: 0n,              // ❌ Problem: arbitrary value
   token: token,         // ✅ Fixed: matches transfer token
   value: 0n,            // ✅ Triggers conditional Merkle check bypass
-  random: 0n,           // ❌ Problem: doesn't produce valid NPK
+  random: 0n,           // ❌ Problem: doesn't produce valid NSK
   commitment: poseidonHash([0n, token, 0n])
 };
 ```
@@ -55,26 +55,26 @@ isValueZero[i] = IsZero();
 isValueZero[i].in <== input_values[i];
 enabled[i] <== 1 - isValueZero[i].out;  // 0 for dummy, 1 for real
 
-// Line 82: NPK verification - NOT CONDITIONAL (always verified)
+// Line 82: NSK verification - NOT CONDITIONAL (always verified)
 inputNpkHashers[i] = Poseidon(2);
 inputNpkHashers[i].inputs[0] <== mpk;
 inputNpkHashers[i].inputs[1] <== input_randoms[i];
-input_npks[i] === inputNpkHashers[i].out;  // ❌ Fails for dummy note
+input_nsks[i] === inputNpkHashers[i].out;  // ❌ Fails for dummy note
 
 // Line 110: Merkle root check - CONDITIONAL (bypassed when enabled=0)
 enabled[i] * (merkle_root - inputMerkleProofs[i].root) === 0;  // ✅ Passes for dummy
 ```
 
-**Key Insight:** Only the Merkle root check (line 110) is conditional. All other constraints (NPK verification line 82, commitment computation line 88, nullifier computation line 94) are **always verified** regardless of `value=0`.
+**Key Insight:** Only the Merkle root check (line 110) is conditional. All other constraints (NSK verification line 82, commitment computation line 88, nullifier computation line 94) are **always verified** regardless of `value=0`.
 
 ### Why Dummy Note Fails
 
 For the dummy note:
 
-- Provided NPK: `0n`
+- Provided NSK: `0n`
 - Circuit computes: `Poseidon(MPK, 0n)` where MPK is derived from user's keypair
 - `Poseidon(MPK, 0n) ≠ 0n` in general
-- Constraint `input_npks[i] === inputNpkHashers[i].out` fails ❌
+- Constraint `input_nsks[i] === inputNpkHashers[i].out` fails ❌
 
 ## Fix History
 
@@ -100,18 +100,18 @@ The dummy note was created with `token: 0n`, but the circuit requires all notes 
 #### Result
 
 ✅ Fixed line 110 Merkle root error
-❌ Exposed line 82 NPK verification error (previously masked)
+❌ Exposed line 82 NSK verification error (previously masked)
 
-### Fix 2: NPK Verification (COMPLETED ✅)
+### Fix 2: NSK Verification (COMPLETED ✅)
 
 #### Problem
 
-**Error:** Line 82 - NPK verification failure
+**Error:** Line 82 - NSK verification failure
 
-The dummy note uses `npk: 0n` and `random: 0n`, but the circuit verifies:
+The dummy note uses `nsk: 0n` and `random: 0n`, but the circuit verifies:
 
 ```circom
-input_npks[i] === Poseidon(MPK, input_randoms[i])
+input_nsks[i] === Poseidon(MPK, input_randoms[i])
 0n === Poseidon(MPK, 0n)  // ❌ False
 ```
 
@@ -119,36 +119,36 @@ input_npks[i] === Poseidon(MPK, input_randoms[i])
 
 **Files Modified:** `sdk/src/prover.ts` lines 460-476
 
-Compute a **valid NPK** for the dummy note using the user's MPK:
+Compute a **valid NSK** for the dummy note using the user's MPK:
 
 ```typescript
 // Compute MPK from keypair (same as circuit does)
 const mpk = poseidonHash([keypair.spendingKey, keypair.nullifyingKey]);
 
-// Generate valid NPK for dummy note
+// Generate valid NSK for dummy note
 const dummyRandom = 0n;  // Can be any value
 const dummyNpk = poseidonHash([mpk, dummyRandom]);
 
-// Create dummy note with valid NPK
+// Create dummy note with valid NSK
 const dummyNote: Note = {
-  npk: dummyNpk,           // ✅ Valid: Poseidon(MPK, random)
+  nsk: dummyNpk,           // ✅ Valid: Poseidon(MPK, random)
   token: token,            // ✅ Matches transfer token
   value: 0n,               // ✅ Triggers Merkle bypass
-  random: dummyRandom,     // ✅ Matches NPK computation
+  random: dummyRandom,     // ✅ Matches NSK computation
   commitment: poseidonHash([dummyNpk, token, 0n])  // ✅ Correct commitment
 };
 ```
 
 This ensures all circuit constraints pass:
 
-- ✅ Line 82 (NPK): `dummyNpk === Poseidon(MPK, dummyRandom)`
+- ✅ Line 82 (NSK): `dummyNpk === Poseidon(MPK, dummyRandom)`
 - ✅ Line 88 (Commitment): `commitment === Poseidon(dummyNpk, token, 0n)`
 - ✅ Line 94 (Nullifier): `nullifier === Poseidon(nullifying_key, leaf_index)`
 - ✅ Line 110 (Merkle): Bypassed due to `enabled=0` when `value=0`
 
 #### Result
 
-✅ Fixed line 82 NPK verification error
+✅ Fixed line 82 NSK verification error
 ❌ Exposed line 124 output commitment verification error (previously masked)
 
 ### Fix 3: Output Commitment Token Mismatch (COMPLETED ✅)
@@ -164,7 +164,7 @@ ERROR: 4 Error in template Transfer_143 line: 124
 The circuit computes output commitments as:
 
 ```circom
-outputCommitmentHashers[i].inputs[0] <== output_npks[i];
+outputCommitmentHashers[i].inputs[0] <== output_nsks[i];
 outputCommitmentHashers[i].inputs[1] <== token;
 outputCommitmentHashers[i].inputs[2] <== output_values[i];
 output_commitments[i] === outputCommitmentHashers[i].out;
@@ -172,8 +172,8 @@ output_commitments[i] === outputCommitmentHashers[i].out;
 
 The frontend was creating output notes with `token: 0n` (line 106), but the circuit uses the actual token from the transfer. This caused a mismatch:
 
-- Output note commitment: `Poseidon(NPK, 0n, value)`
-- Circuit computation: `Poseidon(NPK, actualToken, value)`
+- Output note commitment: `Poseidon(NSK, 0n, value)`
+- Circuit computation: `Poseidon(NSK, actualToken, value)`
 - These don't match ❌
 
 #### Solution (Fix 3)
@@ -285,10 +285,10 @@ async handleSubmit() {
 
 ### Option A: Modify Circuit (More Complex)
 
-Make NPK verification conditional like the Merkle check:
+Make NSK verification conditional like the Merkle check:
 
 ```circom
-enabled[i] * (input_npks[i] - inputNpkHashers[i].out) === 0;
+enabled[i] * (input_nsks[i] - inputNpkHashers[i].out) === 0;
 ```
 
 **Pros:**
@@ -306,9 +306,9 @@ enabled[i] * (input_npks[i] - inputNpkHashers[i].out) === 0;
 
 **Decision:** NOT RECOMMENDED - SDK fix is simpler and doesn't require circuit changes.
 
-### Option B: Compute Valid NPK (RECOMMENDED)
+### Option B: Compute Valid NSK (RECOMMENDED)
 
-Generate a valid NPK for the dummy note using user's MPK.
+Generate a valid NSK for the dummy note using user's MPK.
 
 **Pros:**
 
@@ -326,7 +326,7 @@ Generate a valid NPK for the dummy note using user's MPK.
 ## Implementation Status
 
 - [x] Fix 1: Token value (dummy note) - COMPLETED
-- [x] Fix 2: NPK verification (dummy note) - COMPLETED
+- [x] Fix 2: NSK verification (dummy note) - COMPLETED
 - [x] Fix 3: Token value (output notes) - COMPLETED
 - [x] Fix 4: Stale Merkle root (refresh mechanism) - COMPLETED
 - [ ] Testing: Single-input transfer end-to-end
@@ -336,7 +336,7 @@ Generate a valid NPK for the dummy note using user's MPK.
 
 ### Unit Tests
 
-1. Test dummy note creation with valid NPK
+1. Test dummy note creation with valid NSK
 2. Verify commitment computation
 3. Verify all circuit inputs are valid
 
@@ -383,8 +383,8 @@ Generate a valid NPK for the dummy note using user's MPK.
 
 ``` txt
 MPK = Poseidon(spending_key, nullifying_key)
-NPK = Poseidon(MPK, random)
-Commitment = Poseidon(NPK, token, value)
+NSK = Poseidon(MPK, random)
+Commitment = Poseidon(NSK, token, value)
 Nullifier = Poseidon(nullifying_key, leaf_index)
 ```
 

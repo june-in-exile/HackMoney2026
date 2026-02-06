@@ -41,6 +41,7 @@ const config: Config = {
         "ocean-flow": "oceanFlow 20s ease-in-out infinite",
         "marquee": "marquee 30s linear infinite",
         "scan": "scan 4s ease-in-out infinite",
+        "scan-full": "scanFull 5s ease-in-out infinite",
       },
       keyframes: {
         glow: {
@@ -66,6 +67,12 @@ const config: Config = {
           "10%": { opacity: "1" },
           "90%": { opacity: "1" },
           "100%": { transform: "translateY(300%)", opacity: "0" },
+        },
+        scanFull: {
+          "0%": { transform: "translateY(-20px)", opacity: "0" },
+          "5%": { opacity: "1" },
+          "95%": { opacity: "1" },
+          "100%": { transform: "translateY(350px)", opacity: "0" },
         },
       },
       boxShadow: {

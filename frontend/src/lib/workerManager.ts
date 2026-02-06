@@ -113,6 +113,7 @@ class NoteScanWorkerManager {
             current: response.current,
             total: response.total,
             message: response.message,
+            totalNotesInPool: response.totalNotesInPool, // Pass through immediately
           });
         }
         break;
@@ -125,7 +126,12 @@ class NoteScanWorkerManager {
    */
   private sendRequest<T>(
     request: WorkerRequest,
-    onProgress?: (progress: { current: number; total: number; message: string }) => void
+    onProgress?: (progress: {
+      current: number;
+      total: number;
+      message: string;
+      totalNotesInPool?: number;
+    }) => void
   ): Promise<T> {
     if (!this.worker) {
       return Promise.reject(new Error("Worker not initialized"));
@@ -156,10 +162,6 @@ class NoteScanWorkerManager {
 
   /**
    * Public API: Scan notes from blockchain (GraphQL query + decrypt + Merkle tree)
-   *
-   * PHASE 2 OPTIMIZATION: Supports incremental scanning
-   * - Pass in cursors and cached commitments to resume from last scan
-   * - Returns both notes and updated scan state for next scan
    */
   async scanNotes(
     graphqlUrl: string,
@@ -169,10 +171,12 @@ class NoteScanWorkerManager {
     nullifyingKey: bigint,
     masterPublicKey: bigint,
     options?: {
-      startShieldCursor?: string | null;
-      startTransferCursor?: string | null;
-      cachedCommitments?: Array<{ commitment: string; leafIndex: number }>;
-      onProgress?: (progress: { current: number; total: number; message: string }) => void;
+      onProgress?: (progress: {
+        current: number;
+        total: number;
+        message: string;
+        totalNotesInPool?: number;
+      }) => void;
     }
   ): Promise<{
     notes: Array<{
@@ -182,9 +186,7 @@ class NoteScanWorkerManager {
       nullifier: bigint;
       txDigest: string;
     }>;
-    lastShieldCursor: string | null;
-    lastTransferCursor: string | null;
-    allCommitments: Array<{ commitment: string; leafIndex: number }>;
+    totalNotesInPool?: number;
   }> {
     // Ensure worker is initialized before sending request
     await this.initialize();
@@ -199,10 +201,6 @@ class NoteScanWorkerManager {
         spendingKey: spendingKey.toString(),
         nullifyingKey: nullifyingKey.toString(),
         masterPublicKey: masterPublicKey.toString(),
-        // PHASE 2: Pass incremental scan parameters
-        startShieldCursor: options?.startShieldCursor,
-        startTransferCursor: options?.startTransferCursor,
-        cachedCommitments: options?.cachedCommitments,
       },
       options?.onProgress
     );
@@ -215,9 +213,7 @@ class NoteScanWorkerManager {
         nullifier: BigInt(n.nullifier),
         txDigest: n.txDigest,
       })),
-      lastShieldCursor: response.lastShieldCursor,
-      lastTransferCursor: response.lastTransferCursor,
-      allCommitments: response.allCommitments,
+      totalNotesInPool: response.totalNotesInPool,
     };
   }
 

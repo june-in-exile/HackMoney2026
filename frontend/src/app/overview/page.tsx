@@ -1,0 +1,213 @@
+"use client";
+
+import Image from "next/image";
+import { Header } from "@/components/Header";
+
+export default function OverviewPage() {
+  return (
+    <div className="min-h-screen">
+      <Header />
+
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {/* Page Title */}
+        <div className="mb-12 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 border-t-2 border-r-2 border-cyber-blue/30 clip-corner opacity-50" />
+
+          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8">
+            <div className="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-cyber-blue via-cyber-purple to-transparent animate-pulse-slow" />
+
+            <h1 className="text-5xl md:text-6xl font-black tracking-tighter text-cyber-blue uppercase mb-4 text-cyber">
+              PROTOCOL OVERVIEW
+            </h1>
+            <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono max-w-2xl">
+              Understanding how Octopus enables private transactions on Sui
+            </p>
+          </div>
+        </div>
+
+        {/* Concept Diagram */}
+        <div className="card mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 bg-gradient-to-b from-cyber-blue to-transparent" />
+            <h2 className="text-xl font-black uppercase tracking-wider text-cyber-blue">
+              ARCHITECTURE DIAGRAM
+            </h2>
+          </div>
+
+          <div className="bg-white/5 rounded-lg p-6 border border-gray-800">
+            <Image
+              src="/concept.svg"
+              alt="Octopus Protocol Architecture"
+              width={1200}
+              height={800}
+              className="w-full h-auto"
+              priority
+            />
+          </div>
+        </div>
+
+        {/* User Interactions */}
+        <div className="card mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 bg-gradient-to-b from-cyber-blue to-transparent" />
+            <h2 className="text-xl font-black uppercase tracking-wider text-cyber-blue">
+              USER INTERACTIONS
+            </h2>
+          </div>
+
+          <div className="space-y-6">
+            {/* Shield */}
+            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
+                  <span className="text-cyber-blue text-2xl">▲</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                    SHIELD (Deposit)
+                  </h3>
+                  <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
+                    Users deposit tokens into the privacy pool, converting them into encrypted notes.
+                    Each note is represented by a commitment stored in a Merkle tree, making it
+                    indistinguishable from other notes.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/30">
+                      NO ZK PROOF REQUIRED
+                    </span>
+                    <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
+                      ENCRYPTION: ChaCha20-Poly1305
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Transfer */}
+            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
+                  <span className="text-cyber-blue text-2xl">⇄</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                    TRANSFER (Private Payment)
+                  </h3>
+                  <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
+                    Send tokens privately to another user within the pool. The transaction uses a
+                    2-input, 2-output UTXO model with ZK proofs, completely hiding sender, recipient,
+                    and amount from observers.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/30">
+                      ZK PROOF VERIFIED
+                    </span>
+                    <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
+                      CONSTRAINTS: ~21,649
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Swap */}
+            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
+                  <span className="text-cyber-blue text-2xl">⇌</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                    SWAP (Private Exchange)
+                  </h3>
+                  <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
+                    Exchange tokens privately through integrated DEXs. The swap happens within the
+                    privacy pool, maintaining anonymity while leveraging external liquidity sources
+                    like Cetus.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 text-xs font-mono bg-yellow-500/10 text-yellow-500 border border-yellow-500/30">
+                      85% COMPLETE
+                    </span>
+                    <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
+                      CONSTRAINTS: ~22,553
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Unshield */}
+            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
+                  <span className="text-cyber-blue text-2xl">▼</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                    UNSHIELD (Withdraw)
+                  </h3>
+                  <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
+                    Withdraw tokens from the privacy pool using ZK proofs. The proof verifies ownership
+                    without revealing which deposit it came from, breaking the link between deposits
+                    and withdrawals.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/30">
+                      ZK PROOF VERIFIED
+                    </span>
+                    <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
+                      CONSTRAINTS: ~11,000
+                    </span>
+                    <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
+                      AUTO CHANGE NOTES
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Privacy Benefits */}
+        <div className="card">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-1 h-6 bg-gradient-to-b from-cyber-blue to-transparent" />
+            <h2 className="text-xl font-black uppercase tracking-wider text-cyber-blue">
+              PRIVACY GUARANTEES
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="border border-gray-800 p-4 clip-corner">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                SENDER ANONYMITY
+              </h3>
+              <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                ZK proofs hide the sender's identity by not revealing which note is being spent
+              </p>
+            </div>
+
+            <div className="border border-gray-800 p-4 clip-corner">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                RECIPIENT PRIVACY
+              </h3>
+              <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                Output notes are encrypted, only decryptable by the intended recipient
+              </p>
+            </div>
+
+            <div className="border border-gray-800 p-4 clip-corner">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                AMOUNT CONFIDENTIALITY
+              </h3>
+              <p className="text-xs text-gray-400 font-mono leading-relaxed">
+                Transaction amounts are hidden within encrypted notes, not visible on-chain
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

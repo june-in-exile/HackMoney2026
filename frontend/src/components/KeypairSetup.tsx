@@ -4,7 +4,7 @@ import { useState } from "react";
 import { truncateAddress, bigIntToHex } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { StoredKeypair } from "@/lib/keypairStorage";
-import { ViewingKeyDisplay } from "./ViewingKeyDisplay";
+import { exportViewingPublicKey } from "@octopus/sdk";
 
 interface KeypairSetupProps {
   keypair: OctopusKeypair | null;
@@ -26,8 +26,12 @@ export function KeypairSetup({
   onRemove,
 }: KeypairSetupProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showSecrets, setShowSecrets] = useState(false);
   const [showSavedKeypairs, setShowSavedKeypairs] = useState(false);
+  const [copiedMPK, setCopiedMPK] = useState(false);
+  const [copiedVPK, setCopiedVPK] = useState(false);
+  const [showFullMPK, setShowFullMPK] = useState(false);
+  const [showFullVPK, setShowFullVPK] = useState(false);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -37,6 +41,26 @@ export function KeypairSetup({
       console.error("Failed to generate keypair:", error);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleCopyMPK = async (mpkHex: string) => {
+    try {
+      await navigator.clipboard.writeText(mpkHex);
+      setCopiedMPK(true);
+      setTimeout(() => setCopiedMPK(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy MPK:", error);
+    }
+  };
+
+  const handleCopyVPK = async (vpkHex: string) => {
+    try {
+      await navigator.clipboard.writeText(vpkHex);
+      setCopiedVPK(true);
+      setTimeout(() => setCopiedVPK(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy VPK:", error);
     }
   };
 
@@ -188,6 +212,14 @@ export function KeypairSetup({
   }
 
   const mpkHex = bigIntToHex(keypair.masterPublicKey);
+  const vpkHex = exportViewingPublicKey(keypair.spendingKey);
+
+  const displayMPK = showFullMPK
+    ? mpkHex
+    : truncateAddress(mpkHex, 8);
+  const displayVPK = showFullVPK
+    ? vpkHex
+    : `${vpkHex.slice(0, 10)}...${vpkHex.slice(-10)}`;
 
   return (
     <div className="card relative overflow-hidden group">
@@ -210,24 +242,77 @@ export function KeypairSetup({
           </div>
         </div>
 
-        <div className="mb-4 p-3 bg-black/30 border border-gray-800 clip-corner">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
-            Master Public Key
-          </p>
-          <p className="font-mono text-sm text-cyber-blue">
-            {truncateAddress(mpkHex, 8)}
-          </p>
+        {/* Master Public Key */}
+        <div className="mb-3 p-4 border border-gray-700 bg-gray-800/50 clip-corner">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-cyber-blue">
+              Master Public Key
+            </h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowFullMPK(!showFullMPK)}
+                className="btn-secondary text-xs py-2 px-4"
+              >
+                {showFullMPK ? "HIDE" : "SHOW"}
+              </button>
+              <button
+                onClick={() => handleCopyMPK(mpkHex)}
+                className="btn-secondary text-xs py-2 px-4"
+                disabled={copiedMPK}
+              >
+                {copiedMPK ? "✓ COPIED" : "COPY"}
+              </button>
+            </div>
+          </div>
+          <div className="bg-black/50 rounded p-3">
+            <code className="text-xs text-gray-300 font-mono break-all">
+              {displayMPK}
+            </code>
+          </div>
         </div>
 
-        {/* Viewing Key Display */}
-        <ViewingKeyDisplay spendingKey={keypair.spendingKey} />
+        {/* Viewing Public Key */}
+        <div className="mb-4 p-4 border border-gray-700 bg-gray-800/50 clip-corner">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-cyber-blue">
+              Viewing Public Key
+            </h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowFullVPK(!showFullVPK)}
+                className="btn-secondary text-xs py-2 px-4"
+              >
+                {showFullVPK ? "HIDE" : "SHOW"}
+              </button>
+              <button
+                onClick={() => handleCopyVPK(vpkHex)}
+                className="btn-secondary text-xs py-2 px-4"
+                disabled={copiedVPK}
+              >
+                {copiedVPK ? "✓ COPIED" : "COPY"}
+              </button>
+            </div>
+          </div>
+          <div className="bg-black/50 rounded p-3 mb-3">
+            <code className="text-xs text-gray-300 font-mono break-all">
+              {displayVPK}
+            </code>
+          </div>
+          <div className="text-xs text-gray-400">
+            <p className="flex items-start gap-2">
+              <span>
+                Share this key with senders along with your Master Public Key (MPK).
+              </span>
+            </p>
+          </div>
+        </div>
 
         <div className="flex gap-2 mt-4">
           <button
-            onClick={() => setShowDetails(!showDetails)}
+            onClick={() => setShowSecrets(!showSecrets)}
             className="btn-secondary flex-1 text-xs"
           >
-            {showDetails ? "◄ HIDE" : "► SHOW"} DETAILS
+            {showSecrets ? "◄ HIDE" : "► SHOW"} SECRETS
           </button>
           <button
             onClick={onClear}
@@ -237,7 +322,7 @@ export function KeypairSetup({
           </button>
         </div>
 
-        {showDetails && (
+        {showSecrets && (
           <div className="mt-4 space-y-3 p-4 bg-black/50 border border-gray-800 clip-corner">
             <div>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
@@ -263,17 +348,6 @@ export function KeypairSetup({
               </p>
             </div>
             <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
-                Master Public Key
-              </p>
-              <p className="text-[9px] text-gray-600 mb-2 font-mono">
-                // Your public identity for receiving private funds
-              </p>
-              <p className="break-all font-mono text-xs text-gray-400">
-                {mpkHex}
-              </p>
-            </div>
           </div>
         )}
       </div>

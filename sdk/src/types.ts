@@ -34,15 +34,15 @@ export interface OctopusKeypair {
  * A shielded note (UTXO) in the privacy pool
  */
 export interface Note {
-  /** Note public key = Poseidon(MPK, random) */
-  npk: bigint;
+  /** Note secret key = Poseidon(MPK, random) */
+  nsk: bigint;
   /** Token type identifier */
   token: bigint;
   /** Value/amount */
   value: bigint;
   /** Random blinding factor */
   random: bigint;
-  /** Computed commitment = Poseidon(npk, token, value) */
+  /** Computed commitment = Poseidon(nsk, token, value) */
   commitment: bigint;
 }
 
@@ -132,12 +132,12 @@ export interface TransferCircuitInput {
   // Private inputs
   spending_key: string;
   nullifying_key: string;
-  input_npks: string[];
+  input_nsks: string[];
   input_values: string[];
   input_randoms: string[];
   input_leaf_indices: string[];
   input_path_elements: string[][];
-  output_npks: string[];
+  output_nsks: string[];
   output_values: string[];
   output_randoms: string[];
   token: string;
@@ -191,14 +191,14 @@ export interface SwapInput {
   inputPathElements: bigint[][];
   /** Swap parameters */
   swapParams: SwapParams;
-  /** Output note recipient's NPK */
-  outputNPK: bigint;
+  /** Output note recipient's NSK */
+  outputNSK: bigint;
   /** Random blinding factor for output note */
   outputRandom: bigint;
   /** Expected output amount from DEX */
   outputValue: bigint;
-  /** Change note recipient's NPK (usually sender's own NPK) */
-  changeNPK: bigint;
+  /** Change note recipient's NSK (usually sender's own NSK) */
+  changeNSK: bigint;
   /** Random blinding factor for change note */
   changeRandom: bigint;
   /** Change amount (excess input) */
@@ -214,7 +214,7 @@ export interface SwapCircuitInput {
   nullifying_key: string;
 
   // Private inputs - Input notes
-  input_npks: string[];
+  input_nsks: string[];
   input_values: string[];
   input_randoms: string[];
   input_leaf_indices: string[];
@@ -228,12 +228,12 @@ export interface SwapCircuitInput {
   dex_pool_id: string;
 
   // Private inputs - Output note
-  output_npk: string;
+  output_nsk: string;
   output_value: string;
   output_random: string;
 
   // Private inputs - Change note
-  change_npk: string;
+  change_nsk: string;
   change_value: string;
   change_random: string;
 

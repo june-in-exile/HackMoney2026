@@ -88,7 +88,7 @@ User receives encrypted output note
 
 **Private Inputs:**
 
-- Input notes (NPK, value, token)
+- Input notes (NSK, value, token)
 - Spending key (for nullifier generation)
 - Merkle proofs (path elements, indices)
 - Output randomness

@@ -42,14 +42,6 @@ export interface ScanNotesRequest {
   spendingKey: string; // BigInt as string
   nullifyingKey: string; // BigInt as string
   masterPublicKey: string; // BigInt as string
-
-  // PHASE 2: Incremental scanning support
-  startShieldCursor?: string | null; // Resume from this cursor for Shield events
-  startTransferCursor?: string | null; // Resume from this cursor for Transfer events
-  cachedCommitments?: Array<{
-    commitment: string; // BigInt as string
-    leafIndex: number;
-  }>; // Previously scanned commitments
 }
 
 /**
@@ -122,8 +114,6 @@ export interface InitResponse {
 
 /**
  * Scan notes result
- *
- * PHASE 2 OPTIMIZATION: Returns cursors and commitments for next incremental scan
  */
 export interface ScanNotesResponse {
   type: "scan_notes_result";
@@ -136,13 +126,8 @@ export interface ScanNotesResponse {
     txDigest: string;
   }>;
 
-  // PHASE 2: Data for next incremental scan
-  lastShieldCursor: string | null; // Last cursor position for Shield events
-  lastTransferCursor: string | null; // Last cursor position for Transfer events
-  allCommitments: Array<{
-    commitment: string; // BigInt as string
-    leafIndex: number;
-  }>; // All commitments (cached + new) for next scan
+  // Total notes in pool (ShieldEvents - UnshieldEvents)
+  totalNotesInPool?: number;
 }
 
 /**
@@ -203,6 +188,7 @@ export interface ProgressResponse {
   current: number;
   total: number;
   message: string;
+  totalNotesInPool?: number; // Available after event query completes
 }
 
 // ============================================================================
@@ -213,7 +199,7 @@ export interface ProgressResponse {
  * Serialized note with BigInt → string conversion
  */
 export interface SerializedNote {
-  npk: string; // BigInt as string
+  nsk: string; // BigInt as string
   token: string; // BigInt as string
   value: string; // BigInt as string
   random: string; // BigInt as string

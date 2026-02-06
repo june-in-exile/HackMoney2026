@@ -7,9 +7,14 @@ interface AvailableNotesListProps {
   notes: OwnedNote[];
   loading: boolean;
   error: string | null;
+  lastScanStats?: {
+    eventsScanned: number;
+    notesDecrypted: number;
+    timestamp: number;
+  } | null;
 }
 
-export function AvailableNotesList({ notes, loading, error }: AvailableNotesListProps) {
+export function AvailableNotesList({ notes, loading, error, lastScanStats }: AvailableNotesListProps) {
   const unspentNotes = notes.filter((n) => !n.spent);
 
   if (loading) {
@@ -76,9 +81,27 @@ export function AvailableNotesList({ notes, loading, error }: AvailableNotesList
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 font-mono">
             No Notes Available
           </p>
-          <p className="text-[10px] text-gray-400 font-mono">
+          <p className="text-[10px] text-gray-400 font-mono mb-3">
             Shield some tokens first to create notes.
           </p>
+          {lastScanStats && lastScanStats.eventsScanned > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-800">
+              <p className="text-[10px] text-gray-500 font-mono mb-1">
+                🔍 Scan Results:
+              </p>
+              <p className="text-[10px] text-gray-400 font-mono">
+                • Found {lastScanStats.eventsScanned} event{lastScanStats.eventsScanned !== 1 ? 's' : ''} on blockchain
+              </p>
+              <p className="text-[10px] text-gray-400 font-mono">
+                • Decrypted {lastScanStats.notesDecrypted} note{lastScanStats.notesDecrypted !== 1 ? 's' : ''} with your keypair
+              </p>
+              {lastScanStats.eventsScanned > 0 && lastScanStats.notesDecrypted === 0 && (
+                <p className="text-[10px] text-yellow-500 font-mono mt-2">
+                  ⚠️ No notes belong to your current keypair. Make sure you're using the correct keypair, or shield some tokens to create new notes.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

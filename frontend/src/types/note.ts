@@ -8,8 +8,8 @@
 export interface ShieldedNote {
   /** Note commitment */
   commitment: string;
-  /** NPK (Note Public Key) */
-  npk: string;
+  /** NSK (Note Secret Key) */
+  nsk: string;
   /** Token identifier */
   token: string;
   /** Amount in the note */
@@ -29,7 +29,7 @@ export interface ShieldedNote {
  */
 export interface StoredNote {
   commitment: string;
-  npk: string;
+  nsk: string;
   token: string;
   value: string; // Stored as string to avoid BigInt serialization issues
   random: string;

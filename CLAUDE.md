@@ -99,8 +99,8 @@ viewing_private_key = X25519(SHA256(spending_key))
 viewing_public_key = X25519.publicKey(viewing_private_key)
 
 // Note Creation
-NPK = Poseidon(MPK, random)                    // Note Public Key
-commitment = Poseidon(NPK, token, value)       // Note Commitment
+NSK = Poseidon(MPK, random)                    // Note Secret Key
+commitment = Poseidon(NSK, token, value)       // Note Commitment
 
 // Spending
 nullifier = Poseidon(nullifying_key, leaf_index)

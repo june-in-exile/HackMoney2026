@@ -12,7 +12,7 @@ export function formatSui(mist: bigint | number): string {
   const sui = Number(mist) / 1e9;
   return sui.toLocaleString(undefined, {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
+    maximumFractionDigits: 9,
   });
 }
 
