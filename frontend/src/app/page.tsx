@@ -100,24 +100,24 @@ export default function Home() {
             {/* Animated line */}
             <div className="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-cyber-blue via-cyber-purple to-transparent animate-pulse-slow" />
 
-            <div className="flex items-center gap-4 mb-6">
+            {/* Status indicator - fixed position */}
+            <div className="absolute top-8 right-4 flex flex-col gap-1 text-xs text-gray-600 font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-pulse" />
+                <span>ACTIVE</span>
+              </div>
+              <div className="flex items-center gap-2 opacity-70">
+                <span className="w-1 h-1 bg-cyber-purple rounded-full" />
+                <span className="text-[12px]">v1.0</span>
+              </div>
+            </div>
+
+            <div className="mb-6">
               <div className="relative">
                 <h1 className="text-6xl md:text-7xl font-black tracking-tighter text-cyber-blue uppercase relative z-10 text-cyber">
                   O.C.T.O.P.U.S.
                 </h1>
                 <div className="absolute -inset-2 bg-cyber-blue/10 blur-2xl -z-10" />
-              </div>
-
-              {/* Status indicator */}
-              <div className="flex flex-col gap-1 text-xs text-gray-600 font-mono ml-auto">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-pulse" />
-                  <span >ACTIVE</span>
-                </div>
-                <div className="flex items-center gap-2 opacity-70">
-                  <span className="w-1 h-1 bg-cyber-purple rounded-full" />
-                  <span className="text-[12px]">v1.0</span>
-                </div>
               </div>
             </div>
 

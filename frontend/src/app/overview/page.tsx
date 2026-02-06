@@ -13,12 +13,36 @@ export default function OverviewPage() {
         <div className="mb-12 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 border-t-2 border-r-2 border-cyber-blue/30 clip-corner opacity-50" />
 
-          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8">
+          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8 pr-4">
+            {/* Scanning line effect - sweeps across the entire title section */}
+            <div className="absolute inset-0 -left-6 -right-4 pointer-events-none z-20 overflow-hidden">
+              <div className="absolute w-full h-[3px] top-0 animate-scan-full">
+                {/* Outer glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-60 blur-md" />
+                {/* Main scanning line */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-60" />
+                {/* Bright core */}
+                <div className="absolute inset-0 h-[1px] top-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-white to-transparent" />
+              </div>
+            </div>
             <div className="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-cyber-blue via-cyber-purple to-transparent animate-pulse-slow" />
+
+            {/* Status indicator - fixed position */}
+            <div className="absolute top-8 right-4 flex flex-col gap-1 text-xs text-gray-600 font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-pulse" />
+                <span>ACTIVE</span>
+              </div>
+              <div className="flex items-center gap-2 opacity-70">
+                <span className="w-1 h-1 bg-cyber-purple rounded-full" />
+                <span className="text-[12px]">v1.0</span>
+              </div>
+            </div>
 
             <h1 className="text-5xl md:text-6xl font-black tracking-tighter text-cyber-blue uppercase mb-4 text-cyber">
               PROTOCOL OVERVIEW
             </h1>
+
             <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono max-w-2xl">
               Understanding how Octopus enables private transactions on Sui
             </p>
@@ -57,13 +81,13 @@ export default function OverviewPage() {
 
           <div className="space-y-6">
             {/* Shield */}
-            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+            <div className="group border border-gray-800 p-6 hover:border-purple-500/50 transition-all clip-corner">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
-                  <span className="text-cyber-blue text-2xl">▲</span>
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 group-hover:bg-purple-500/10 flex items-center justify-center border border-cyber-blue/30 group-hover:border-purple-500/30 flex-shrink-0 transition-colors">
+                  <span className="text-cyber-blue group-hover:text-purple-500 text-2xl transition-colors">▲</span>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue group-hover:text-purple-500 mb-2 transition-colors">
                     SHIELD (Deposit)
                   </h3>
                   <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
@@ -72,7 +96,7 @@ export default function OverviewPage() {
                     indistinguishable from other notes.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/30">
+                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 group-hover:bg-purple-500/10 text-cyber-blue group-hover:text-purple-500 border border-cyber-blue/30 group-hover:border-purple-500/30 transition-colors">
                       NO ZK PROOF REQUIRED
                     </span>
                     <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
@@ -84,13 +108,13 @@ export default function OverviewPage() {
             </div>
 
             {/* Transfer */}
-            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+            <div className="group border border-gray-800 p-6 hover:border-purple-500/50 transition-all clip-corner">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
-                  <span className="text-cyber-blue text-2xl">⇄</span>
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 group-hover:bg-purple-500/10 flex items-center justify-center border border-cyber-blue/30 group-hover:border-purple-500/30 flex-shrink-0 transition-colors">
+                  <span className="text-cyber-blue group-hover:text-purple-500 text-2xl transition-colors">⇄</span>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue group-hover:text-purple-500 mb-2 transition-colors">
                     TRANSFER (Private Payment)
                   </h3>
                   <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
@@ -99,7 +123,7 @@ export default function OverviewPage() {
                     and amount from observers.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/30">
+                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 group-hover:bg-purple-500/10 text-cyber-blue group-hover:text-purple-500 border border-cyber-blue/30 group-hover:border-purple-500/30 transition-colors">
                       ZK PROOF VERIFIED
                     </span>
                     <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">
@@ -111,13 +135,13 @@ export default function OverviewPage() {
             </div>
 
             {/* Swap */}
-            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+            <div className="group border border-gray-800 p-6 hover:border-purple-500/50 transition-all clip-corner">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
-                  <span className="text-cyber-blue text-2xl">⇌</span>
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 group-hover:bg-purple-500/10 flex items-center justify-center border border-cyber-blue/30 group-hover:border-purple-500/30 flex-shrink-0 transition-colors">
+                  <span className="text-cyber-blue group-hover:text-purple-500 text-2xl transition-colors">⇌</span>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue group-hover:text-purple-500 mb-2 transition-colors">
                     SWAP (Private Exchange)
                   </h3>
                   <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
@@ -138,13 +162,13 @@ export default function OverviewPage() {
             </div>
 
             {/* Unshield */}
-            <div className="border border-gray-800 p-6 hover:border-cyber-blue/50 transition-all clip-corner">
+            <div className="group border border-gray-800 p-6 hover:border-purple-500/50 transition-all clip-corner">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 flex items-center justify-center border border-cyber-blue/30 flex-shrink-0">
-                  <span className="text-cyber-blue text-2xl">▼</span>
+                <div className="w-12 h-12 rounded-full bg-cyber-blue/10 group-hover:bg-purple-500/10 flex items-center justify-center border border-cyber-blue/30 group-hover:border-purple-500/30 flex-shrink-0 transition-colors">
+                  <span className="text-cyber-blue group-hover:text-purple-500 text-2xl transition-colors">▼</span>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue mb-2">
+                  <h3 className="text-lg font-bold uppercase tracking-wider text-cyber-blue group-hover:text-purple-500 mb-2 transition-colors">
                     UNSHIELD (Withdraw)
                   </h3>
                   <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
@@ -153,7 +177,7 @@ export default function OverviewPage() {
                     and withdrawals.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/30">
+                    <span className="px-2 py-1 text-xs font-mono bg-cyber-blue/10 group-hover:bg-purple-500/10 text-cyber-blue group-hover:text-purple-500 border border-cyber-blue/30 group-hover:border-purple-500/30 transition-colors">
                       ZK PROOF VERIFIED
                     </span>
                     <span className="px-2 py-1 text-xs font-mono bg-gray-800/50 text-gray-400 border border-gray-700">

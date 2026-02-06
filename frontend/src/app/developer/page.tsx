@@ -37,12 +37,36 @@ export default function DeveloperPage() {
         <div className="mb-12 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 border-t-2 border-r-2 border-cyber-blue/30 clip-corner opacity-50" />
 
-          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8">
+          <div className="relative border-l-2 border-cyber-blue/50 pl-6 py-8 pr-4">
+            {/* Scanning line effect - sweeps across the entire title section */}
+            <div className="absolute inset-0 -left-6 -right-4 pointer-events-none z-20 overflow-hidden">
+              <div className="absolute w-full h-[3px] top-0 animate-scan-full">
+                {/* Outer glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-60 blur-md" />
+                {/* Main scanning line */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyber-blue to-transparent opacity-60" />
+                {/* Bright core */}
+                <div className="absolute inset-0 h-[1px] top-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-white to-transparent" />
+              </div>
+            </div>
             <div className="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-cyber-blue via-cyber-purple to-transparent animate-pulse-slow" />
+
+            {/* Status indicator - fixed position */}
+            <div className="absolute top-8 right-4 flex flex-col gap-1 text-xs text-gray-600 font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-pulse" />
+                <span>ACTIVE</span>
+              </div>
+              <div className="flex items-center gap-2 opacity-70">
+                <span className="w-1 h-1 bg-cyber-purple rounded-full" />
+                <span className="text-[12px]">v1.0</span>
+              </div>
+            </div>
 
             <h1 className="text-5xl md:text-6xl font-black tracking-tighter text-cyber-blue uppercase mb-4 text-cyber">
               DEVELOPER GUIDE
             </h1>
+
             <p className="text-gray-400 text-sm md:text-base tracking-wider font-mono max-w-2xl">
               Technical implementation details and cryptographic primitives
             </p>
