@@ -205,14 +205,16 @@ class NoteScanWorkerManager {
       options?.onProgress
     );
 
+    const processedNotes = response.notes.map((n) => ({
+      note: n.note,
+      leafIndex: n.leafIndex,
+      pathElements: n.pathElements.map((p) => BigInt(p)),
+      nullifier: BigInt(n.nullifier),
+      txDigest: n.txDigest,
+    }));
+
     return {
-      notes: response.notes.map((n) => ({
-        note: n.note,
-        leafIndex: n.leafIndex,
-        pathElements: n.pathElements.map((p) => BigInt(p)),
-        nullifier: BigInt(n.nullifier),
-        txDigest: n.txDigest,
-      })),
+      notes: processedNotes,
       totalNotesInPool: response.totalNotesInPool,
     };
   }

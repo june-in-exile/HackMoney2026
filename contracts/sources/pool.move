@@ -101,8 +101,8 @@ module octopus::pool {
         output_commitments: vector<vector<u8>>,
         /// Positions of output commitments in tree
         output_positions: vector<u64>,
-        /// Encrypted note data for recipients to scan
-        encrypted_notes: vector<vector<u8>>,
+        /// Encrypted note for transferred value and change (if any)
+        output_notes: vector<vector<u8>>,
     }
 
     /// Event emitted when tokens are swapped privately through DEX
@@ -392,27 +392,31 @@ module octopus::pool {
 
         // 5. Mark both nullifiers as spent
         nullifier::mark_spent(&mut pool.nullifiers, nullifier1);
-        nullifier::mark_spent(&mut pool.nullifiers, nullifier2);
+        if (!is_zero_commitment(&nullifier2)) { // not dummy commit
+            nullifier::mark_spent(&mut pool.nullifiers, nullifier2);
+        };
 
         // 6. Save current root before inserting (so existing proofs remain valid)
         save_historical_root(pool);
 
         // 7. Build output vectors for non-zero commitments
+        let mut output_notes: vector<vector<u8>> = vector::empty<vector<u8>>();
         let mut output_commitments = vector::empty<vector<u8>>();
         let mut output_positions = vector::empty<u64>();
 
-        // 8. Insert transfer commitment into Merkle tree (for recipient) if not zero
-        if (!is_zero_commitment(&transfer_commitment)) {
-            let position = merkle_tree::get_next_index(&pool.merkle_tree);
-            merkle_tree::insert(&mut pool.merkle_tree, transfer_commitment);
-            vector::push_back(&mut output_commitments, transfer_commitment);
-            vector::push_back(&mut output_positions, position);
-        };
+        // 8. Insert transfer commitment into Merkle tree (for recipient)
+        let position = merkle_tree::get_next_index(&pool.merkle_tree);
+        merkle_tree::insert(&mut pool.merkle_tree, transfer_commitment);
+        vector::push_back(&mut output_notes, encrypted_notes[0]);
+        vector::push_back(&mut output_commitments, transfer_commitment);
+        vector::push_back(&mut output_positions, position);
+
 
         // 9. Insert change commitment into Merkle tree (back to sender) if not zero
         if (!is_zero_commitment(&change_commitment)) {
             let position = merkle_tree::get_next_index(&pool.merkle_tree);
             merkle_tree::insert(&mut pool.merkle_tree, change_commitment);
+            vector::push_back(&mut output_notes, encrypted_notes[1]);
             vector::push_back(&mut output_commitments, change_commitment);
             vector::push_back(&mut output_positions, position);
         };
@@ -423,7 +427,7 @@ module octopus::pool {
             input_nullifiers: vector[nullifier1, nullifier2],
             output_commitments,
             output_positions,
-            encrypted_notes,
+            output_notes,
         });
     }
 

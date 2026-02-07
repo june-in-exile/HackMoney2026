@@ -335,13 +335,6 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
     paddedIndices[0]
   );
 
-  // DEBUG: Log Merkle root computation details
-  console.log('[Transfer Prover] Merkle Root Computation:');
-  console.log(`  Input 0 commitment: ${paddedInputs[0].commitment.toString()}`);
-  console.log(`  Input 0 leafIndex: ${paddedIndices[0]}`);
-  console.log(`  Computed root: ${merkleRoot.toString()}`);
-  console.log(`  Path elements[0]: ${paddedPaths[0][0].toString()}`);
-
   // CRITICAL VALIDATION: Verify second input (if non-dummy) has same root
   if (paddedInputs.length === 2 && paddedInputs[1].value > 0n) {
     const root2 = computeMerkleRoot(
@@ -349,10 +342,6 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
       paddedPaths[1],
       paddedIndices[1]
     );
-
-    console.log(`  Input 1 commitment: ${paddedInputs[1].commitment.toString()}`);
-    console.log(`  Input 1 leafIndex: ${paddedIndices[1]}`);
-    console.log(`  Input 1 computed root: ${root2.toString()}`);
 
     if (root2 !== merkleRoot) {
       throw new Error(

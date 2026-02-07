@@ -26,6 +26,7 @@ import type {
   WorkerResponse,
   SerializedNote,
 } from "./types";
+import { cn } from "@/lib/utils";
 
 // ============================================================================
 // Worker State
@@ -84,14 +85,57 @@ function decryptNote(
     const note = sdkDecryptNote(encryptedData, mySpendingKey, myMpk);
     if (!note) return null;
 
-    return {
+    // Validate note has all required fields and valid types
+    if (note.nsk === undefined || note.token === undefined ||
+      note.value === undefined || note.random === undefined ||
+      note.commitment === undefined) {
+      console.error("❌ [Worker] SDK returned note with undefined fields:", note);
+      return null;
+    }
+
+    // Check for NaN values (typeof NaN === 'number' but it's invalid)
+    if (typeof note.nsk === 'number' && isNaN(note.nsk)) {
+      console.error("❌ [Worker] SDK returned note with NaN nsk:", note);
+      return null;
+    }
+    if (typeof note.token === 'number' && isNaN(note.token)) {
+      console.error("❌ [Worker] SDK returned note with NaN token:", note);
+      return null;
+    }
+    if (typeof note.value === 'number' && isNaN(note.value)) {
+      console.error("❌ [Worker] SDK returned note with NaN value:", note);
+      return null;
+    }
+    if (typeof note.random === 'number' && isNaN(note.random)) {
+      console.error("❌ [Worker] SDK returned note with NaN random:", note);
+      return null;
+    }
+    if (typeof note.commitment === 'number' && isNaN(note.commitment)) {
+      console.error("❌ [Worker] SDK returned note with NaN commitment:", note);
+      return null;
+    }
+
+    const serialized = {
       nsk: note.nsk.toString(),
       token: note.token.toString(),
       value: note.value.toString(),
       random: note.random.toString(),
       commitment: note.commitment.toString(),
     };
-  } catch {
+
+    // Validate serialization worked correctly (check for "undefined" and "NaN" strings)
+    if (serialized.nsk === "undefined" || serialized.nsk === "NaN" ||
+      serialized.token === "undefined" || serialized.token === "NaN" ||
+      serialized.value === "undefined" || serialized.value === "NaN" ||
+      serialized.random === "undefined" || serialized.random === "NaN" ||
+      serialized.commitment === "undefined" || serialized.commitment === "NaN") {
+      console.error("❌ [Worker] Note serialization produced invalid string:", note, serialized);
+      return null;
+    }
+
+    return serialized;
+  } catch (err) {
+    console.error("❌ [Worker] Failed to decrypt note:", err);
     return null;
   }
 }
@@ -362,18 +406,154 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
         const queryTime = Date.now() - queryStart;
 
-        // Calculate total notes in pool: Shield events - Unshield events
-        // IMPORTANT: Filter BOTH shield and unshield events by pool_id to only count events from this pool
+        // Calculate total notes in pool: Shield events + Transfer output notes - Spent nullifiers
+        // IMPORTANT: Filter events by pool_id to only count events from this pool
         const shieldEventsInPool = allShieldNodes.filter((node) => {
           const eventData = node.contents?.json as any;
           return eventData?.pool_id === request.poolId;
         });
+
+        const transferEventsInPool = allTransferNodes.filter((node) => {
+          const eventData = node.contents?.json as any;
+          return eventData?.pool_id === request.poolId;
+        });
+
         const unshieldEventsInPool = allUnshieldNodes.filter((node) => {
           const eventData = node.contents?.json as any;
           return eventData?.pool_id === request.poolId;
         });
 
-        const totalNotesInPool = shieldEventsInPool.length - unshieldEventsInPool.length;
+        // Count total output notes from all transfer events
+        const transferOutputNotesCount = transferEventsInPool.reduce((sum, node) => {
+          const eventData = node.contents?.json as any;
+          const output_notes = eventData?.output_notes || [];
+          return sum + output_notes.length;
+        }, 0);
+
+        // Query nullifier count from the pool's NullifierRegistry dynamic fields
+        let nullifierCount = 0;
+        console.log('🔍 [Worker] Starting nullifier count query for pool:', request.poolId);
+        console.log('🔍 [Worker] Unshield events in pool:', unshieldEventsInPool.length);
+
+        try {
+          const nullifierQuery = await withTimeout(
+            client.query({
+              query: graphql(`
+                query NullifierCount($poolId: SuiAddress!) {
+                  object(address: $poolId) {
+                    asMoveObject {
+                      contents {
+                        json
+                      }
+                      dynamicFields {
+                        pageInfo {
+                          hasNextPage
+                        }
+                        nodes {
+                          name {
+                            json
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `),
+              variables: {
+                poolId: request.poolId,
+              },
+            }),
+            30000,
+            'Nullifier count query'
+          );
+
+          console.log('✅ [Worker] Nullifier query succeeded');
+
+          // Extract nullifiers object ID from pool
+          const poolData = nullifierQuery.data?.object?.asMoveObject?.contents?.json as any;
+          console.log('📦 [Worker] Pool data:', JSON.stringify(poolData, null, 2));
+
+          const nullifiersObjectId = poolData?.nullifiers?.id;
+          console.log('🆔 [Worker] Nullifiers Table ID:', nullifiersObjectId);
+
+          // In Sui Move, Table data is stored as dynamic fields on the PARENT object (pool),
+          // not on the Table object itself. The Table's "id" is just a UID for the Table struct.
+          // So we need to query the pool's dynamic fields and filter for nullifiers.
+
+          // Query pool's dynamic fields to count nullifiers
+          let hasNextPage = true;
+          let cursor: string | null = null;
+
+          while (hasNextPage) {
+            const dfQuery: any = await withTimeout(
+              client.query({
+                query: graphql(`
+                  query PoolDynamicFields($poolId: SuiAddress!, $first: Int, $after: String) {
+                    object(address: $poolId) {
+                      dynamicFields(first: $first, after: $after) {
+                        pageInfo {
+                          hasNextPage
+                          endCursor
+                        }
+                        nodes {
+                          name {
+                            type {
+                              repr
+                            }
+                            json
+                          }
+                        }
+                      }
+                    }
+                  }
+                `),
+                variables: {
+                  poolId: request.poolId,
+                  first: 50,
+                  after: cursor,
+                },
+              }),
+              30000,
+              'Pool dynamic fields query'
+            );
+
+            console.log('🔍 [Worker] Pool dynamic fields query response:', JSON.stringify(dfQuery.data, null, 2));
+            const nodes = dfQuery.data?.object?.dynamicFields?.nodes || [];
+            console.log(`📄 [Worker] Found ${nodes.length} dynamic fields on pool (total so far: ${nullifierCount + nodes.length})`);
+
+            // Filter for nullifier entries (they should have a specific type pattern)
+            // Nullifiers are stored with type like "0x2::dynamic_field::Field<vector<u8>, bool>"
+            const nullifierNodes = nodes.filter((node: any) => {
+              const typeName = node.name?.type?.repr || '';
+              // Look for dynamic fields with vector<u8> key (nullifiers are stored as bytes)
+              return typeName.includes('vector<u8>');
+            });
+
+            console.log(`🔑 [Worker] Found ${nullifierNodes.length} nullifier entries in this page`);
+            if (nullifierNodes.length > 0) {
+              console.log('📝 [Worker] Sample nullifier nodes:', JSON.stringify(nullifierNodes.slice(0, 3), null, 2));
+            }
+
+            nullifierCount += nullifierNodes.length;
+
+            hasNextPage = dfQuery.data?.object?.dynamicFields?.pageInfo?.hasNextPage || false;
+            cursor = dfQuery.data?.object?.dynamicFields?.pageInfo?.endCursor || null;
+
+            // Safety limit
+            if (nullifierCount >= 1000) break;
+          }
+          console.log('✅ [Worker] Finished querying pool dynamic fields. Total nullifiers:', nullifierCount);
+        } catch (err) {
+          console.error('❌ [Worker] Failed to query nullifier count, falling back to unshield event count:', err);
+          // Fallback: use unshield events count (not accurate but better than nothing)
+          // Note: unshieldEventsInPool is already defined above
+          nullifierCount = unshieldEventsInPool.length;
+          console.log('🔄 [Worker] Using fallback nullifier count from unshield events:', nullifierCount);
+        }
+
+        console.log('📊 [Worker] Final nullifier count:', nullifierCount);
+
+        const totalNotesInPool = shieldEventsInPool.length + transferOutputNotesCount - nullifierCount;
 
         // Progress: Query complete - send totalNotesInPool immediately
         postMessage({
@@ -485,24 +665,24 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
             continue; // Skip events from other pools
           }
 
-          const encrypted_notes = eventData.encrypted_notes;
+          const output_notes = eventData.output_notes;
           const output_positions = eventData.output_positions;
           const output_commitments = eventData.output_commitments;
 
-          for (let i = 0; i < encrypted_notes.length; i++) {
+          for (let i = 0; i < output_notes.length; i++) {
             transferNotesAttempted++;
             // Decode encrypted_note from Base64 if needed
-            let encryptedNoteBytes: number[];
-            if (typeof encrypted_notes[i] === 'string') {
-              encryptedNoteBytes = decodeBase64(encrypted_notes[i]);
-            } else if (Array.isArray(encrypted_notes[i])) {
-              encryptedNoteBytes = encrypted_notes[i];
+            let outputNoteBytes: number[];
+            if (typeof output_notes[i] === 'string') {
+              outputNoteBytes = decodeBase64(output_notes[i]);
+            } else if (Array.isArray(output_notes[i])) {
+              outputNoteBytes = output_notes[i];
             } else {
               continue;
             }
 
             const note = decryptNote(
-              encryptedNoteBytes,
+              outputNoteBytes,
               BigInt(request.spendingKey),
               BigInt(request.masterPublicKey)
             );

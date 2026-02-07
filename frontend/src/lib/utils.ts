@@ -9,7 +9,21 @@ export function cn(...inputs: ClassValue[]) {
  * Format SUI amount from MIST (1 SUI = 10^9 MIST)
  */
 export function formatSui(mist: bigint | number): string {
-  const sui = Number(mist) / 1e9;
+  // Handle invalid inputs gracefully
+  if (mist === undefined || mist === null) {
+    return "0";
+  }
+
+  // Convert to number safely
+  const num = typeof mist === 'bigint' ? Number(mist) : mist;
+
+  // Check for NaN or invalid numbers
+  if (isNaN(num) || !isFinite(num)) {
+    console.error("Invalid SUI amount:", mist);
+    return "0";
+  }
+
+  const sui = num / 1e9;
   return sui.toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 9,

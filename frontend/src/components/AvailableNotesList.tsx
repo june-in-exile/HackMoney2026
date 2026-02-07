@@ -103,7 +103,9 @@ export function AvailableNotesList({ notes, loading, error, lastScanStats }: Ava
   }
 
   // Sort notes by value (largest first) and show ALL notes
-  const sortedNotes = [...unspentNotes].sort((a, b) => Number(b.note.value - a.note.value));
+  const sortedNotes = [...unspentNotes].sort((a, b) => {
+    return Number(b.note.value - a.note.value);
+  });
 
   return (
     <div className="card">

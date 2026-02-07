@@ -49,12 +49,22 @@ template Transfer(levels) {
     signal output transfer_commitment;         // Commitments for transferred amount
     signal output change_commitment;           // Commitments for change
 
-    // ============ Step 1: Compute MPK ============
+    // ============ Step 1: Range Check ============
+    signal positiveTransfer <== GreaterThan(120)([transfer_value, 0]);
+    positiveTransfer === 1;
+
+    // ============ Step 2: Balance Conservation ============
+    // Verify sum(input_values) = sum(output_values)
+    signal input_sum <== input_values[0] + input_values[1];
+    signal output_sum <== transfer_value + change_value;
+    input_sum === output_sum;
+
+    // ============ Step 3: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)
     // Proves sender knows the private keys
     signal sender_mpk <== Poseidon(2)([spending_key, nullifying_key]);
 
-    // ============ Step 2: Verify Input Notes ============
+    // ============ Step 4: Verify Input Notes ============
     // For each input note:
     // 1. Verify NSK = Poseidon(MPK, random)
     // 2. Compute commitment = Poseidon(NSK, token, value)
@@ -63,8 +73,9 @@ template Transfer(levels) {
 
     signal input_nsks[2];             // Note secret keys
     signal input_commitments[2];
+    signal isValueZero[2];            // Detect dummy notes (value == 0)
+    signal calculated_nullifiers[2];
     signal calculated_roots[2];
-    signal isValueZero[2];      // Detect dummy notes (value == 0)
 
     for (var i = 0; i < 2; i++) {
         // Verify note ownership: NSK = Poseidon(MPK, random)
@@ -73,14 +84,17 @@ template Transfer(levels) {
         // Compute commitment = Poseidon(NSK, token, value)
         input_commitments[i] <== Poseidon(3)([input_nsks[i], token, input_values[i]]);
 
-        // Verify nullifier = Poseidon(nullifying_key, leaf_index)
-        input_nullifiers[i] <== Poseidon(2)([nullifying_key, input_leaf_indices[i]]);
-
         // Verify Merkle proof (commitment exists in tree at leaf_index)
         calculated_roots[i] <== MerkleProof(levels)(input_commitments[i], input_leaf_indices[i], input_path_elements[i]);
 
         // Check if this input is a dummy note (value == 0)
         isValueZero[i] <== IsZero()(input_values[i]);
+
+        // Conditionally verify nullifier = Poseidon(nullifying_key, leaf_index)
+        // - For real notes (value != 0): use real nullifier
+        // - For dummy notes (value == 0): set nullifier to 0
+        calculated_nullifiers[i] <== Poseidon(2)([nullifying_key, input_leaf_indices[i]]);
+        input_nullifiers[i] <== (1 - isValueZero[i]) * calculated_nullifiers[i];
 
         // Conditionally verify Merkle root:
         // - For real notes (value != 0): MUST match merkle_root
@@ -88,7 +102,7 @@ template Transfer(levels) {
         (1 - isValueZero[i]) * (calculated_roots[i] - merkle_root) === 0;
     }
 
-    // ============ Step 3: Verify Output Commitments ============
+    // ============ Step 5: Verify Output Commitments ============
     // For each output note, verify commitment = Poseidon(NSK, token, value)
     signal transfer_nsk <== Poseidon(2)([recipient_mpk, transfer_random]);
     transfer_commitment <== Poseidon(3)([transfer_nsk, token, transfer_value]);
@@ -97,12 +111,6 @@ template Transfer(levels) {
     signal real_change_commitment <== Poseidon(3)([change_nsk, token, change_value]);
     signal no_change <== IsZero()(change_value);
     change_commitment <== real_change_commitment * (1 - no_change);
-
-    // ============ Step 4: Balance Conservation ============
-    // Verify sum(input_values) = sum(output_values)
-    signal input_sum <== input_values[0] + input_values[1];
-    signal output_sum <== transfer_value + change_value;
-    input_sum === output_sum;
 }
 
 // Main circuit with 16 levels (supports 2^16 = 65,536 notes)
