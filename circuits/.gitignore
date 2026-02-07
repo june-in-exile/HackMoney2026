@@ -9,6 +9,7 @@ build/*.wtns
 build/*.r1cs
 build/*.sym
 build/*_js/
+build/*.log
 
 # Keep hex outputs and JSON for reference
 !build/*.hex

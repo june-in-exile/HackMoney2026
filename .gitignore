@@ -21,3 +21,4 @@ sdk/dist/
 *.backup
 .vercel
 .env*.local
+circuits/build/
