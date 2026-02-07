@@ -29,17 +29,66 @@ print_section() {
     echo ""
 }
 
-# Compile unshield circuit
-print_section "1/3: Compiling Unshield Circuit"
-"${SCRIPT_DIR}/compile_unshield.sh"
+# Pre-download Powers of Tau files to avoid race conditions
+print_section "Preparing Powers of Tau Files"
+BUILD_DIR="../build"
+PTAU_14="$BUILD_DIR/pot14_final.ptau"
+PTAU_15="$BUILD_DIR/pot15_final.ptau"
 
-# Compile transfer circuit
-print_section "2/3: Compiling Transfer Circuit"
-"${SCRIPT_DIR}/compile_transfer.sh"
+mkdir -p "$BUILD_DIR"
 
-# Compile swap circuit
-print_section "3/3: Compiling Swap Circuit"
-"${SCRIPT_DIR}/compile_swap.sh"
+if [ ! -f "$PTAU_14" ]; then
+    echo "Downloading pot14_final.ptau (~200MB)..."
+    curl -L https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_14.ptau \
+        -o "$PTAU_14" --progress-bar
+    echo "✓ pot14 download complete"
+fi
+
+if [ ! -f "$PTAU_15" ]; then
+    echo "Downloading pot15_final.ptau (~400MB)..."
+    curl -L https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_15.ptau \
+        -o "$PTAU_15" --progress-bar
+    echo "✓ pot15 download complete"
+fi
+
+# Compile all circuits in parallel
+print_section "Compiling All Circuits in Parallel"
+echo "Starting parallel compilation of unshield, transfer, and swap circuits..."
+echo ""
+
+# Run all three compilations in background
+"${SCRIPT_DIR}/compile_unshield.sh" > "$BUILD_DIR/compile_unshield.log" 2>&1 &
+PID_UNSHIELD=$!
+
+"${SCRIPT_DIR}/compile_transfer.sh" > "$BUILD_DIR/compile_transfer.log" 2>&1 &
+PID_TRANSFER=$!
+
+"${SCRIPT_DIR}/compile_swap.sh" > "$BUILD_DIR/compile_swap.log" 2>&1 &
+PID_SWAP=$!
+
+# Wait for all compilations to complete
+echo "⏳ Waiting for unshield compilation (PID: $PID_UNSHIELD)..."
+wait $PID_UNSHIELD
+STATUS_UNSHIELD=$?
+
+echo "⏳ Waiting for transfer compilation (PID: $PID_TRANSFER)..."
+wait $PID_TRANSFER
+STATUS_TRANSFER=$?
+
+echo "⏳ Waiting for swap compilation (PID: $PID_SWAP)..."
+wait $PID_SWAP
+STATUS_SWAP=$?
+
+# Check if all compilations succeeded
+if [ $STATUS_UNSHIELD -ne 0 ] || [ $STATUS_TRANSFER -ne 0 ] || [ $STATUS_SWAP -ne 0 ]; then
+    echo ""
+    echo "❌ Some compilations failed!"
+    echo ""
+    [ $STATUS_UNSHIELD -ne 0 ] && echo "  ✗ Unshield failed (exit code: $STATUS_UNSHIELD). See: $BUILD_DIR/compile_unshield.log"
+    [ $STATUS_TRANSFER -ne 0 ] && echo "  ✗ Transfer failed (exit code: $STATUS_TRANSFER). See: $BUILD_DIR/compile_transfer.log"
+    [ $STATUS_SWAP -ne 0 ] && echo "  ✗ Swap failed (exit code: $STATUS_SWAP). See: $BUILD_DIR/compile_swap.log"
+    exit 1
+fi
 
 # Final summary
 echo ""

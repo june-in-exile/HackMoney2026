@@ -138,43 +138,42 @@ async function main() {
     console.log("Merkle Root:", merkle_root);
 
     // ============ Create Input JSON ============
+    // NEW CIRCUIT INTERFACE: Uses recipient_mpk instead of output_nsks
     const input = {
         // Private inputs
         spending_key,
         nullifying_key,
 
-        // Input notes
-        input_nsks: [input1_nsk, input2_nsk],
-        input_values: [input1_value, input2_value],
+        // Input notes (circuit computes NSKs internally from MPK + randoms)
         input_randoms: [input1_random, input2_random],
+        input_values: [input1_value, input2_value],
         input_leaf_indices: [input1_leaf_index, input2_leaf_index],
         input_path_elements: [input1_path_elements, input2_path_elements],
 
-        // Output notes
-        output_nsks: [output1_nsk, output2_nsk],
-        output_values: [output1_value, output2_value],
-        output_randoms: [output1_random, output2_random],
-
-        // Token
-        token,
+        // NEW: Separate transfer and change outputs
+        recipient_mpk,
+        transfer_value: output1_value,
+        transfer_random: output1_random,
+        change_value: output2_value,
+        change_random: output2_random,
 
         // Public inputs
-        merkle_root,
-        input_nullifiers: [input1_nullifier, input2_nullifier],
-        output_commitments: [output1_commitment, output2_commitment]
+        token,
+        merkle_root
     };
 
     // Save to file
     fs.writeFileSync(path.join(__dirname, "../build/transfer_input.json"), JSON.stringify(input, null, 2));
     console.log("\n✓ Input saved to build/transfer_input.json");
 
-    // Also print public inputs for reference
-    console.log("\n=== Public Inputs (160 bytes total) ===");
-    console.log("merkle_root:         ", merkle_root);
-    console.log("input_nullifiers[0]: ", input1_nullifier);
-    console.log("input_nullifiers[1]: ", input2_nullifier);
-    console.log("output_commitments[0]:", output1_commitment);
-    console.log("output_commitments[1]:", output2_commitment);
+    // Also print public inputs for reference (NEW FORMAT)
+    console.log("\n=== Public Inputs (192 bytes total) ===");
+    console.log("token:                ", token);
+    console.log("merkle_root:          ", merkle_root);
+    console.log("input_nullifiers[0]:  ", input1_nullifier);
+    console.log("input_nullifiers[1]:  ", input2_nullifier);
+    console.log("transfer_commitment:  ", output1_commitment);
+    console.log("change_commitment:    ", output2_commitment);
 
     console.log("\n=== Test Scenario ===");
     console.log("Alice (sender) has 2 notes: 5 SUI + 3 SUI = 8 SUI");

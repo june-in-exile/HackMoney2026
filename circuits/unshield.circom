@@ -40,8 +40,8 @@ template Unshield(levels) {
 
     // ============ Public Outputs ============
     signal output nullifier;              // Nullifier for input note
-    signal output change_commitment;      // Commitment for change note (0 if no change)
     signal output merkle_root;            // Merkle root
+    signal output change_commitment;      // Commitment for change note (0 if no change)
 
     // ============ Step 1: Compute MPK ============
     // MPK = Poseidon(spending_key, nullifying_key)

@@ -91,7 +91,7 @@ template Transfer(levels) {
     // ============ Step 3: Verify Output Commitments ============
     // For each output note, verify commitment = Poseidon(NSK, token, value)
     signal transfer_nsk <== Poseidon(2)([recipient_mpk, transfer_random]);
-    signal transfer_commitments <== Poseidon(3)([transfer_nsk, token, transfer_value]);
+    transfer_commitment <== Poseidon(3)([transfer_nsk, token, transfer_value]);
 
     signal change_nsk <== Poseidon(2)([sender_mpk, change_random]);
     signal real_change_commitment <== Poseidon(3)([change_nsk, token, change_value]);
@@ -106,6 +106,4 @@ template Transfer(levels) {
 }
 
 // Main circuit with 16 levels (supports 2^16 = 65,536 notes)
-// Public inputs: merkle_root, input_nullifiers[2], output_commitments[2]
-// Total public inputs: 5 field elements (1 + 2 + 2)
 component main {public [token, merkle_root]} = Transfer(16);

@@ -99,10 +99,6 @@ export interface SuiUnshieldProof {
   proofBytes: Uint8Array;
   /** Public inputs (128 bytes: root || nullifier || unshield_amount || change_commitment) */
   publicInputsBytes: Uint8Array;
-  /** Change note (if any) */
-  changeNote: Note | null;
-  /** Encrypted change note data for scanning */
-  encryptedChangeNote: Uint8Array;
 }
 
 // ============ Transfer Types ============
@@ -119,32 +115,46 @@ export interface TransferInput {
   inputLeafIndices: number[];
   /** Merkle proof paths for input notes */
   inputPathElements: bigint[][];
-  /** Output notes (exactly 2: recipient + change) */
-  outputNotes: Note[];
+  /** Recipient's master public key (for transfer output) */
+  recipientMpk: bigint;
+  /** Amount to transfer to recipient */
+  transferValue: bigint;
+  /** Random blinding factor for transfer note */
+  transferRandom: bigint;
+  /** Change amount (back to sender) */
+  changeValue: bigint;
+  /** Random blinding factor for change note */
+  changeRandom: bigint;
   /** Token type */
   token: bigint;
 }
 
 /**
- * Circuit input for transfer proof generation
+ * Circuit input for transfer proof generation (NEW INTERFACE)
+ * Matches updated transfer.circom with separate transfer/change outputs
  */
 export interface TransferCircuitInput {
   // Private inputs
   spending_key: string;
   nullifying_key: string;
-  input_nsks: string[];
-  input_values: string[];
-  input_randoms: string[];
-  input_leaf_indices: string[];
-  input_path_elements: string[][];
-  output_nsks: string[];
-  output_values: string[];
-  output_randoms: string[];
-  token: string;
+  input_randoms: string[];          // [2] - Random blinding factors for inputs
+  input_values: string[];           // [2] - Values for inputs (can be 0 for dummy)
+  input_leaf_indices: string[];     // [2] - Leaf positions in tree
+  input_path_elements: string[][];  // [2][levels] - Merkle proof siblings
+
+  // NEW: Separate transfer and change outputs
+  recipient_mpk: string;            // Recipient's master public key
+  transfer_value: string;           // Amount to transfer to recipient
+  transfer_random: string;          // Random for transfer commitment
+  change_value: string;             // Change amount back to sender
+  change_random: string;            // Random for change commitment
+
   // Public inputs
+  token: string;
   merkle_root: string;
-  input_nullifiers: string[];
-  output_commitments: string[];
+
+  // Note: Public outputs (input_nullifiers[2], transfer_commitment, change_commitment)
+  // are computed by the circuit and don't need to be provided as inputs
 }
 
 /**
@@ -153,7 +163,7 @@ export interface TransferCircuitInput {
 export interface SuiTransferProof {
   /** Proof points (128 bytes: A || B || C) */
   proofBytes: Uint8Array;
-  /** Public inputs (160 bytes: root || null1 || null2 || comm1 || comm2) */
+  /** Public inputs (192 bytes: token || root || null1 || null2 || transfer_comm || change_comm) */
   publicInputsBytes: Uint8Array;
 }
 

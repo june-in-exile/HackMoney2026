@@ -66,7 +66,8 @@ export function buildUnshieldTransaction<T extends string>(
   poolId: string,
   coinType: T,
   proof: SuiUnshieldProof,
-  recipient: string
+  recipient: string,
+  encryptedChangeNote: Uint8Array
 ): Transaction {
   const tx = new Transaction();
 
@@ -78,7 +79,7 @@ export function buildUnshieldTransaction<T extends string>(
       tx.pure.vector("u8", Array.from(proof.proofBytes)),
       tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
       tx.pure.address(recipient),
-      tx.pure.vector("u8", Array.from(proof.encryptedChangeNote)),
+      tx.pure.vector("u8", Array.from(encryptedChangeNote)),
     ],
   });
 

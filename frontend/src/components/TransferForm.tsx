@@ -162,7 +162,11 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
           inputNotes: selectedNotes.map((n) => n.note),
           inputLeafIndices: selectedNotes.map((n) => n.leafIndex),
           inputPathElements: selectedNotes.map((n) => n.pathElements!),
-          outputNotes: [recipientNote, changeNote],
+          recipientMpk: recipientProfile.mpk,
+          transferValue: amountNano,
+          transferRandom: recipientNote.random,
+          changeValue: inputTotal - amountNano,
+          changeRandom: changeNote.random,
           token: selectedNotes[0].note.token,
         },
         {
@@ -175,7 +179,6 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       const suiProof = convertTransferProofToSui(proof.proof, proof.publicSignals);
 
       // 7. Encrypt output notes for recipients using viewing public keys
-      // ✅ PRODUCTION: Using explicitly shared viewing public key
       const recipientViewingPk = typeof recipientProfile.viewingPublicKey === 'string'
         ? importViewingPublicKey(recipientProfile.viewingPublicKey)
         : recipientProfile.viewingPublicKey;
@@ -257,7 +260,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
             )}
           </p>
         </div>
-        
+
         {/* Recipient Profile Input */}
         <RecipientInput
           onRecipientChange={setRecipientProfile}
@@ -300,15 +303,15 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
                 {state === "refreshing"
                   ? "Refreshing Notes..."
                   : state === "generating-proof"
-                  ? "Generating ZK Proof..."
-                  : "Submitting Transaction..."}
+                    ? "Generating ZK Proof..."
+                    : "Submitting Transaction..."}
               </p>
               <p className="text-[10px] text-gray-400 font-mono mt-0.5">
                 {state === "refreshing"
                   ? "// Fetching latest Merkle proofs"
                   : state === "generating-proof"
-                  ? "// Proof generation in progress (30-60s)"
-                  : "// Awaiting wallet confirmation"}
+                    ? "// Proof generation in progress (30-60s)"
+                    : "// Awaiting wallet confirmation"}
               </p>
             </div>
           </div>

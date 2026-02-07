@@ -42,12 +42,11 @@ function isNodeEnvironment(): boolean {
     process.versions.node != null;
 }
 
-/** Load file in Node.js environment */
-async function loadFileNode(filePath: string): Promise<Buffer> {
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`File not found: ${filePath}`);
-  }
-  return fs.readFileSync(filePath);
+/** Helper: Path validation for Node.js environment */
+function validateAndGetPaths(wasmPath: string, zkeyPath: string): [string, string] {
+  if (!fs.existsSync(wasmPath)) throw new Error(`WASM not found: ${wasmPath}`);
+  if (!fs.existsSync(zkeyPath)) throw new Error(`Zkey not found: ${zkeyPath}`);
+  return [wasmPath, zkeyPath];
 }
 
 /** Load file in browser environment via fetch */
@@ -57,6 +56,21 @@ async function loadFileBrowser(url: string): Promise<ArrayBuffer> {
     throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
   }
   return await response.arrayBuffer();
+}
+
+/** Helper: Resource loading for browser environment */
+async function loadBrowserBuffers(wasmPath: string, zkeyPath: string): Promise<[Uint8Array, Uint8Array]> {
+  const [wasmBuf, zkeyBuf] = await Promise.all([
+    loadFileBrowser(wasmPath),
+    loadFileBrowser(zkeyPath),
+  ]);
+  return [new Uint8Array(wasmBuf), new Uint8Array(zkeyBuf)];
+}
+
+function validateMerkleRoot(expected: string, actual: string): void {
+  if (expected !== actual) {
+    console.warn("Merkle root mismatch between SDK and circuit");
+  }
 }
 
 /**
@@ -169,44 +183,24 @@ export async function generateUnshieldProof(
   unshieldInput: UnshieldInput,
   config: ProverConfig = {}
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[]; changeNote: Note | null; changeRandom: bigint }> {
-  const paths = getUnshieldCircuitPaths();
-  const wasmPath = config.wasmPath ?? paths.wasmPath;
-  const zkeyPath = config.zkeyPath ?? paths.zkeyPath;
+  const { wasmPath, zkeyPath } = { ...getUnshieldCircuitPaths(), ...config };
 
   // Build circuit input
   const { circuitInput, changeNote, changeRandom } = buildUnshieldInput(unshieldInput);
 
-  // Generate proof (snarkjs supports both Node.js and browser)
-  if (isNodeEnvironment()) {
-    // Node.js: Check if files exist, then use file paths directly
-    if (!fs.existsSync(wasmPath)) {
-      throw new Error(`Circuit WASM not found: ${wasmPath}`);
-    }
-    if (!fs.existsSync(zkeyPath)) {
-      throw new Error(`ZKey not found: ${zkeyPath}`);
-    }
+  // 1. Prepare resources (get content or paths based on environment)
+  const [wasm, zkey] = isNodeEnvironment()
+    ? validateAndGetPaths(wasmPath, zkeyPath)
+    : await loadBrowserBuffers(wasmPath, zkeyPath);
 
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      circuitInput as unknown as snarkjs.CircuitSignals,
-      wasmPath,
-      zkeyPath
-    );
+  // 2. Execute proof generation
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    circuitInput as unknown as snarkjs.CircuitSignals,
+    wasm,
+    zkey
+  );
 
-    return { proof, publicSignals, changeNote, changeRandom };
-  } else {
-    const [wasmBuffer, zkeyBuffer] = await Promise.all([
-      loadFileBrowser(wasmPath),
-      loadFileBrowser(zkeyPath),
-    ]);
-
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      circuitInput as unknown as snarkjs.CircuitSignals,
-      new Uint8Array(wasmBuffer),
-      new Uint8Array(zkeyBuffer)
-    );
-
-    return { proof, publicSignals, changeNote, changeRandom };
-  }
+  return { proof, publicSignals, changeNote, changeRandom };
 }
 
 /**
@@ -217,22 +211,18 @@ export async function generateUnshieldProof(
 export function convertUnshieldProofToSui(
   proof: snarkjs.Groth16Proof,
   publicSignals: string[],
-  changeNote: Note | null,
-  recipientViewingPk: Uint8Array
 ): SuiUnshieldProof {
+  // Validate public signals count for unshield circuit
+  if (publicSignals.length !== 4) {
+    throw new Error(`Expected 4 public signals for unshield, got ${publicSignals.length}`);
+  }
+
   const proofBytes = serializeProof(proof as any);
   const publicInputsBytes = serializePublicInputs(publicSignals);
 
-  // Encrypt change note if it exists (user sends change to themselves)
-  const encryptedChangeNote = changeNote
-    ? encryptNote(changeNote, recipientViewingPk)
-    : new Uint8Array(0);
-
   return {
     proofBytes,
-    publicInputsBytes,
-    changeNote,
-    encryptedChangeNote,
+    publicInputsBytes
   };
 }
 
@@ -265,16 +255,25 @@ function getTransferCircuitPaths() {
 
 /**
  * Build circuit input for transfer proof (2-input, 2-output)
+ * Updated to match new transfer.circom interface with separate transfer/change outputs
  */
 export function buildTransferInput(transferInput: TransferInput): TransferCircuitInput {
-  const { keypair, inputNotes, inputLeafIndices, inputPathElements, outputNotes, token } = transferInput;
+  const {
+    keypair,
+    inputNotes,
+    inputLeafIndices,
+    inputPathElements,
+    recipientMpk,
+    transferValue,
+    transferRandom,
+    changeValue,
+    changeRandom,
+    token
+  } = transferInput;
 
   // Validate inputs
   if (inputNotes.length < 1 || inputNotes.length > 2) {
     throw new Error("Transfer requires 1 or 2 input notes");
-  }
-  if (outputNotes.length !== 2) {
-    throw new Error("Transfer requires exactly 2 output notes");
   }
   if (inputPathElements.length !== inputNotes.length) {
     throw new Error("Path elements must match input notes count");
@@ -289,6 +288,16 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
     }
   }
 
+  // Validate balance conservation
+  const inputSum = inputNotes.reduce((sum, note) => sum + note.value, 0n);
+  const outputSum = transferValue + changeValue;
+  if (inputSum !== outputSum) {
+    throw new Error(
+      `Balance mismatch: inputs=${inputSum}, outputs=${outputSum}. ` +
+      `Transfer requires input_sum === transfer_value + change_value`
+    );
+  }
+
   // Pad to 2 inputs if only 1 provided (use dummy note with value=0)
   const paddedInputs = [...inputNotes];
   const paddedIndices = [...inputLeafIndices];
@@ -296,48 +305,28 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
 
   if (paddedInputs.length === 1) {
     // Create a dummy note with value=0 to pad to 2 inputs.
-    // The circuit uses conditional constraints (enabled flag based on value):
+    // The circuit uses conditional constraints (isValueZero flag):
     //   - When value=0: Merkle proof check and root equality are bypassed
     //   - Nullifier is still computed: Poseidon(nullifying_key, leaf_index)
-    //
-    // Key requirements for dummy note:
-    // 1. value = 0 (triggers Merkle proof bypass in circuit line 110)
-    // 2. token = same as transfer token (circuit requires all notes use same token)
-    // 3. NSK = Poseidon(MPK, random) (circuit verifies this at line 82)
-    // 4. commitment = Poseidon(NSK, token, value)
-    // 5. Unique leaf index (to avoid duplicate nullifiers with real note)
-
-    // Compute MPK from keypair (same as circuit does at line 53-56)
-    const mpk = poseidonHash([keypair.spendingKey, keypair.nullifyingKey]);
-
-    // Generate valid NSK for dummy note
-    const dummyRandom = 0n;  // Can be any value, using 0 for simplicity
-    const dummyNpk = poseidonHash([mpk, dummyRandom]);
+    const dummyRandom = 0n;
 
     const dummyNote: Note = {
-      nsk: dummyNpk,           // Valid NSK = Poseidon(MPK, random)
-      token: token,            // Must match transfer token
+      nsk: 0n,
+      token: token,
       value: 0n,               // Triggers Merkle bypass
-      random: dummyRandom,     // Matches NSK computation
-      commitment: poseidonHash([dummyNpk, token, 0n])  // Use computed NSK
+      random: dummyRandom,
+      commitment: 0n
     };
 
     paddedInputs.push(dummyNote);
 
     // Use a unique leaf index for the dummy note to avoid nullifier collision.
-    // If the real note is at index 0, we use 1 for the dummy. Otherwise, 0 is safe.
     const dummyIndex = inputLeafIndices[0] === 0 ? 1 : 0;
     paddedIndices.push(dummyIndex);
 
     // For a dummy/zero input, the path elements should all be zero.
-    // The circuit bypasses Merkle proof verification when value=0.
     paddedPaths.push(Array(MERKLE_TREE_DEPTH).fill(0n));
   }
-
-  // Compute nullifiers for both inputs
-  const inputNullifiers = paddedIndices.map((index) =>
-    computeNullifier(keypair.nullifyingKey, index)
-  );
 
   // Compute merkle root from first input
   const merkleRoot = computeMerkleRoot(
@@ -346,8 +335,14 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
     paddedIndices[0]
   );
 
+  // DEBUG: Log Merkle root computation details
+  console.log('[Transfer Prover] Merkle Root Computation:');
+  console.log(`  Input 0 commitment: ${paddedInputs[0].commitment.toString()}`);
+  console.log(`  Input 0 leafIndex: ${paddedIndices[0]}`);
+  console.log(`  Computed root: ${merkleRoot.toString()}`);
+  console.log(`  Path elements[0]: ${paddedPaths[0][0].toString()}`);
+
   // CRITICAL VALIDATION: Verify second input (if non-dummy) has same root
-  // This prevents circuit constraint failure at line 103
   if (paddedInputs.length === 2 && paddedInputs[1].value > 0n) {
     const root2 = computeMerkleRoot(
       paddedInputs[1].commitment,
@@ -355,9 +350,13 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
       paddedIndices[1]
     );
 
+    console.log(`  Input 1 commitment: ${paddedInputs[1].commitment.toString()}`);
+    console.log(`  Input 1 leafIndex: ${paddedIndices[1]}`);
+    console.log(`  Input 1 computed root: ${root2.toString()}`);
+
     if (root2 !== merkleRoot) {
       throw new Error(
-        `Merkle root mismatch! This will cause circuit failure at line 103.\n` +
+        `Merkle root mismatch! This will cause circuit failure.\n` +
         `Input 0: leafIndex=${paddedIndices[0]}, root=${merkleRoot.toString()}\n` +
         `Input 1: leafIndex=${paddedIndices[1]}, root=${root2.toString()}\n` +
         `Reason: Notes were created at different tree states.\n` +
@@ -370,19 +369,21 @@ export function buildTransferInput(transferInput: TransferInput): TransferCircui
     // Private inputs
     spending_key: keypair.spendingKey.toString(),
     nullifying_key: keypair.nullifyingKey.toString(),
-    input_nsks: paddedInputs.map((n) => n.nsk.toString()),
-    input_values: paddedInputs.map((n) => n.value.toString()),
     input_randoms: paddedInputs.map((n) => n.random.toString()),
+    input_values: paddedInputs.map((n) => n.value.toString()),
     input_leaf_indices: paddedIndices.map((idx) => idx.toString()),
     input_path_elements: paddedPaths.map((path) => path.map((e) => e.toString())),
-    output_nsks: outputNotes.map((n) => n.nsk.toString()),
-    output_values: outputNotes.map((n) => n.value.toString()),
-    output_randoms: outputNotes.map((n) => n.random.toString()),
-    token: token.toString(),
+
+    // NEW: Separate transfer and change outputs
+    recipient_mpk: recipientMpk.toString(),
+    transfer_value: transferValue.toString(),
+    transfer_random: transferRandom.toString(),
+    change_value: changeValue.toString(),
+    change_random: changeRandom.toString(),
+
     // Public inputs
+    token: token.toString(),
     merkle_root: merkleRoot.toString(),
-    input_nullifiers: inputNullifiers.map((n) => n.toString()),
-    output_commitments: outputNotes.map((n) => n.commitment.toString()),
   };
 }
 
@@ -393,59 +394,48 @@ export async function generateTransferProof(
   transferInput: TransferInput,
   config: ProverConfig = {}
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
-  const paths = getTransferCircuitPaths();
-  const wasmPath = config.wasmPath ?? paths.wasmPath;
-  const zkeyPath = config.zkeyPath ?? paths.zkeyPath;
+  const { wasmPath, zkeyPath } = { ...getTransferCircuitPaths(), ...config };
 
   // Build circuit input
   const input = buildTransferInput(transferInput);
 
-  // Generate proof (snarkjs supports both Node.js and browser)
-  if (isNodeEnvironment()) {
-    // Node.js: Check if files exist, then use file paths directly
-    if (!fs.existsSync(wasmPath)) {
-      throw new Error(`Transfer circuit WASM not found: ${wasmPath}`);
-    }
-    if (!fs.existsSync(zkeyPath)) {
-      throw new Error(`Transfer zkey not found: ${zkeyPath}`);
-    }
+  // 1. Prepare resources (get content or paths based on environment)
+  const [wasm, zkey] = isNodeEnvironment()
+    ? validateAndGetPaths(wasmPath, zkeyPath)
+    : await loadBrowserBuffers(wasmPath, zkeyPath);
 
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input as unknown as snarkjs.CircuitSignals,
-      wasmPath,
-      zkeyPath
-    );
+  // 2. Execute proof generation
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    input as unknown as snarkjs.CircuitSignals,
+    wasm,
+    zkey
+  );
 
-    return { proof, publicSignals };
-  } else {
-    const [wasmBuffer, zkeyBuffer] = await Promise.all([
-      loadFileBrowser(wasmPath),
-      loadFileBrowser(zkeyPath),
-    ]);
+  validateMerkleRoot(input.merkle_root, publicSignals[5]);
 
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input as unknown as snarkjs.CircuitSignals,
-      new Uint8Array(wasmBuffer),
-      new Uint8Array(zkeyBuffer)
-    );
-
-    return { proof, publicSignals };
-  }
+  return { proof, publicSignals };
 }
 
 /**
  * Convert transfer proof to Sui-compatible format (Arkworks compressed)
  *
  * Uses shared compression utilities for consistent serialization.
- * Transfer proofs have 5 public inputs (vs 3 for unshield).
+ *
+ * IMPORTANT: Circom outputs public signals in this order:
+ *   [0] nullifier1, [1] nullifier2, [2] transfer_commitment, [3] change_commitment, [4] token, [5] merkle_root
+ *
+ * But Move contract expects this order:
+ *   [0] token, [1] merkle_root, [2] nullifier1, [3] nullifier2, [4] transfer_commitment, [5] change_commitment
+ *
+ * So we need to reorder the signals before serialization.
  */
 export function convertTransferProofToSui(
   proof: snarkjs.Groth16Proof,
   publicSignals: string[]
 ): SuiTransferProof {
   // Validate public signals count for transfer circuit
-  if (publicSignals.length !== 5) {
-    throw new Error(`Expected 5 public signals for transfer, got ${publicSignals.length}`);
+  if (publicSignals.length !== 6) {
+    throw new Error(`Expected 6 public signals for transfer, got ${publicSignals.length}`);
   }
 
   const proofBytes = serializeProof(proof as any);
@@ -634,18 +624,21 @@ export async function generateSwapProof(
   swapInput: SwapInput,
   config?: { wasmPath?: string; zkeyPath?: string }
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
-  const paths = getSwapCircuitPaths();
-  const wasmPath = config?.wasmPath ?? paths.wasmPath;
-  const zkeyPath = config?.zkeyPath ?? paths.zkeyPath;
+  const { wasmPath, zkeyPath } = { ...getTransferCircuitPaths(), ...config };
 
   // Build circuit input
-  const circuitInput = buildSwapInput(swapInput);
+  const input = buildSwapInput(swapInput);
+
+  // 1. Prepare resources (get content or paths based on environment)
+  const [wasm, zkey] = isNodeEnvironment()
+    ? validateAndGetPaths(wasmPath, zkeyPath)
+    : await loadBrowserBuffers(wasmPath, zkeyPath);
 
   // Generate proof using snarkjs
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-    circuitInput as any,
-    wasmPath,
-    zkeyPath
+    input as unknown as snarkjs.CircuitSignals,
+    wasm,
+    zkey
   );
 
   return { proof, publicSignals };

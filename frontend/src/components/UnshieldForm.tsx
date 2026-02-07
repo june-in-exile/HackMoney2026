@@ -14,6 +14,8 @@ import {
   generateUnshieldProof,
   convertUnshieldProofToSui,
   deriveViewingPublicKey,
+  buildUnshieldTransaction,
+  encryptNote,
 } from "@june_zk/octopus-sdk";
 import { NumberInput } from "@/components/NumberInput";
 
@@ -135,20 +137,14 @@ export function UnshieldForm({
       setState("submitting");
 
       const viewingPk = deriveViewingPublicKey(keypair!.spendingKey);
-      const suiProof = convertUnshieldProofToSui(proof, publicSignals, changeNote, viewingPk);
+      const suiProof = convertUnshieldProofToSui(proof, publicSignals);
 
-      const tx = new Transaction();
-      tx.moveCall({
-        target: `${PACKAGE_ID}::pool::unshield`,
-        typeArguments: [SUI_COIN_TYPE],
-        arguments: [
-          tx.object(POOL_ID),
-          tx.pure.vector("u8", Array.from(suiProof.proofBytes)),
-          tx.pure.vector("u8", Array.from(suiProof.publicInputsBytes)),
-          tx.pure.address(recipientAddr),
-          tx.pure.vector("u8", Array.from(suiProof.encryptedChangeNote)),
-        ],
-      });
+      // Encrypt change note if it exists
+      const encryptedChangeNote = changeNote
+        ? encryptNote(changeNote, viewingPk)
+        : new Uint8Array(0);
+      
+      const tx = buildUnshieldTransaction(PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, suiProof, recipientAddr, encryptedChangeNote);
 
       const result = await signAndExecute({ transaction: tx });
       txDigests.push(result.digest);
@@ -454,12 +450,6 @@ export function UnshieldForm({
         <div className="space-y-1">
           <p className="text-[10px] text-gray-500 font-mono">
             <span className="text-cyber-blue">◉</span> Privacy: Note details remain hidden, only nullifier revealed
-          </p>
-          <p className="text-[10px] text-gray-500 font-mono">
-            <span className="text-cyber-blue">◉</span> Multiple notes: If no single note covers the amount, multiple transactions will be used
-          </p>
-          <p className="text-[10px] text-gray-500 font-mono">
-            <span className="text-cyber-blue">◉</span> Gas costs: Scale with number of notes used (1 proof + 1 tx per note)
           </p>
         </div>
       </div>

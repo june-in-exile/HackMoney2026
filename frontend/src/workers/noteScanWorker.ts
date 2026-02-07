@@ -559,7 +559,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         // ========================================================================
         // Build Merkle tree
         // ========================================================================
-        const merkleStart = Date.now();
         if (allCommitments.length > 0) {
           // Sort commitments by leafIndex to ensure proper insertion order
           allCommitments.sort((a, b) => a.leafIndex - b.leafIndex);
