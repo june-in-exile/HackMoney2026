@@ -391,9 +391,12 @@ module octopus::pool {
         );
 
         // 5. Mark both nullifiers as spent
+        let mut usedNullifiers = vector::empty<vector<u8>>();
         nullifier::mark_spent(&mut pool.nullifiers, nullifier1);
+        vector::push_back(&mut usedNullifiers, nullifier1);
         if (!is_zero_commitment(&nullifier2)) { // not dummy commit
             nullifier::mark_spent(&mut pool.nullifiers, nullifier2);
+            vector::push_back(&mut usedNullifiers, nullifier2);
         };
 
         // 6. Save current root before inserting (so existing proofs remain valid)
@@ -424,7 +427,7 @@ module octopus::pool {
         // 10. Emit event for wallet scanning
         event::emit(TransferEvent {
             pool_id: object::id(pool),
-            input_nullifiers: vector[nullifier1, nullifier2],
+            input_nullifiers: usedNullifiers,
             output_commitments,
             output_positions,
             output_notes,
