@@ -5,17 +5,18 @@ import {
   useCurrentAccount,
   useSignAndExecuteTransaction,
   useSuiClient,
+  useSuiClientContext,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
+import { PACKAGE_ID, SUI_POOL_ID, SUI_COIN_TYPE, TOKENS, DEEPBOOK_POOLS, CIRCUIT_URLS } from "@/lib/constants";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
   generateSwapProof,
   convertSwapProofToSui,
   calculateMinOutput,
-  estimateCetusSwap,
+  estimateDeepBookSwap,
   buildSwapTransaction,
   selectNotesForTransfer,
   createNote,
@@ -40,29 +41,6 @@ interface SwapFormProps {
   markNoteSpent?: (nullifier: bigint) => void;
 }
 
-// Mock price oracle (for demo purposes)
-// TODO: Replace with real Cetus DEX integration
-const MOCK_PRICES = {
-  SUI_USDC: 3.0, // 1 SUI = 3 USDC
-  USDC_SUI: 1 / 3.0, // 1 USDC = 0.333 SUI
-};
-
-// Token types
-const TOKENS = {
-  SUI: {
-    type: "0x2::sui::SUI",
-    symbol: "SUI",
-    decimals: 9,
-    poolId: POOL_ID, // TODO: Use actual SUI pool ID
-  },
-  USDC: {
-    type: "0x...", // TODO: Add real USDC type
-    symbol: "USDC",
-    decimals: 6,
-    poolId: "0x...", // TODO: Add USDC pool ID
-  },
-};
-
 export function SwapForm({ keypair, notes, loading: notesLoading, error: notesError, onSuccess, onRefresh, markNoteSpent }: SwapFormProps) {
   const [amountIn, setAmountIn] = useState("");
   const [amountOut, setAmountOut] = useState("");
@@ -76,6 +54,8 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
   const [priceImpact, setPriceImpact] = useState<number>(0);
 
   const account = useCurrentAccount();
+  const { network } = useSuiClientContext();
+  const isMainnet = network === "mainnet";
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
@@ -100,36 +80,46 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
       try {
         const amountInFloat = parseFloat(amountIn);
 
-        // Use mock prices for demo
-        // TODO: Replace with real Cetus DEX integration
-        let price: number;
-        let outputDecimals: number;
-
-        if (tokenIn === "SUI" && tokenOut === "USDC") {
-          price = MOCK_PRICES.SUI_USDC;
-          outputDecimals = TOKENS.USDC.decimals;
-        } else if (tokenIn === "USDC" && tokenOut === "SUI") {
-          price = MOCK_PRICES.USDC_SUI;
-          outputDecimals = TOKENS.SUI.decimals;
-        } else {
-          // Same token, no swap
+        // Check if swapping same token
+        if (tokenIn === tokenOut) {
           setAmountOut(amountIn);
           setPriceImpact(0);
           setIsEstimating(false);
           return;
         }
 
-        // Calculate output amount
-        const outputAmount = amountInFloat * price;
+        // Get pool configuration
+        const poolKey = `${tokenIn}_${tokenOut}`;
+        const deepbookPoolId = DEEPBOOK_POOLS[poolKey];
 
-        // Mock price impact (0.1% - 0.5% based on amount)
-        const mockImpact = Math.min(0.5, (amountInFloat / 100) * 0.1);
+        if (!deepbookPoolId || deepbookPoolId === "0x...") {
+          throw new Error(`DeepBook pool not configured for ${poolKey}`);
+        }
 
-        setAmountOut(outputAmount.toFixed(outputDecimals));
-        setPriceImpact(mockImpact);
+        // Convert to smallest units
+        const amountInBigInt = BigInt(
+          Math.floor(amountInFloat * Math.pow(10, TOKENS[tokenIn].decimals))
+        );
+
+        // Estimate swap using DeepBook
+        const isBid = tokenIn === "USDC"; // Buying SUI with USDC
+        const estimation = await estimateDeepBookSwap(
+          client,
+          deepbookPoolId,
+          amountInBigInt,
+          isBid
+        );
+
+        // Convert output to display units
+        const amountOutFloat = Number(estimation.amountOut) /
+          Math.pow(10, TOKENS[tokenOut].decimals);
+
+        setAmountOut(amountOutFloat.toFixed(TOKENS[tokenOut].decimals));
+        setPriceImpact(estimation.priceImpact);
       } catch (err) {
         console.error("Failed to estimate output:", err);
         setAmountOut("0");
+        setError(err instanceof Error ? err.message : "Failed to get price");
       } finally {
         setIsEstimating(false);
       }
@@ -137,7 +127,7 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
 
     const debounce = setTimeout(estimateOutput, 500);
     return () => clearTimeout(debounce);
-  }, [amountIn, tokenIn, tokenOut]);
+  }, [amountIn, tokenIn, tokenOut, client]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,7 +295,7 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
           tx.moveCall({
             target: `${PACKAGE_ID}::pool::get_merkle_root`,
             typeArguments: [SUI_COIN_TYPE],
-            arguments: [tx.object(POOL_ID)],
+            arguments: [tx.object(SUI_POOL_ID)],
           });
           return tx;
         })(),
@@ -370,13 +360,22 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
       const encryptedOutputNote = encryptNote(outputNote, myViewingPk);
       const encryptedChangeNote = encryptNote(changeNote, myViewingPk);
 
-      // 10. Build and execute transaction
+      // 10. Get DeepBook pool ID
+      const poolKey = `${tokenIn}_${tokenOut}`;
+      const deepbookPoolId = DEEPBOOK_POOLS[poolKey];
+
+      if (!deepbookPoolId || deepbookPoolId === "0x...") {
+        throw new Error(`DeepBook pool not found for ${poolKey}`);
+      }
+
+      // 11. Build and execute transaction
       const tx = buildSwapTransaction(
         PACKAGE_ID,
-        POOL_ID, // Pool for tokenIn (SUI pool for now)
-        POOL_ID, // Pool for tokenOut (TODO: separate USDC pool)
-        SUI_COIN_TYPE, // TokenIn type
-        SUI_COIN_TYPE, // TokenOut type (TODO: USDC type)
+        TOKENS[tokenIn].poolId,
+        TOKENS[tokenOut].poolId,
+        deepbookPoolId,
+        TOKENS[tokenIn].type,
+        TOKENS[tokenOut].type,
         suiProof,
         amountInBigInt,
         minAmountOut,
@@ -405,6 +404,7 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
 
   const unspentNotes = notes.filter((n) => !n.spent);
   const isFormValid =
+    isMainnet &&
     !!account &&
     !!keypair &&
     !!amountIn &&
@@ -415,14 +415,25 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="p-3 border border-yellow-600/30 bg-yellow-900/20 clip-corner">
-        <div className="flex items-start gap-2">
-          <span className="text-yellow-500 text-sm">!</span>
-          <p className="text-xs text-yellow-400 font-mono leading-relaxed">
-            Swap uses simulated prices (1 SUI = 3 USDC). Real Cetus DEX integration in progress.
-          </p>
+      {!isMainnet ? (
+        <div className="p-3 border border-red-600/40 bg-red-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-red-400 text-sm">✕</span>
+            <p className="text-xs text-red-400 font-mono leading-relaxed">
+              Swap requires <span className="text-amber-400 font-bold">Mainnet</span>. Switch network in your wallet or click the network badge in the header.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-3 border border-yellow-600/30 bg-yellow-900/20 clip-corner">
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-500 text-sm">!</span>
+            <p className="text-xs text-yellow-400 font-mono leading-relaxed">
+              Swap uses simulated prices (1 SUI = 3 USDC). Real DeepBook V3 integration in progress.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* Token In */}
@@ -507,10 +518,10 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
               FETCHING PRICE...
             </p>
           )}
-          {!isEstimating && amountOut && parseFloat(amountOut) > 0 && (
-            <p className="mt-2 text-[10px] text-yellow-500 font-mono flex items-center gap-1">
+          {!isEstimating && amountOut && parseFloat(amountOut) > 0 && priceImpact > 1.0 && (
+            <p className="mt-2 text-[10px] text-orange-500 font-mono flex items-center gap-1">
               <span>⚠</span>
-              <span>SIMULATED PRICE (1 SUI = {MOCK_PRICES.SUI_USDC} USDC)</span>
+              <span>HIGH PRICE IMPACT: {priceImpact.toFixed(2)}%</span>
             </p>
           )}
         </div>
@@ -614,9 +625,9 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
         </h4>
         <ol className="text-[10px] text-gray-400 space-y-1.5 list-decimal list-inside font-mono leading-relaxed">
           <li>Select input notes from pool</li>
-          <li>Fetch price from Cetus DEX</li>
+          <li>Fetch price from DeepBook DEX</li>
           <li>Generate Merkle proofs</li>
-          <li>Calculate nullifiers (prevent double-spending)</li> 
+          <li>Calculate nullifiers (prevent double-spending)</li>
           <li>Generate ZK proof (30-60s)</li>
           <li>Execute private swap</li>
           <li>Shield output tokens to pool</li>

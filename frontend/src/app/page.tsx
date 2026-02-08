@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSuiClientContext } from "@mysten/dapp-kit";
 import { Header } from "@/components/Header";
 import { KeypairSetup } from "@/components/KeypairSetup";
 import { BalanceCard } from "@/components/BalanceCard";
@@ -13,14 +13,20 @@ import { SwapForm } from "@/components/SwapForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
 import { useNotes } from "@/hooks/useNotes";
 import { usePoolInfo } from "@/hooks/usePoolInfo";
-import { PACKAGE_ID, POOL_ID, NETWORK } from "@/lib/constants";
+import { PACKAGE_ID, NETWORK, TOKENS } from "@/lib/constants";
+import type { TokenConfig } from "@/lib/constants";
 import { initPoseidon } from "@/lib/poseidon";
 
 type TabType = "shield" | "unshield" | "transfer" | "swap";
+type TokenSymbol = "SUI" | "USDC";
 
 export default function Home() {
   const account = useCurrentAccount();
+  const { network } = useSuiClientContext();
+  const isMainnet = network === "mainnet";
   const [activeTab, setActiveTab] = useState<TabType>("shield");
+  const [selectedToken, setSelectedToken] = useState<TokenSymbol>("SUI");
+  const tokenConfig: TokenConfig = TOKENS[selectedToken];
 
   // Initialize Poseidon early to prevent race conditions
   useEffect(() => {
@@ -51,10 +57,18 @@ export default function Home() {
     markNoteSpent,
     lastScanStats,
     totalNotesInPool,
-  } = useNotes(keypair, isLoading);
+  } = useNotes(keypair, isLoading, tokenConfig.poolId);
 
-  // Fetch pool information from blockchain
-  const { poolInfo, loading: isLoadingPoolInfo, refresh: refreshPoolInfo } = usePoolInfo();
+  // Persist worker-calculated active note counts per pool so they survive token switching
+  const [workerNoteCounts, setWorkerNoteCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (totalNotesInPool > 0) {
+      setWorkerNoteCounts((prev) => ({ ...prev, [tokenConfig.poolId]: totalNotesInPool }));
+    }
+  }, [totalNotesInPool, tokenConfig.poolId]);
+
+  // Fetch pool information for refresh only
+  const { refresh: refreshPoolInfo } = usePoolInfo(tokenConfig.poolId);
 
   // Calculate balance and note count from loaded notes
   const unspentNotes = notes.filter((n) => !n.spent);
@@ -134,50 +148,34 @@ export default function Home() {
                     href={`https://${NETWORK}.suivision.xyz/package/${PACKAGE_ID}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-cyber-blue hover:text-cyber-blue/80 transition-colors truncate max-w-md"
+                    className="text-cyber-blue hover:text-cyber-purple/80 transition-colors truncate max-w-md"
                     title={PACKAGE_ID}
                   >
                     {PACKAGE_ID.slice(0, 8)}...{PACKAGE_ID.slice(-6)}
                   </a>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-gray-500 uppercase tracking-wider">Pool ID:</span>
-                  <a
-                    href={`https://${NETWORK}.suivision.xyz/object/${POOL_ID}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyber-blue hover:text-cyber-blue/80 transition-colors"
-                    title={POOL_ID}
-                  >
-                    {POOL_ID.slice(0, 8)}...{POOL_ID.slice(-6)}
-                  </a>
-                  <span className="text-gray-500">
-                    {" | "}Type:
-                    <span className="text-cyber-blue ml-1">
-                      {isLoadingPoolInfo ? (
-                        "..."
-                      ) : poolInfo ? (
-                        poolInfo.tokenType.split("::").pop()?.toUpperCase() || "Unknown"
-                      ) : (
-                        "Unknown"
-                      )}
+                {Object.values(TOKENS).map((token) => (
+                  <div key={token.symbol} className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-gray-500 uppercase tracking-wider">{token.symbol} Pool:</span>
+                    <a
+                      href={`https://${NETWORK}.suivision.xyz/object/${token.poolId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyber-blue hover:text-cyber-purple/80 transition-colors"
+                      title={token.poolId}
+                    >
+                      {token.poolId.slice(0, 8)}...{token.poolId.slice(-6)}
+                    </a>
+                    <span className="text-gray-500">
+                      {" | "}Type:
+                      <span className="text-cyber-blue ml-1">{token.symbol}</span>
+                      {" | "}Total Notes:
+                      <span className="text-cyber-blue ml-1">
+                        {workerNoteCounts[token.poolId]?.toLocaleString() ?? "—"}
+                      </span>
                     </span>
-                    {" | "}Balance:
-                    <span className="text-cyber-blue ml-1">
-                      {isLoadingPoolInfo ? (
-                        "..."
-                      ) : poolInfo ? (
-                        `${Number(poolInfo.balance)}`
-                      ) : (
-                        "Unknown"
-                      )}
-                    </span>
-                    {" | "}Total Notes:
-                    <span className="text-cyber-blue ml-1">
-                      {totalNotesInPool.toLocaleString()}
-                    </span>
-                  </span>
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -193,9 +191,6 @@ export default function Home() {
               <h2 className="mb-3 text-2xl font-black uppercase tracking-wider text-cyber-blue text-cyber">
                 WALLET CONNECTION REQUIRED
               </h2>
-              <p className="text-gray-400 font-mono text-sm">
-                // Initialize Sui wallet to access privacy protocol
-              </p>
               <div className="mt-6 h-px bg-gradient-to-r from-transparent via-cyber-blue to-transparent" />
             </div>
           </div>
@@ -217,6 +212,7 @@ export default function Home() {
               <BalanceCard
                 shieldedBalance={shieldedBalance}
                 noteCount={noteCount}
+                tokenConfig={tokenConfig}
                 isLoading={isLoading}
                 isRefreshing={isLoadingNotes}
                 onRefresh={refreshNotes}
@@ -231,6 +227,26 @@ export default function Home() {
 
             {/* Right Column */}
             <div className="space-y-6">
+              {/* Token Selector */}
+              <div className="card">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Token:</span>
+                  {(["SUI", "USDC"] as TokenSymbol[]).map((sym) => (
+                    <button
+                      key={sym}
+                      onClick={() => setSelectedToken(sym)}
+                      className={`text-xs font-mono px-3 py-1 border transition-colors ${
+                        selectedToken === sym
+                          ? "border-cyber-blue text-cyber-blue bg-cyber-blue/10"
+                          : "border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300"
+                      }`}
+                    >
+                      {sym}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Tab Navigation */}
               <div className="card">
                 <div className="flex border-b-2 border-gray-800 relative">
@@ -256,10 +272,15 @@ export default function Home() {
                     onClick={() => setActiveTab("swap")}
                     className={`tab-button flex-1 ${activeTab === "swap"
                       ? "text-cyber-blue active"
-                      : "text-gray-500 hover:text-gray-300"
+                      : isMainnet
+                        ? "text-gray-500 hover:text-gray-300"
+                        : "text-gray-600 opacity-60"
                       }`}
                   >
                     ⇌ SWAP
+                    {!isMainnet && (
+                      <span className="ml-1 text-[8px] text-amber-500/70 font-mono">MAINNET</span>
+                    )}
                   </button>
                   <button
                     onClick={() => setActiveTab("unshield")}
@@ -275,11 +296,12 @@ export default function Home() {
                 {/* Tab Content */}
                 <div className="p-6">
                   {activeTab === "shield" && (
-                    <ShieldForm keypair={keypair} onSuccess={handleOperationSuccess} />
+                    <ShieldForm keypair={keypair} tokenConfig={tokenConfig} onSuccess={handleOperationSuccess} />
                   )}
                   {activeTab === "transfer" && (
                     <TransferForm
                       keypair={keypair}
+                      tokenConfig={tokenConfig}
                       notes={notes}
                       loading={isLoadingNotes}
                       onSuccess={handleOperationSuccess}
@@ -301,6 +323,7 @@ export default function Home() {
                   {activeTab === "unshield" && (
                     <UnshieldForm
                       keypair={keypair}
+                      tokenConfig={tokenConfig}
                       maxAmount={shieldedBalance}
                       notes={notes}
                       onSuccess={handleOperationSuccess}
