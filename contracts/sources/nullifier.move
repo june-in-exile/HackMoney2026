@@ -11,7 +11,7 @@ module octopus::nullifier {
     public struct NullifierRegistry has key, store {
         id: UID,
         // Nullifiers are stored as dynamic fields: dynamic_field::add(&mut id, nullifier, true)
-        // No need for explicit Table or count - Sui handles storage automatically
+        count: u64,
     }
 
     // ============ Public Functions ============
@@ -20,6 +20,7 @@ module octopus::nullifier {
     public fun new(ctx: &mut TxContext): NullifierRegistry {
         NullifierRegistry {
             id: object::new(ctx),
+            count: 0,
         }
     }
 
@@ -33,13 +34,19 @@ module octopus::nullifier {
     /// Uses Sui's dynamic_field::add which automatically aborts on duplicate keys.
     public fun mark_spent(registry: &mut NullifierRegistry, nullifier: vector<u8>) {
         dynamic_field::add(&mut registry.id, nullifier, true);
+        registry.count = registry.count + 1;
+    }
+
+    /// Return the total number of spent nullifiers
+    public fun count(registry: &NullifierRegistry): u64 {
+        registry.count
     }
 
     // ============ Test Helpers ============
 
     #[test_only]
     public fun destroy_for_testing(registry: NullifierRegistry) {
-        let NullifierRegistry { id } = registry;
+        let NullifierRegistry { id, count: _ } = registry;
         object::delete(id);
     }
 }
