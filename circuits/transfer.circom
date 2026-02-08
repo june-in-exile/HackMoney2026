@@ -35,10 +35,12 @@ template Transfer(levels) {
 
     // Output notes (notes being created)
     signal input recipient_mpk;          // Recipient master public key
-    signal input transfer_value;
-    signal input transfer_random;
-    signal input change_value;
-    signal input change_random;
+    signal input transfer_value;         // Transfer amount
+    signal input transfer_random;        // Random blinding factor for transfer
+
+    // Change note (if input > transfer_value, return change)
+    signal input change_value;           // Change amount
+    signal input change_random;          // Random blinding factor for change
 
     // ============ Public Inputs ============
     signal input token;                  // Token identifier (address hash)
@@ -90,7 +92,7 @@ template Transfer(levels) {
         // Check if this input is a dummy note (value == 0)
         isValueZero[i] <== IsZero()(input_values[i]);
 
-        // Conditionally verify nullifier = Poseidon(nullifying_key, leaf_index)
+        // Conditionally generate nullifier = Poseidon(nullifying_key, leaf_index)
         // - For real notes (value != 0): use real nullifier
         // - For dummy notes (value == 0): set nullifier to 0
         calculated_nullifiers[i] <== Poseidon(2)([nullifying_key, input_leaf_indices[i]]);
@@ -103,10 +105,13 @@ template Transfer(levels) {
     }
 
     // ============ Step 5: Verify Output Commitments ============
-    // For each output note, verify commitment = Poseidon(NSK, token, value)
+    // Output note commitment = Poseidon(recipient_NSK, token, value)
     signal transfer_nsk <== Poseidon(2)([recipient_mpk, transfer_random]);
     transfer_commitment <== Poseidon(3)([transfer_nsk, token, transfer_value]);
 
+    // ============ Step 6: Verify Change Commitment ============
+    // Change note commitment = Poseidon(sender_NSK, token, change_value)
+    // If no change, commitment will be 0
     signal change_nsk <== Poseidon(2)([sender_mpk, change_random]);
     signal real_change_commitment <== Poseidon(3)([change_nsk, token, change_value]);
     signal no_change <== IsZero()(change_value);

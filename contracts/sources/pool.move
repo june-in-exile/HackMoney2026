@@ -436,112 +436,6 @@ module octopus::pool {
         });
     }
 
-    /// Swap tokens privately through external DEX (e.g., DeepBook V3).
-    ///
-    /// The ZK proof proves:
-    /// 1. Knowledge of spending_key and nullifying_key (ownership of input notes)
-    /// 2. Both input notes exist in Merkle tree (2 Merkle proofs)
-    /// 3. Correct nullifier computation for both inputs
-    /// 4. Sufficient balance: sum(input_values) >= amount_in + change_value
-    /// 5. Swap parameters hash correctly
-    /// 6. Output and change commitments correctly computed
-    ///
-    /// Public inputs format (192 bytes total):
-    /// - merkle_root (32 bytes): Merkle tree root
-    /// - input_nullifiers[2] (64 bytes): Nullifiers for both input notes
-    /// - output_commitment (32 bytes): Commitment for output note (token_out)
-    /// - change_commitment (32 bytes): Commitment for change note (token_in)
-    /// - swap_data_hash (32 bytes): Hash of swap parameters
-    ///
-    /// NOTE: This is a TEST-ONLY version using 1:1 swap ratio.
-    /// For production use, see swap_production() with DeepBook V3 integration.
-    #[test_only]
-    public fun swap<TokenIn, TokenOut>(
-        pool_in: &mut PrivacyPool<TokenIn>,
-        pool_out: &mut PrivacyPool<TokenOut>,
-        proof_bytes: vector<u8>,
-        public_inputs_bytes: vector<u8>,
-        amount_in: u64,
-        min_amount_out: u64,
-        encrypted_output_note: vector<u8>,
-        encrypted_change_note: vector<u8>,
-        ctx: &mut TxContext,
-    ) {
-        // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 192, E_INVALID_PUBLIC_INPUTS);
-
-        // 0. Validate amount_in is greater than zero
-        assert!(amount_in > 0, E_ZERO_AMOUNT);
-
-        // 1. Parse public inputs
-        let (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, _swap_data_hash) =
-            parse_swap_public_inputs(&public_inputs_bytes);
-
-        // 2. Verify merkle root is valid (current or in history)
-        assert!(is_valid_root(pool_in, &merkle_root), E_INVALID_ROOT);
-
-        // 3. Check both nullifiers have not been spent (prevent double-spend)
-        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier1), E_DOUBLE_SPEND);
-        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier2), E_DOUBLE_SPEND);
-
-        // 4. Verify Groth16 ZK proof using swap verification key
-        // NOTE: Proof verification skipped in test-only version since we use placeholder proofs
-        // In production, this would verify the real ZK proof
-        let _pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool_in.swap_vk_bytes);
-        let _public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
-        let _proof_points = groth16::proof_points_from_bytes(proof_bytes);
-
-        // assert!(
-        //     groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
-        //     E_INVALID_PROOF
-        // );
-
-        // 5. Extract tokens from pool_in
-        assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
-        let coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
-
-        // 6. Execute swap through DEX
-        // TODO: Replace with real DeepBook V3 integration
-        // For now, using simplified 1:1 swap ratio for testing
-        let amount_out = execute_mock_swap<TokenIn, TokenOut>(
-            coin_in,
-            min_amount_out,
-            pool_out,
-            ctx
-        );
-
-        // 7. Mark both nullifiers as spent
-        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
-        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
-
-        // 8. Save current roots before inserting (so existing proofs remain valid)
-        save_historical_root(pool_in);
-        save_historical_root(pool_out);
-
-        // 9. Insert output commitment into pool_out's Merkle tree
-        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
-        merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
-
-        // 10. Insert change commitment into pool_in's Merkle tree
-        let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
-        merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
-
-        // 11. Emit event for wallet scanning
-        event::emit(SwapEvent {
-            pool_in_id: object::id(pool_in),
-            pool_out_id: object::id(pool_out),
-            input_nullifiers: vector[nullifier1, nullifier2],
-            output_commitment,
-            change_commitment,
-            output_position,
-            change_position,
-            amount_in,
-            amount_out,
-            encrypted_output_note,
-            encrypted_change_note,
-        });
-    }
-
     /// Execute private swap through external DEX (Production Version)
     ///
     /// This function enables private swaps through DeepBook V3 while maintaining privacy.
@@ -572,7 +466,7 @@ module octopus::pool {
     /// * `encrypted_output_note` - Encrypted note for recipient
     /// * `encrypted_change_note` - Encrypted change note
     /// * `ctx` - Transaction context
-    public fun swap_production<TokenIn, TokenOut>(
+    public fun swap<TokenIn, TokenOut>(
         pool_in: &mut PrivacyPool<TokenIn>,
         pool_out: &mut PrivacyPool<TokenOut>,
         deepbook_pool: &mut DeepBookPool<TokenIn, TokenOut>,
@@ -584,14 +478,14 @@ module octopus::pool {
         encrypted_change_note: vector<u8>,
         ctx: &mut TxContext,
     ) {
-        // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 192, E_INVALID_PUBLIC_INPUTS);
+        // Validate public inputs length (8 field elements × 32 bytes = 256 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 256, E_INVALID_PUBLIC_INPUTS);
 
         // 0. Validate amount_in is greater than zero
         assert!(amount_in > 0, E_ZERO_AMOUNT);
 
         // 1. Parse public inputs
-        let (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, _swap_data_hash) =
+        let (_token_in, _token_out, merkle_root, nullifier1, nullifier2, _swap_data_hash, output_commitment, change_commitment) =
             parse_swap_public_inputs(&public_inputs_bytes);
 
         // 2. Verify merkle root is valid (current or in history)
@@ -857,46 +751,52 @@ module octopus::pool {
     }
 
     /// Parse swap public inputs from concatenated bytes (for swap).
-    /// Returns (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash)
+    /// Returns (token_in, token_out, merkle_root, nullifier1, nullifier2, swap_data_hash, output_commitment, change_commitment)
     /// each as 32-byte vectors.
+    ///
+    /// Public signal order (8 × 32 = 256 bytes):
+    /// - Public inputs (token_in, token_out, merkle_root) come first
+    /// - Public outputs (nullifiers, swap_data_hash, output_commitment, change_commitment) follow
     fun parse_swap_public_inputs(bytes: &vector<u8>):
-        (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
+        (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
 
+        let mut token_in = vector::empty<u8>();
+        let mut token_out = vector::empty<u8>();
         let mut merkle_root = vector::empty<u8>();
         let mut nullifier1 = vector::empty<u8>();
         let mut nullifier2 = vector::empty<u8>();
+        let mut swap_data_hash = vector::empty<u8>();
         let mut output_commitment = vector::empty<u8>();
         let mut change_commitment = vector::empty<u8>();
-        let mut swap_data_hash = vector::empty<u8>();
 
-        // Extract merkle_root (bytes 0-31)
+        // Extract token_in (bytes 0-31)
         let mut i = 0;
         while (i < 32) {
+            vector::push_back(&mut token_in, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract token_out (bytes 32-63)
+        while (i < 64) {
+            vector::push_back(&mut token_out, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract merkle_root (bytes 64-95)
+        while (i < 96) {
             vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
-        // Extract nullifier1 (bytes 32-63)
-        while (i < 64) {
+        // Extract nullifier1 (bytes 96-127)
+        while (i < 128) {
             vector::push_back(&mut nullifier1, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
-        // Extract nullifier2 (bytes 64-95)
-        while (i < 96) {
-            vector::push_back(&mut nullifier2, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        // Extract output_commitment (bytes 96-127)
-        while (i < 128) {
-            vector::push_back(&mut output_commitment, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        // Extract change_commitment (bytes 128-159)
+        // Extract nullifier2 (bytes 128-159)
         while (i < 160) {
-            vector::push_back(&mut change_commitment, *vector::borrow(bytes, i));
+            vector::push_back(&mut nullifier2, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
@@ -906,7 +806,19 @@ module octopus::pool {
             i = i + 1;
         };
 
-        (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash)
+        // Extract output_commitment (bytes 192-223)
+        while (i < 224) {
+            vector::push_back(&mut output_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract change_commitment (bytes 224-255)
+        while (i < 256) {
+            vector::push_back(&mut change_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        (token_in, token_out, merkle_root, nullifier1, nullifier2, swap_data_hash, output_commitment, change_commitment)
     }
 
     /// Execute a mock swap (1:1 ratio) for testing.
@@ -948,6 +860,68 @@ module octopus::pool {
     }
 
     // ============ Test Helpers ============
+
+    /// Test-only swap that skips ZK proof verification and DeepBook integration.
+    /// Mirrors the production swap logic with a mock 1:1 exchange rate.
+    #[test_only]
+    public fun swap_for_testing<TokenIn, TokenOut>(
+        pool_in: &mut PrivacyPool<TokenIn>,
+        pool_out: &mut PrivacyPool<TokenOut>,
+        proof_bytes: vector<u8>,
+        public_inputs_bytes: vector<u8>,
+        amount_in: u64,
+        min_amount_out: u64,
+        encrypted_output_note: vector<u8>,
+        encrypted_change_note: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        // Validate public inputs length (8 field elements × 32 bytes = 256 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 256, E_INVALID_PUBLIC_INPUTS);
+        assert!(amount_in > 0, E_ZERO_AMOUNT);
+
+        let (_token_in, _token_out, merkle_root, nullifier1, nullifier2, _swap_data_hash, output_commitment, change_commitment) =
+            parse_swap_public_inputs(&public_inputs_bytes);
+
+        assert!(is_valid_root(pool_in, &merkle_root), E_INVALID_ROOT);
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier1), E_DOUBLE_SPEND);
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier2), E_DOUBLE_SPEND);
+
+        // Skip proof verification — use execute_mock_swap instead of real DEX
+        let _ = proof_bytes;
+        assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
+        let amount_out = execute_mock_swap<TokenIn, TokenOut>(
+            coin::take(&mut pool_in.balance, amount_in, ctx),
+            min_amount_out,
+            pool_out,
+            ctx,
+        );
+
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
+
+        save_historical_root(pool_in);
+        save_historical_root(pool_out);
+
+        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
+        merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
+
+        let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
+        merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
+
+        event::emit(SwapEvent {
+            pool_in_id: object::id(pool_in),
+            pool_out_id: object::id(pool_out),
+            input_nullifiers: vector[nullifier1, nullifier2],
+            output_commitment,
+            change_commitment,
+            output_position,
+            change_position,
+            amount_in,
+            amount_out,
+            encrypted_output_note,
+            encrypted_change_note,
+        });
+    }
 
     #[test_only]
     public fun destroy_for_testing<T>(pool: PrivacyPool<T>) {

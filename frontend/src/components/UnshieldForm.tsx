@@ -7,8 +7,8 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseTokenAmount, formatTokenAmount, truncateAddress } from "@/lib/utils";
-import { PACKAGE_ID } from "@/lib/constants";
 import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -56,6 +56,7 @@ export function UnshieldForm({
   const [currentTxIndex, setCurrentTxIndex] = useState(0);
   const [totalTxs, setTotalTxs] = useState(0);
 
+  const { packageId, network } = useNetworkConfig();
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
@@ -147,7 +148,7 @@ export function UnshieldForm({
         ? encryptNote(changeNote, viewingPk)
         : new Uint8Array(0);
       
-      const tx = buildUnshieldTransaction(PACKAGE_ID, tokenConfig.poolId, tokenConfig.type, suiProof, recipientAddr, encryptedChangeNote);
+      const tx = buildUnshieldTransaction(packageId!, tokenConfig.poolId, tokenConfig.type, suiProof, recipientAddr, encryptedChangeNote);
 
       const result = await signAndExecute({ transaction: tx });
       txDigests.push(result.digest);
@@ -386,7 +387,7 @@ export function UnshieldForm({
                     <>
                       TX:{' '}
                       <a
-                        href={`https://testnet.suivision.xyz/txblock/${success.txDigests[0]}`}
+                        href={`https://${network}.suivision.xyz/txblock/${success.txDigests[0]}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-cyber-blue hover:text-cyber-blue/80 underline"
@@ -401,7 +402,7 @@ export function UnshieldForm({
                         <span key={digest}>
                           {i > 0 && ', '}
                           <a
-                            href={`https://testnet.suivision.xyz/txblock/${digest}`}
+                            href={`https://${network}.suivision.xyz/txblock/${digest}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-cyber-blue hover:text-cyber-blue/80 underline"

@@ -2,7 +2,10 @@
  * Storage utility for managing Privacy Keypairs organized by wallet address and pool ID
  */
 
-import { PACKAGE_ID } from "./constants";
+import { NETWORK_CONFIG, NETWORK } from "./constants";
+
+const DEFAULT_PACKAGE_ID =
+  NETWORK_CONFIG[NETWORK as keyof typeof NETWORK_CONFIG]?.packageId ?? "octopus";
 
 export interface StoredKeypair {
   spendingKey: string;
@@ -186,6 +189,6 @@ export function clearActiveKeypair(identifier: KeypairIdentifier): void {
 export function getDefaultIdentifier(walletAddress: string): KeypairIdentifier {
   return {
     walletAddress: walletAddress.toLowerCase(),
-    poolPackageId: PACKAGE_ID,
+    poolPackageId: DEFAULT_PACKAGE_ID,
   };
 }

@@ -147,7 +147,7 @@ export function buildSwapTransaction<TokenIn extends string, TokenOut extends st
   const tx = new Transaction();
 
   tx.moveCall({
-    target: `${packageId}::pool::swap_production`,
+    target: `${packageId}::pool::swap`,
     typeArguments: [coinTypeIn, coinTypeOut],
     arguments: [
       tx.object(poolInId),

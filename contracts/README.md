@@ -48,18 +48,13 @@ cd ../../contracts/scripts
 ./deploy_package.sh
 # Or deploy to mainnet:
 ./deploy_package.sh --network mainnet
+# Auto-updates NEXT_PUBLIC_TESTNET_PACKAGE_ID or NEXT_PUBLIC_MAINNET_PACKAGE_ID in .env
 
-# 4. Update .env with PACKAGE_ID from deploy output
-# PACKAGE_ID=<package_id from deploy output>
-
-# 5. Create privacy pools (SUI + USDC by default)
+# 4. Create SUI pool (default: SUI pool on testnet)
 ./create_pool.sh
-# Or for mainnet:
-./create_pool.sh --network mainnet
-
-# 6. Update .env and frontend with SUI_POOL_ID and USDC_POOL_ID
-# SUI_POOL_ID=<auto-updated by create_pool.sh>
-# USDC_POOL_ID=<auto-updated by create_pool.sh>
+# Or create USDC pool on mainnet:
+./create_pool.sh --coin usdc --network mainnet
+# Auto-updates NEXT_PUBLIC_TESTNET_SUI_POOL_ID / NEXT_PUBLIC_MAINNET_USDC_POOL_ID etc. in .env
 ```
 
 ### When to Use Each Script
@@ -81,7 +76,7 @@ cd ../../contracts/scripts
 1. Switches active Sui client env to the target network
 2. Builds Move package (`sui move build`)
 3. Publishes package (`sui client publish`)
-4. Returns `PACKAGE_ID`
+4. Updates `NEXT_PUBLIC_TESTNET_PACKAGE_ID` or `NEXT_PUBLIC_MAINNET_PACKAGE_ID` in `.env`
 
 **Note:** Publishing creates a new immutable package. To upgrade an existing package, use `sui client upgrade` instead.
 
@@ -95,19 +90,22 @@ cd ../../contracts/scripts
 **Usage:**
 
 ```bash
-./create_pool.sh                        # Both pools, testnet (default)
-./create_pool.sh sui                    # SUI pool only, testnet
-./create_pool.sh usdc                   # USDC pool only, testnet
-./create_pool.sh --network mainnet      # Both pools, mainnet
-./create_pool.sh usdc --network mainnet # USDC pool only, mainnet
+./create_pool.sh                              # SUI + USDC pools, testnet (default)
+./create_pool.sh --coin usdc                  # USDC pool, testnet
+./create_pool.sh --coin both                  # SUI + USDC pools, testnet
+./create_pool.sh --network mainnet            # SUI pool, mainnet
+./create_pool.sh --coin usdc --network mainnet # USDC pool, mainnet
 ```
 
 **What it does:**
 
-1. Calls `pool::create_shared_pool<T>()` with verification keys from .env
-2. Creates shared `PrivacyPool<T>` object(s)
-3. Transfers `PoolAdminCap` to caller
-4. Updates `SUI_POOL_ID` / `USDC_POOL_ID` in `.env` automatically
+1. Reads `NEXT_PUBLIC_TESTNET_PACKAGE_ID` / `NEXT_PUBLIC_MAINNET_PACKAGE_ID` from `.env`
+2. Calls `pool::create_shared_pool<T>()` with verification keys from circuit build output
+3. Creates shared `PrivacyPool<T>` object(s) and transfers `PoolAdminCap` to caller
+4. Updates the following network-specific vars in `.env` automatically:
+   - `NEXT_PUBLIC_{NETWORK}_SUI_POOL_ID` / `NEXT_PUBLIC_{NETWORK}_USDC_POOL_ID`
+   - `{NETWORK}_UNSHIELD_VK`, `{NETWORK}_TRANSFER_VK`, `{NETWORK}_SWAP_VK`
+   - `NEXT_PUBLIC_{NETWORK}_USDC_TYPE`
 
 **Note:** Each pool instance has its own Merkle tree and nullifier registry. USDC pool enables private swaps via DeepBook.
 
@@ -199,7 +197,7 @@ All scripts are located in the `scripts/` directory.
 | Script | Purpose | Usage | When to Use |
 |--------|---------|-------|-------------|
 | `deploy_package.sh` | Publish Move package | `./deploy_package.sh [--network testnet\|mainnet]` | Initial deploy, contract changes |
-| `create_pool.sh` | Create privacy pool(s) | `./create_pool.sh [sui\|usdc\|both] [--network testnet\|mainnet]` | After package deploy (defaults to both) |
+| `create_pool.sh` | Create privacy pool(s) | `./create_pool.sh [--coin sui\|usdc\|both] [--network testnet\|mainnet]` | After package deploy (defaults to SUI/testnet) |
 | `update_vk.sh` | Update verification key(s) | `./update_vk.sh [vk] [pool]` | After modifying any circuit |
 
 **`update_vk.sh` arguments:** `vk` = `unshield` \| `transfer` \| `swap` \| `all` (default), `pool` = `sui` \| `usdc` \| `both` (default).

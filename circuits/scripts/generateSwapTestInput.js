@@ -145,55 +145,54 @@ async function main() {
     console.log("Merkle Root:", merkle_root);
 
     // ============ Create Input JSON ============
+    // Note: input_nsks, output_nsk, change_nsk are computed internally by the circuit.
+    // input_nullifiers, output_commitment, change_commitment, swap_data_hash are public OUTPUTS.
     const input = {
         // Private inputs - Keypair
         spending_key,
         nullifying_key,
 
-        // Input notes
-        input_nsks: [input1_nsk, input2_nsk],
+        // Input notes (private)
         input_values: [input1_value, input2_value],
         input_randoms: [input1_random, input2_random],
         input_leaf_indices: [input1_leaf_index, input2_leaf_index],
         input_path_elements: [input1_path_elements, input2_path_elements],
 
-        // Swap parameters
-        token_in,
-        token_out,
+        // Swap parameters (private)
         amount_in,
         min_amount_out,
         dex_pool_id,
 
-        // Output note
-        output_nsk,
+        // Output note (private)
         output_value,
         output_random,
 
-        // Change note
-        change_nsk,
+        // Change note (private)
         change_value,
         change_random,
 
         // Public inputs
+        token_in,
+        token_out,
         merkle_root,
-        input_nullifiers: [input1_nullifier, input2_nullifier],
-        output_commitment,
-        change_commitment,
-        swap_data_hash
     };
 
     // Save to file
     fs.writeFileSync(path.join(__dirname, "../build/swap_input.json"), JSON.stringify(input, null, 2));
     console.log("\n✓ Input saved to build/swap_input.json");
 
-    // Print public inputs for reference
-    console.log("\n=== Public Inputs (192 bytes total) ===");
+    // Print public inputs/outputs for reference
+    console.log("\n=== Public Inputs ===");
+    console.log("token_in:             ", token_in);
+    console.log("token_out:            ", token_out);
     console.log("merkle_root:          ", merkle_root);
+
+    console.log("\n=== Expected Public Outputs ===");
     console.log("input_nullifiers[0]:  ", input1_nullifier);
     console.log("input_nullifiers[1]:  ", input2_nullifier);
+    console.log("swap_data_hash:       ", swap_data_hash);
     console.log("output_commitment:    ", output_commitment);
     console.log("change_commitment:    ", change_commitment);
-    console.log("swap_data_hash:       ", swap_data_hash);
 
     console.log("\n=== Test Scenario ===");
     console.log("User has 2 notes: 5 SUI + 3 SUI = 8 SUI");

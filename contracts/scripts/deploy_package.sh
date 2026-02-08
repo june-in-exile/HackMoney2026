@@ -34,7 +34,8 @@ if [ -f "../.env" ]; then
 elif [ -f "../../.env" ]; then
     ENV_FILE="../../.env"
 else
-    echo "Warning: No .env file found. You'll need to manually update NEXT_PUBLIC_PACKAGE_ID later."
+    NETWORK_UPPER=$(echo "$NETWORK" | tr '[:lower:]' '[:upper:]')
+    echo "Warning: No .env file found. You'll need to manually update NEXT_PUBLIC_${NETWORK_UPPER}_PACKAGE_ID later."
 fi
 
 if [ -n "$ENV_FILE" ]; then
@@ -52,10 +53,7 @@ sui move build
 echo ""
 echo "Step 3: Publishing package to $NETWORK..."
 
-# Remove old Published.toml if exists
-rm -f Published.toml
-
-RAW_OUTPUT=$(sui client publish --gas-budget 500000000 --json)
+RAW_OUTPUT=$(sui client publish --json --no-lint)
 PUBLISH_OUTPUT=$(echo "$RAW_OUTPUT" | sed -n '/{/,$p')
 
 # Extract package ID from publish output
@@ -99,9 +97,11 @@ if [ -n "$ENV_FILE" ]; then
         fi
     }
 
-    update_env_var "NEXT_PUBLIC_PACKAGE_ID" "$NEXT_PUBLIC_PACKAGE_ID" "$ENV_FILE"
+    NETWORK_UPPER=$(echo "$NETWORK" | tr '[:lower:]' '[:upper:]')
+    ENV_KEY="NEXT_PUBLIC_${NETWORK_UPPER}_PACKAGE_ID"
+    update_env_var "$ENV_KEY" "$NEXT_PUBLIC_PACKAGE_ID" "$ENV_FILE"
 
-    echo "✓ Updated NEXT_PUBLIC_PACKAGE_ID in $ENV_FILE"
+    echo "✓ Updated $ENV_KEY in $ENV_FILE"
     echo ""
 fi
 

@@ -2,45 +2,29 @@
  * Octopus Frontend Constants
  */
 
-// Deployed contract addresses (from environment variables)
-// Use IIFEs to validate and type as string
-export const PACKAGE_ID: string = (() => {
-  const id = process.env.NEXT_PUBLIC_PACKAGE_ID;
-  if (!id) {
-    throw new Error("NEXT_PUBLIC_PACKAGE_ID is not defined in environment variables");
-  }
-  return id;
-})();
+// Network configuration - must be defined first
+export const NETWORK = "testnet" as "testnet" | "mainnet" | "devnet" | "localnet";
 
-export const SUI_POOL_ID: string = (() => {
-  const id = process.env.NEXT_PUBLIC_SUI_POOL_ID;
-  if (!id) {
-    throw new Error("NEXT_PUBLIC_SUI_POOL_ID is not defined in environment variables");
-  }
-  return id;
-})();
+// Per-network contract addresses (all baked into the bundle at build time)
+export const NETWORK_CONFIG = {
+  testnet: {
+    packageId: process.env.NEXT_PUBLIC_TESTNET_PACKAGE_ID || null,
+    suiPoolId: process.env.NEXT_PUBLIC_TESTNET_SUI_POOL_ID || null,
+    usdcPoolId: process.env.NEXT_PUBLIC_TESTNET_USDC_POOL_ID || null,
+    usdcCoinType: process.env.NEXT_PUBLIC_TESTNET_USDC_TYPE || null,
+    graphqlUrl: "https://graphql.testnet.sui.io/graphql",
+  },
+  mainnet: {
+    packageId: process.env.NEXT_PUBLIC_MAINNET_PACKAGE_ID || null,
+    suiPoolId: process.env.NEXT_PUBLIC_MAINNET_SUI_POOL_ID || null,
+    usdcPoolId: process.env.NEXT_PUBLIC_MAINNET_USDC_POOL_ID || null,
+    usdcCoinType: process.env.NEXT_PUBLIC_MAINNET_USDC_TYPE || null,
+    graphqlUrl: "https://graphql.mainnet.sui.io/graphql",
+  },
+} as const;
 
-export const USDC_POOL_ID: string = (() => {
-  const id = process.env.NEXT_PUBLIC_USDC_POOL_ID;
-  if (!id) {
-    throw new Error("NEXT_PUBLIC_USDC_POOL_ID is not defined in environment variables");
-  }
-  return id;
-})();
-
-// Token types
+// Static token type (same across networks)
 export const SUI_COIN_TYPE = "0x2::sui::SUI";
-
-export const USDC_COIN_TYPE: string = (() => {
-  const t = process.env.NEXT_PUBLIC_USDC_TYPE;
-  if (!t) {
-    throw new Error("NEXT_PUBLIC_USDC_TYPE is not defined in environment variables");
-  }
-  return t;
-})();
-
-// Network configuration
-export const NETWORK = (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
 
 // LocalStorage keys
 export const STORAGE_KEYS = {
@@ -78,22 +62,7 @@ export interface TokenConfig {
   poolId: string;
 }
 
-export const TOKENS: Record<string, TokenConfig> = {
-  SUI: {
-    type: SUI_COIN_TYPE,
-    symbol: "SUI",
-    decimals: 9,
-    poolId: SUI_POOL_ID,
-  },
-  USDC: {
-    type: USDC_COIN_TYPE,
-    symbol: "USDC",
-    decimals: 6,
-    poolId: USDC_POOL_ID,
-  },
-};
-
-// DeepBook pool mappings (SUI/USDC pair)
+// DeepBook pool mappings (SUI/USDC pair - mainnet only)
 export const DEEPBOOK_POOLS: Record<string, string> = {
   SUI_USDC: process.env.NEXT_PUBLIC_DEEPBOOK_SUI_USDC || "0x...",
   USDC_SUI: process.env.NEXT_PUBLIC_DEEPBOOK_SUI_USDC || "0x...", // Same pool, reverse direction
