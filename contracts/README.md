@@ -90,7 +90,7 @@ cd ../../contracts/scripts
 **Usage:**
 
 ```bash
-./create_pool.sh                              # SUI pool, testnet (default)
+./create_pool.sh                              # SUI + USDC pools, testnet (default)
 ./create_pool.sh --coin usdc                  # USDC pool, testnet
 ./create_pool.sh --coin both                  # SUI + USDC pools, testnet
 ./create_pool.sh --network mainnet            # SUI pool, mainnet

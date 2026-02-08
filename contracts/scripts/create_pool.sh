@@ -4,7 +4,7 @@ set -e
 cd ..
 
 # Parse arguments
-COIN_TYPE="sui"
+COIN_TYPE="both"
 NETWORK="testnet"
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Usage: $0 [--coin sui|usdc|both] [--network testnet|mainnet]"
-            echo "Default: create SUI pool on testnet"
+            echo "Default: create both SUI and USDC pools on testnet"
             exit 1
             ;;
     esac
@@ -129,15 +129,16 @@ create_pool() {
     echo ""
 
     set +e
-    POOL_OUTPUT=$(sui client call \
+    RAW_OUTPUT=$(sui client call \
         --package "$PACKAGE_ID" \
         --module pool \
         --function create_shared_pool \
         --type-args "$type_args" \
         --args "0x$UNSHIELD_VK" "0x$TRANSFER_VK" "0x$SWAP_VK" \
         --gas-budget 200000000 \
-        --json 2>&1 | grep -v '^\[warning\]')
+        --json 2>&1)
     EXIT_CODE=$?
+    POOL_OUTPUT=$(echo "$RAW_OUTPUT" | grep -v '^\[warning\]')
     set -e
 
     if [ $EXIT_CODE -ne 0 ]; then
@@ -152,34 +153,21 @@ create_pool() {
         return 1
     fi
 
-    # Support both old format (effects.status.status) and new format (effects.V2.status)
     local tx_status
-    tx_status=$(echo "$POOL_OUTPUT" | jq -r '
-        if .effects.status.status then .effects.status.status
-        elif .effects.V2.status then .effects.V2.status
-        else "unknown"
-        end' 2>/dev/null)
+    tx_status=$(echo "$POOL_OUTPUT" | jq -r '.effects.V2.status // .effects.status.status // "unknown"' 2>/dev/null)
 
     if [ "$tx_status" != "success" ] && [ "$tx_status" != "Success" ]; then
         echo "❌ Transaction executed but failed! (status: $tx_status)"
-        echo "$POOL_OUTPUT" | jq '.effects.status // .effects.V2.status // .clever_error'
+        echo "$POOL_OUTPUT" | jq '.effects.V2.status // .effects.status // .clever_error'
         return 1
     fi
 
     local pool_id
-    # Try old format first (objectChanges with objectType containing PrivacyPool)
+    # Extract PrivacyPool shared object from top-level changed_objects
     pool_id=$(echo "$POOL_OUTPUT" | jq -r '
-        (.objectChanges // [])[]\
+        .changed_objects[]?
         | select(.objectType? | strings | contains("PrivacyPool"))
         | .objectId' 2>/dev/null)
-
-    # New format: find shared object in effects.V2.changed_objects
-    if [ -z "$pool_id" ] || [ "$pool_id" = "null" ]; then
-        pool_id=$(echo "$POOL_OUTPUT" | jq -r '
-            .effects.V2.changed_objects[]?
-            | select(.[1].output_state.ObjectWrite?[1].Shared?)
-            | .[0]' 2>/dev/null)
-    fi
 
     if [ -z "$pool_id" ] || [ "$pool_id" = "null" ]; then
         echo "❌ Failed to extract pool ID from transaction output"
