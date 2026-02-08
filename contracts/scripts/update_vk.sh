@@ -2,22 +2,49 @@
 set -e
 
 # Parse arguments
-VK_TYPE="${1:-all}"
-POOL_TYPE="${2:-both}"
+VK_TYPE="all"
+POOL_TYPE="both"
+NETWORK="testnet"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --network)
+            NETWORK="$2"
+            shift 2
+            ;;
+        --pool)
+            POOL_TYPE="$2"
+            shift 2
+            ;;
+        unshield|transfer|swap|all)
+            VK_TYPE="$1"
+            shift
+            ;;
+        *)
+            echo "Usage: $0 [unshield|transfer|swap|all] [--pool sui|usdc|both] [--network testnet|mainnet]"
+            echo "Default: update all VKs for both pools on testnet"
+            exit 1
+            ;;
+    esac
+done
 
 if [ "$VK_TYPE" != "unshield" ] && [ "$VK_TYPE" != "transfer" ] && [ "$VK_TYPE" != "swap" ] && [ "$VK_TYPE" != "all" ]; then
     echo "Error: Invalid VK type '$VK_TYPE'"
-    echo "Usage: $0 [unshield|transfer|swap|all] [sui|usdc|both]"
-    echo "Default: update all VKs for both pools"
+    echo "Usage: $0 [unshield|transfer|swap|all] [--pool sui|usdc|both] [--network testnet|mainnet]"
     exit 1
 fi
 
 if [ "$POOL_TYPE" != "sui" ] && [ "$POOL_TYPE" != "usdc" ] && [ "$POOL_TYPE" != "both" ]; then
     echo "Error: Invalid pool type '$POOL_TYPE'"
-    echo "Usage: $0 [unshield|transfer|swap|all] [sui|usdc|both]"
-    echo "Default: update all VKs for both pools"
+    echo "Usage: $0 [unshield|transfer|swap|all] [--pool sui|usdc|both] [--network testnet|mainnet]"
     exit 1
 fi
+
+if [ "$NETWORK" != "testnet" ] && [ "$NETWORK" != "mainnet" ]; then
+    echo "Error: --network must be 'testnet' or 'mainnet'"
+    exit 1
+fi
+
+NETWORK_UPPER=$(echo "$NETWORK" | tr '[:lower:]' '[:upper:]')
 
 # Determine .env file path
 ENV_FILE=""
@@ -31,16 +58,20 @@ else
 fi
 
 echo "Using .env file: $ENV_FILE"
+echo "Network: $NETWORK"
 
 # Load environment variables from .env file
 export $(cat "$ENV_FILE" | grep -v '^#' | xargs)
 
-if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
-    echo "Error: NEXT_PUBLIC_PACKAGE_ID not set in .env file"
+PACKAGE_ID_VAR="NEXT_PUBLIC_${NETWORK_UPPER}_PACKAGE_ID"
+PACKAGE_ID="${!PACKAGE_ID_VAR}"
+
+if [ -z "$PACKAGE_ID" ]; then
+    echo "Error: ${PACKAGE_ID_VAR} not set in .env file"
     exit 1
 fi
 
-echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
+echo "Package ID: $PACKAGE_ID"
 echo ""
 
 # Update or append an env variable in a file
@@ -54,7 +85,7 @@ update_env_var() {
             sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
         else
             sed -i "s|^${key}=.*|${key}=${value}|" "$file"
-    fi
+        fi
     else
         echo "${key}=${value}" >> "$file"
     fi
@@ -72,18 +103,18 @@ update_pool_vk() {
     echo "--- Updating $vk_upper VK for $pool_upper pool ---"
 
     if [ -z "$pool_id" ]; then
-        echo "Error: NEXT_PUBLIC_${pool_upper}_POOL_ID not set in .env file"
+        echo "Error: NEXT_PUBLIC_${NETWORK_UPPER}_${pool_upper}_POOL_ID not set in .env file"
         return 1
     fi
     if [ -z "$type_arg" ]; then
         echo "Error: Type argument not configured for $pool"
-        [ "$pool" = "usdc" ] && echo "Please set NEXT_PUBLIC_USDC_TYPE in .env"
+        [ "$pool" = "usdc" ] && echo "Please set NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE in .env"
         return 1
     fi
 
     echo "Looking for PoolAdminCap..."
     local admin_cap_id
-    admin_cap_id=$(sui client objects --json 2>/dev/null | jq -r --arg pkg "$NEXT_PUBLIC_PACKAGE_ID" --arg pid "$pool_id" '.[] | select(.data.type == ($pkg + "::pool::PoolAdminCap") and .data.content.fields.pool_id == $pid) | .data.objectId' | head -1)
+    admin_cap_id=$(sui client objects --json 2>/dev/null | jq -r --arg pkg "$PACKAGE_ID" --arg pid "$pool_id" '.[] | select(.data.type == ($pkg + "::pool::PoolAdminCap") and .data.content.fields.pool_id == $pid) | .data.objectId' | head -1)
 
     if [ -z "$admin_cap_id" ]; then
         echo "Error: PoolAdminCap not found for $pool_upper pool"
@@ -96,7 +127,7 @@ update_pool_vk() {
     echo ""
 
     sui client call \
-        --package "$NEXT_PUBLIC_PACKAGE_ID" \
+        --package "$PACKAGE_ID" \
         --module pool \
         --function "update_${vk}_vk" \
         --type-args "$type_arg" \
@@ -128,8 +159,8 @@ update_vk() {
     fi
     echo "New VK: ${#NEW_VK} bytes (expected: $expected_bytes)"
 
-    # Get old VK env var name dynamically
-    local old_vk_var="${vk_upper}_VK"
+    # Get old VK env var name dynamically (network-prefixed)
+    local old_vk_var="${NETWORK_UPPER}_${vk_upper}_VK"
     local OLD_VK
     OLD_VK=$(eval echo "\$$old_vk_var" | tr -d '\n')
 
@@ -143,17 +174,21 @@ update_vk() {
     echo "✗ VK changed - updating on-chain..."
     echo ""
 
+    SUI_POOL_ID_VAR="NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID"
+    USDC_POOL_ID_VAR="NEXT_PUBLIC_${NETWORK_UPPER}_USDC_POOL_ID"
+    USDC_TYPE_VAR="NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE"
+
     case "$POOL_TYPE" in
-        sui)  update_pool_vk "$vk" sui "$NEXT_PUBLIC_SUI_POOL_ID" "0x2::sui::SUI" ;;
-        usdc) update_pool_vk "$vk" usdc "$NEXT_PUBLIC_USDC_POOL_ID" "$NEXT_PUBLIC_USDC_TYPE" ;;
+        sui)  update_pool_vk "$vk" sui "${!SUI_POOL_ID_VAR}" "0x2::sui::SUI" ;;
+        usdc) update_pool_vk "$vk" usdc "${!USDC_POOL_ID_VAR}" "${!USDC_TYPE_VAR}" ;;
         both)
-            update_pool_vk "$vk" sui "$NEXT_PUBLIC_SUI_POOL_ID" "0x2::sui::SUI"
-            update_pool_vk "$vk" usdc "$NEXT_PUBLIC_USDC_POOL_ID" "$NEXT_PUBLIC_USDC_TYPE"
+            update_pool_vk "$vk" sui "${!SUI_POOL_ID_VAR}" "0x2::sui::SUI"
+            update_pool_vk "$vk" usdc "${!USDC_POOL_ID_VAR}" "${!USDC_TYPE_VAR}"
             ;;
     esac
 
-    update_env_var "${vk_upper}_VK" "$NEW_VK" "$ENV_FILE"
-    echo "✓ Updated ${vk_upper}_VK in $ENV_FILE"
+    update_env_var "${NETWORK_UPPER}_${vk_upper}_VK" "$NEW_VK" "$ENV_FILE"
+    echo "✓ Updated ${NETWORK_UPPER}_${vk_upper}_VK in $ENV_FILE"
     echo ""
 }
 

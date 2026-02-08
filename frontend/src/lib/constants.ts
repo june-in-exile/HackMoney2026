@@ -2,28 +2,37 @@
  * Octopus Frontend Constants
  */
 
+// Network configuration - must be defined first
+export const NETWORK = (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
+
 // Deployed contract addresses (from environment variables)
 // Use IIFEs to validate and type as string
 export const PACKAGE_ID: string = (() => {
-  const id = process.env.NEXT_PUBLIC_PACKAGE_ID;
+  const id = NETWORK === "mainnet"
+    ? process.env.NEXT_PUBLIC_MAINNET_PACKAGE_ID
+    : process.env.NEXT_PUBLIC_TESTNET_PACKAGE_ID;
   if (!id) {
-    throw new Error("NEXT_PUBLIC_PACKAGE_ID is not defined in environment variables");
+    throw new Error(`NEXT_PUBLIC_${NETWORK.toUpperCase()}_PACKAGE_ID is not defined in environment variables`);
   }
   return id;
 })();
 
 export const SUI_POOL_ID: string = (() => {
-  const id = process.env.NEXT_PUBLIC_SUI_POOL_ID;
+  const id = NETWORK === "mainnet"
+    ? process.env.NEXT_PUBLIC_MAINNET_SUI_POOL_ID
+    : process.env.NEXT_PUBLIC_TESTNET_SUI_POOL_ID;
   if (!id) {
-    throw new Error("NEXT_PUBLIC_SUI_POOL_ID is not defined in environment variables");
+    throw new Error(`NEXT_PUBLIC_${NETWORK.toUpperCase()}_SUI_POOL_ID is not defined in environment variables`);
   }
   return id;
 })();
 
 export const USDC_POOL_ID: string = (() => {
-  const id = process.env.NEXT_PUBLIC_USDC_POOL_ID;
+  const id = NETWORK === "mainnet"
+    ? process.env.NEXT_PUBLIC_MAINNET_USDC_POOL_ID
+    : process.env.NEXT_PUBLIC_TESTNET_USDC_POOL_ID;
   if (!id) {
-    throw new Error("NEXT_PUBLIC_USDC_POOL_ID is not defined in environment variables");
+    throw new Error(`NEXT_PUBLIC_${NETWORK.toUpperCase()}_USDC_POOL_ID is not defined in environment variables`);
   }
   return id;
 })();
@@ -32,15 +41,14 @@ export const USDC_POOL_ID: string = (() => {
 export const SUI_COIN_TYPE = "0x2::sui::SUI";
 
 export const USDC_COIN_TYPE: string = (() => {
-  const t = process.env.NEXT_PUBLIC_USDC_TYPE;
+  const t = NETWORK === "mainnet"
+    ? process.env.NEXT_PUBLIC_MAINNET_USDC_TYPE
+    : process.env.NEXT_PUBLIC_TESTNET_USDC_TYPE;
   if (!t) {
-    throw new Error("NEXT_PUBLIC_USDC_TYPE is not defined in environment variables");
+    throw new Error(`NEXT_PUBLIC_${NETWORK.toUpperCase()}_USDC_TYPE is not defined in environment variables`);
   }
   return t;
 })();
-
-// Network configuration
-export const NETWORK = (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
 
 // LocalStorage keys
 export const STORAGE_KEYS = {
@@ -93,7 +101,7 @@ export const TOKENS: Record<string, TokenConfig> = {
   },
 };
 
-// DeepBook pool mappings (SUI/USDC pair)
+// DeepBook pool mappings (SUI/USDC pair - mainnet only)
 export const DEEPBOOK_POOLS: Record<string, string> = {
   SUI_USDC: process.env.NEXT_PUBLIC_DEEPBOOK_SUI_USDC || "0x...",
   USDC_SUI: process.env.NEXT_PUBLIC_DEEPBOOK_SUI_USDC || "0x...", // Same pool, reverse direction
