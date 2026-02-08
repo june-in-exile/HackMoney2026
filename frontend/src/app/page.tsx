@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useCurrentAccount, useSuiClientContext } from "@mysten/dapp-kit";
 import { Header } from "@/components/Header";
 import { KeypairSetup } from "@/components/KeypairSetup";
@@ -15,6 +15,7 @@ import { useNotes } from "@/hooks/useNotes";
 import { usePoolInfo } from "@/hooks/usePoolInfo";
 import { PACKAGE_ID, NETWORK, TOKENS } from "@/lib/constants";
 import type { TokenConfig } from "@/lib/constants";
+import { getWorkerManager } from "@/lib/workerManager";
 import { initPoseidon } from "@/lib/poseidon";
 
 type TabType = "shield" | "unshield" | "transfer" | "swap";
@@ -56,16 +57,33 @@ export default function Home() {
     refresh: refreshNotes,
     markNoteSpent,
     lastScanStats,
-    totalNotesInPool,
   } = useNotes(keypair, isLoading, tokenConfig.poolId);
 
-  // Persist worker-calculated active note counts per pool so they survive token switching
+  // Pool note counts — scanned once at startup for all pools, updated after operations
   const [workerNoteCounts, setWorkerNoteCounts] = useState<Record<string, number>>({});
-  useEffect(() => {
-    if (totalNotesInPool > 0) {
-      setWorkerNoteCounts((prev) => ({ ...prev, [tokenConfig.poolId]: totalNotesInPool }));
+
+  const refreshAllPoolCounts = useCallback(async () => {
+    const worker = getWorkerManager();
+    const graphqlUrl = "https://graphql.testnet.sui.io/graphql";
+    const results = await Promise.allSettled(
+      Object.values(TOKENS).map(async (token) => {
+        const count = await worker.countPoolNotes(graphqlUrl, PACKAGE_ID, token.poolId);
+        return { poolId: token.poolId, count };
+      })
+    );
+    const updates: Record<string, number> = {};
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        updates[result.value.poolId] = result.value.count;
+      }
     }
-  }, [totalNotesInPool, tokenConfig.poolId]);
+    setWorkerNoteCounts((prev) => ({ ...prev, ...updates }));
+  }, []);
+
+  // Scan all pools at startup
+  useEffect(() => {
+    refreshAllPoolCounts();
+  }, [refreshAllPoolCounts]);
 
   // Fetch pool information for refresh only
   const { refresh: refreshPoolInfo } = usePoolInfo(tokenConfig.poolId);
@@ -81,11 +99,13 @@ export default function Home() {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     refreshNotes();
     refreshPoolInfo();
+    refreshAllPoolCounts();
 
     // Retry after another delay to ensure we catch the event
     setTimeout(() => {
       refreshNotes();
       refreshPoolInfo();
+      refreshAllPoolCounts();
     }, 3000);
   };
 
@@ -221,6 +241,7 @@ export default function Home() {
                 notes={notes}
                 loading={isLoadingNotes}
                 error={notesError}
+                tokenConfig={tokenConfig}
                 lastScanStats={lastScanStats}
               />
             </div>
