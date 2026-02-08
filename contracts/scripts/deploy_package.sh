@@ -13,7 +13,7 @@ if [ -f "../.env" ]; then
 elif [ -f "../../.env" ]; then
     ENV_FILE="../../.env"
 else
-    echo "Warning: No .env file found. You'll need to manually update PACKAGE_ID later."
+    echo "Warning: No .env file found. You'll need to manually update NEXT_PUBLIC_PACKAGE_ID later."
 fi
 
 if [ -n "$ENV_FILE" ]; then
@@ -34,16 +34,16 @@ RAW_OUTPUT=$(sui client publish --gas-budget 500000000 --json)
 PUBLISH_OUTPUT=$(echo "$RAW_OUTPUT" | sed -n '/{/,$p')
 
 # Extract package ID from publish output
-PACKAGE_ID=$(echo "$PUBLISH_OUTPUT" | jq -r '.objectChanges[] | select(.type == "published") | .packageId')
+NEXT_PUBLIC_PACKAGE_ID=$(echo "$PUBLISH_OUTPUT" | jq -r '.objectChanges[] | select(.type == "published") | .packageId')
 
-if [ -z "$PACKAGE_ID" ]; then
+if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
     echo "Error: Failed to extract package ID from publish output"
     echo "$PUBLISH_OUTPUT"
     exit 1
 fi
 
 echo "✅ Package published successfully!"
-echo "Package ID: $PACKAGE_ID"
+echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
 echo ""
 
 # Update .env file if it exists
@@ -69,18 +69,16 @@ if [ -n "$ENV_FILE" ]; then
         fi
     }
 
-    update_env_var "PACKAGE_ID" "$PACKAGE_ID" "$ENV_FILE"
-    update_env_var "NEXT_PUBLIC_PACKAGE_ID" "$PACKAGE_ID" "$ENV_FILE"
+    update_env_var "NEXT_PUBLIC_PACKAGE_ID" "$NEXT_PUBLIC_PACKAGE_ID" "$ENV_FILE"
 
-    echo "✓ Updated PACKAGE_ID in $ENV_FILE"
     echo "✓ Updated NEXT_PUBLIC_PACKAGE_ID in $ENV_FILE"
     echo ""
 fi
 
 echo "=== Deployment Complete ==="
-echo "Package ID: $PACKAGE_ID"
+echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
 echo "Network: testnet"
 echo ""
 echo "=== Next Steps ==="
-echo "1. Create a privacy pool by running:"
+echo "1. Create privacy pools by running:"
 echo "   ./create_pool.sh"

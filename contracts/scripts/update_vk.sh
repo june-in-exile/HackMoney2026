@@ -35,12 +35,12 @@ echo "Using .env file: $ENV_FILE"
 # Load environment variables from .env file
 export $(cat "$ENV_FILE" | grep -v '^#' | xargs)
 
-if [ -z "$PACKAGE_ID" ]; then
-    echo "Error: PACKAGE_ID not set in .env file"
+if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
+    echo "Error: NEXT_PUBLIC_PACKAGE_ID not set in .env file"
     exit 1
 fi
 
-echo "Package ID: $PACKAGE_ID"
+echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
 echo ""
 
 # Update or append an env variable in a file
@@ -72,7 +72,7 @@ update_pool_vk() {
     echo "--- Updating $vk_upper VK for $pool_upper pool ---"
 
     if [ -z "$pool_id" ]; then
-        echo "Error: ${pool_upper}_POOL_ID not set in .env file"
+        echo "Error: NEXT_PUBLIC_${pool_upper}_POOL_ID not set in .env file"
         return 1
     fi
     if [ -z "$type_arg" ]; then
@@ -83,7 +83,7 @@ update_pool_vk() {
 
     echo "Looking for PoolAdminCap..."
     local admin_cap_id
-    admin_cap_id=$(sui client objects --json 2>/dev/null | jq -r --arg pkg "$PACKAGE_ID" --arg pid "$pool_id" '.[] | select(.data.type == ($pkg + "::pool::PoolAdminCap") and .data.content.fields.pool_id == $pid) | .data.objectId' | head -1)
+    admin_cap_id=$(sui client objects --json 2>/dev/null | jq -r --arg pkg "$NEXT_PUBLIC_PACKAGE_ID" --arg pid "$pool_id" '.[] | select(.data.type == ($pkg + "::pool::PoolAdminCap") and .data.content.fields.pool_id == $pid) | .data.objectId' | head -1)
 
     if [ -z "$admin_cap_id" ]; then
         echo "Error: PoolAdminCap not found for $pool_upper pool"
@@ -96,7 +96,7 @@ update_pool_vk() {
     echo ""
 
     sui client call \
-        --package "$PACKAGE_ID" \
+        --package "$NEXT_PUBLIC_PACKAGE_ID" \
         --module pool \
         --function "update_${vk}_vk" \
         --type-args "$type_arg" \
@@ -144,11 +144,11 @@ update_vk() {
     echo ""
 
     case "$POOL_TYPE" in
-        sui)  update_pool_vk "$vk" sui "$SUI_POOL_ID" "0x2::sui::SUI" ;;
-        usdc) update_pool_vk "$vk" usdc "$USDC_POOL_ID" "$NEXT_PUBLIC_USDC_TYPE" ;;
+        sui)  update_pool_vk "$vk" sui "$NEXT_PUBLIC_SUI_POOL_ID" "0x2::sui::SUI" ;;
+        usdc) update_pool_vk "$vk" usdc "$NEXT_PUBLIC_USDC_POOL_ID" "$NEXT_PUBLIC_USDC_TYPE" ;;
         both)
-            update_pool_vk "$vk" sui "$SUI_POOL_ID" "0x2::sui::SUI"
-            update_pool_vk "$vk" usdc "$USDC_POOL_ID" "$NEXT_PUBLIC_USDC_TYPE"
+            update_pool_vk "$vk" sui "$NEXT_PUBLIC_SUI_POOL_ID" "0x2::sui::SUI"
+            update_pool_vk "$vk" usdc "$NEXT_PUBLIC_USDC_POOL_ID" "$NEXT_PUBLIC_USDC_TYPE"
             ;;
     esac
 

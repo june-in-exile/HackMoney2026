@@ -29,13 +29,13 @@ echo "Using .env file: $ENV_FILE"
 # Load environment variables from .env file (strip inline comments)
 export $(cat "$ENV_FILE" | sed 's/#.*//' | sed '/^$/d' | xargs)
 
-if [ -z "$PACKAGE_ID" ]; then
-    echo "Error: PACKAGE_ID not set in .env file"
-    echo "Please run scripts/deploy_package.sh first and update .env with the PACKAGE_ID"
+if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
+    echo "Error: NEXT_PUBLIC_PACKAGE_ID not set in .env file"
+    echo "Please run scripts/deploy_package.sh first"
     exit 1
 fi
 
-echo "Package ID: $PACKAGE_ID"
+echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
 echo ""
 
 # Read verification keys from circuit build output
@@ -99,7 +99,7 @@ create_pool() {
 
     set +e
     POOL_OUTPUT=$(sui client call \
-        --package "$PACKAGE_ID" \
+        --package "$NEXT_PUBLIC_PACKAGE_ID" \
         --module pool \
         --function create_shared_pool \
         --type-args "$type_args" \
@@ -161,25 +161,16 @@ create_pool() {
 
     # Update .env
     if [ "$token" = "sui" ]; then
-        update_env_var "SUI_POOL_ID" "$pool_id" "$ENV_FILE"
         update_env_var "NEXT_PUBLIC_SUI_POOL_ID" "$pool_id" "$ENV_FILE"
         update_env_var "UNSHIELD_VK" "$UNSHIELD_VK" "$ENV_FILE"
         update_env_var "TRANSFER_VK" "$TRANSFER_VK" "$ENV_FILE"
         update_env_var "SWAP_VK" "$SWAP_VK" "$ENV_FILE"
-        echo "✓ Updated SUI_POOL_ID, NEXT_PUBLIC_SUI_POOL_ID"
+        echo "✓ Updated NEXT_PUBLIC_SUI_POOL_ID"
         echo "✓ Updated UNSHIELD_VK, TRANSFER_VK, SWAP_VK"
     else
-        update_env_var "USDC_POOL_ID" "$pool_id" "$ENV_FILE"
         update_env_var "NEXT_PUBLIC_USDC_POOL_ID" "$pool_id" "$ENV_FILE"
         update_env_var "NEXT_PUBLIC_USDC_TYPE" "$type_args" "$ENV_FILE"
-        echo "✓ Updated USDC_POOL_ID, NEXT_PUBLIC_USDC_POOL_ID, NEXT_PUBLIC_USDC_TYPE"
-
-        local root_env="../.env"
-        if [ -f "$root_env" ]; then
-            update_env_var "NEXT_PUBLIC_USDC_POOL_ID" "$pool_id" "$root_env"
-            update_env_var "NEXT_PUBLIC_USDC_TYPE" "$type_args" "$root_env"
-            echo "✓ Updated .env"
-        fi
+        echo "✓ Updated NEXT_PUBLIC_USDC_POOL_ID, NEXT_PUBLIC_USDC_TYPE"
     fi
     echo ""
 
@@ -204,7 +195,7 @@ case "$TOKEN_TYPE" in
 esac
 
 echo "=== Summary ==="
-echo "Package ID: $PACKAGE_ID"
+echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
 [ -n "$SUI_POOL_RESULT" ]  && echo "SUI Pool ID:  $SUI_POOL_RESULT"
 [ -n "$USDC_POOL_RESULT" ] && echo "USDC Pool ID: $USDC_POOL_RESULT"
 echo "Network: testnet"
