@@ -37,16 +37,31 @@ export {
   decryptNote,
 } from "./crypto.js";
 
-// DEX Integration (Cetus price fetching)
+// DEX Integration (DeepBook price fetching - legacy Cetus exports deprecated)
+// Note: Cetus integration has been replaced with DeepBook
+// export {
+//   getCetusPool,
+//   estimateCetusSwap,
+//   findCetusPool,
+//   getCetusPrice,
+//   CETUS_TESTNET_POOLS,
+//   type CetusPoolConfig,
+//   type SwapEstimation,
+// } from "./dex.js";
+
+// DeepBook V3 Integration
 export {
-  getCetusPool,
-  estimateCetusSwap,
-  findCetusPool,
-  getCetusPrice,
-  CETUS_TESTNET_POOLS,
-  type CetusPoolConfig,
-  type SwapEstimation,
-} from "./dex.js";
+  estimateDeepBookSwap,
+  getDeepBookPrice,
+  getDeepBookPool,
+  DEEPBOOK_TESTNET_POOLS,
+  type DeepBookPoolConfig,
+} from "./dex/deepbook.js";
+
+// DEX Adapter Interface
+export {
+  type DexAdapter,
+} from "./dex/adapter.js";
 
 // Merkle tree utilities
 export {

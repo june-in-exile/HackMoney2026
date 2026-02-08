@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
-import { cn, formatSui, truncateAddress } from "@/lib/utils";
+import { cn, formatTokenAmount, truncateAddress } from "@/lib/utils";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -16,12 +16,15 @@ import {
   encryptNote,
   type RecipientProfile,
 } from "@june_zk/octopus-sdk";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, CIRCUIT_URLS } from "@/lib/constants";
+import { CIRCUIT_URLS } from "@/lib/constants";
+import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import { NumberInput } from "@/components/NumberInput";
 import { RecipientInput } from "@/components/RecipientInput";
 
 interface TransferFormProps {
   keypair: OctopusKeypair | null;
+  tokenConfig: TokenConfig;
   notes: OwnedNote[];
   loading: boolean;
   onSuccess?: () => void | Promise<void>;
@@ -37,7 +40,8 @@ type TransferState =
   | "success"
   | "error";
 
-export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess, onRefresh, markNoteSpent }: TransferFormProps) {
+export function TransferForm({ keypair, tokenConfig, notes, loading: notesLoading, onSuccess, onRefresh, markNoteSpent }: TransferFormProps) {
+  const { packageId, network } = useNetworkConfig();
   const [recipientProfile, setRecipientProfile] = useState<RecipientProfile | null>(null);
   const [amount, setAmount] = useState("");
   const [state, setState] = useState<TransferState>("idle");
@@ -98,7 +102,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       }
 
       // 2. Select notes to cover amount
-      const amountNano = BigInt(Math.floor(parseFloat(amount) * 1_000_000_000)); // Convert SUI to nanoSUI
+      const amountNano = BigInt(Math.floor(parseFloat(amount) * 10 ** tokenConfig.decimals));
 
       // Extra safety check: Ensure we only use notes with Merkle proofs
       const notesWithProofs = unspentNotes.filter(
@@ -190,9 +194,9 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       // 8. Build and submit transaction
       setState("submitting");
       const tx = buildTransferTransaction(
-        PACKAGE_ID,
-        POOL_ID,
-        SUI_COIN_TYPE,
+        packageId!,
+        tokenConfig.poolId,
+        tokenConfig.type,
         suiProof,
         [encryptedRecipientNote, encryptedChangeNote]
       );
@@ -202,7 +206,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
       // 8. Success!
       setState("success");
       setSuccess({
-        message: `Transferred ${amount} SUI!`,
+        message: `Transferred ${amount} ${tokenConfig.symbol}!`,
         txDigest: result.digest
       });
 
@@ -233,7 +237,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
         {/* Amount Input */}
         <div>
           <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
-            Amount (SUI)
+            Amount ({tokenConfig.symbol})
           </label>
           <NumberInput
             value={amount}
@@ -248,7 +252,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
               <>LOADING NOTES...</>
             ) : notes.length > 0 ? (
               <>
-                TOTAL: {formatSui(notes.filter((n: OwnedNote) => !n.spent).reduce((sum: bigint, n: OwnedNote) => sum + n.note.value, 0n))}
+                TOTAL: {formatTokenAmount(notes.filter((n: OwnedNote) => !n.spent).reduce((sum: bigint, n: OwnedNote) => sum + n.note.value, 0n), tokenConfig.decimals)}
                 {notes.filter((n: OwnedNote) => !n.spent).length > 1 && (
                   <span className="text-gray-600">
                     {" "}// {notes.filter((n: OwnedNote) => !n.spent).length} NOTES
@@ -337,7 +341,7 @@ export function TransferForm({ keypair, notes, loading: notesLoading, onSuccess,
                 <>
                   {' '}
                   <a
-                    href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                    href={`https://${network}.suivision.xyz/txblock/${success.txDigest}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-cyber-blue hover:text-cyber-blue/80 underline"

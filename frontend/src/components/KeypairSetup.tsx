@@ -16,6 +16,7 @@ interface KeypairSetupProps {
   onClear: () => void;
   onRemove: (masterPublicKey: string) => void;
   onRestore: (spendingKeyHex: string) => Promise<OctopusKeypair>;
+  onRename: (masterPublicKey: string, label: string) => void;
 }
 
 export function KeypairSetup({
@@ -27,12 +28,17 @@ export function KeypairSetup({
   onClear,
   onRemove,
   onRestore,
+  onRename,
 }: KeypairSetupProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
+  const [aliasInput, setAliasInput] = useState("");
   const [showSavedKeypairs, setShowSavedKeypairs] = useState(false);
   const [copiedMPK, setCopiedMPK] = useState(false);
   const [copiedVPK, setCopiedVPK] = useState(false);
+  const [copiedSK, setCopiedSK] = useState(false);
+  const [copiedNK, setCopiedNK] = useState(false);
   const [showFullMPK, setShowFullMPK] = useState(false);
   const [showFullVPK, setShowFullVPK] = useState(false);
   const [showRestoreInput, setShowRestoreInput] = useState(false);
@@ -103,6 +109,31 @@ export function KeypairSetup({
     } catch (error) {
       console.error("Failed to copy VPK:", error);
     }
+  };
+
+  const handleCopySK = async (skHex: string) => {
+    try {
+      await navigator.clipboard.writeText(skHex);
+      setCopiedSK(true);
+      setTimeout(() => setCopiedSK(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy SK:", error);
+    }
+  };
+
+  const handleCopyNK = async (nkHex: string) => {
+    try {
+      await navigator.clipboard.writeText(nkHex);
+      setCopiedNK(true);
+      setTimeout(() => setCopiedNK(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy NK:", error);
+    }
+  };
+
+  const handleSaveAlias = (mpkHex: string) => {
+    onRename(mpkHex, aliasInput.trim());
+    setIsEditingAlias(false);
   };
 
   const handleToggleSecrets = () => {
@@ -195,9 +226,15 @@ export function KeypairSetup({
                             <span className="text-[10px] text-gray-500 font-mono">
                               #{index + 1}
                             </span>
-                            <span className="text-xs text-cyber-blue font-mono">
-                              {mpkShort}
-                            </span>
+                            {kp.label ? (
+                              <span className="text-xs text-cyber-blue font-mono">
+                                {kp.label}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-cyber-blue font-mono">
+                                {mpkShort}
+                              </span>
+                            )}
                           </div>
                           <p className="text-[10px] text-gray-600 font-mono">
                             {dateStr}
@@ -355,6 +392,8 @@ export function KeypairSetup({
 
   const mpkHex = bigIntToHex(keypair.masterPublicKey);
   const vpkHex = exportViewingPublicKey(keypair.spendingKey);
+  const activeStored = savedKeypairs.find((kp) => kp.masterPublicKey === mpkHex);
+  const currentLabel = activeStored?.label ?? "";
 
   const displayMPK = showFullMPK
     ? mpkHex
@@ -369,18 +408,19 @@ export function KeypairSetup({
       <div className="absolute top-0 right-0 w-32 h-32 bg-cyber-blue/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
       <div className="relative z-10">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-5 bg-gradient-to-b from-cyber-blue to-transparent" />
-            <h2 className="text-sm font-black uppercase tracking-wider text-cyber-blue">
-              Privacy Keypair
-            </h2>
-          </div>
-          <button
-            onClick={onClear}
-            className="p-1.5 text-red-500 hover:text-red-400 transition-colors border border-red-600 hover:border-red-500 clip-corner"
-            title="Clear keypair"
-          >
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-5 bg-gradient-to-b from-cyber-blue to-transparent" />
+              <h2 className="text-sm font-black uppercase tracking-wider text-cyber-blue">
+                Privacy Keypair
+              </h2>
+            </div>
+            <button
+              onClick={onClear}
+              className="p-1.5 text-red-500 hover:text-red-400 transition-colors border border-red-600 hover:border-red-500 clip-corner"
+              title="Clear keypair"
+            >
             <svg
               className="h-4 w-4"
               fill="none"
@@ -395,6 +435,34 @@ export function KeypairSetup({
               />
             </svg>
           </button>
+          </div>
+
+          {/* Alias / Name */}
+          {isEditingAlias ? (
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="text"
+                value={aliasInput}
+                onChange={(e) => setAliasInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveAlias(mpkHex);
+                  if (e.key === "Escape") setIsEditingAlias(false);
+                }}
+                placeholder="Enter alias..."
+                autoFocus
+                className="flex-1 px-2 py-1 bg-gray-900/50 border border-cyber-blue text-gray-300 text-xs font-mono focus:outline-none"
+              />
+              <button onClick={() => handleSaveAlias(mpkHex)} className="btn-secondary text-[10px] py-1 px-2">SAVE</button>
+              <button onClick={() => setIsEditingAlias(false)} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setAliasInput(currentLabel); setIsEditingAlias(true); }}
+              className="mt-1 text-[10px] text-gray-500 hover:text-gray-300 font-mono transition-colors"
+            >
+              {currentLabel ? `✎ ${currentLabel}` : "✎ add alias"}
+            </button>
+          )}
         </div>
 
         {/* Master Public Key */}
@@ -481,18 +549,36 @@ export function KeypairSetup({
         >
           <div className="space-y-3 p-4 bg-black/30 border border-gray-800 clip-corner">
             <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
-                Spending Key
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono">
+                  Spending Key
+                </p>
+                <button
+                  onClick={() => handleCopySK(bigIntToHex(keypair.spendingKey))}
+                  className="btn-secondary text-[10px] py-1 px-2 min-w-[42px]"
+                  disabled={copiedSK}
+                >
+                  {copiedSK ? "✓" : "COPY"}
+                </button>
+              </div>
               <p className="break-all font-mono text-xs text-gray-400">
                 {bigIntToHex(keypair.spendingKey)}
               </p>
             </div>
             <div className="h-px bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
             <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 font-mono">
-                Nullifying Key
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-mono">
+                  Nullifying Key
+                </p>
+                <button
+                  onClick={() => handleCopyNK(bigIntToHex(keypair.nullifyingKey))}
+                  className="btn-secondary text-[10px] py-1 px-2 min-w-[42px]"
+                  disabled={copiedNK}
+                >
+                  {copiedNK ? "✓" : "COPY"}
+                </button>
+              </div>
               <p className="break-all font-mono text-xs text-gray-400">
                 {bigIntToHex(keypair.nullifyingKey)}
               </p>

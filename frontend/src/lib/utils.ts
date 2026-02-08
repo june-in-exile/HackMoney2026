@@ -50,6 +50,30 @@ export function truncateAddress(address: string, chars = 4): string {
 }
 
 /**
+ * Format token amount from base units (e.g. MIST → SUI, base → USDC)
+ */
+export function formatTokenAmount(amount: bigint | number, decimals: number): string {
+  if (amount === undefined || amount === null) return "0";
+  const num = typeof amount === "bigint" ? Number(amount) : amount;
+  if (isNaN(num) || !isFinite(num)) return "0";
+  return (num / 10 ** decimals).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  });
+}
+
+/**
+ * Parse token amount string to base units
+ */
+export function parseTokenAmount(amount: string, decimals: number): bigint {
+  const parsed = parseFloat(amount);
+  if (isNaN(parsed) || parsed < 0) {
+    throw new Error("Invalid token amount");
+  }
+  return BigInt(Math.floor(parsed * 10 ** decimals));
+}
+
+/**
  * Convert BigInt to hex string
  */
 export function bigIntToHex(n: bigint): string {

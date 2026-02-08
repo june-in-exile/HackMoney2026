@@ -14,6 +14,7 @@
 export type WorkerRequest =
   | InitRequest
   | ScanNotesRequest
+  | CountPoolNotesRequest
   | BatchDecryptRequest
   | ComputeNullifierRequest
   | BuildMerkleTreeRequest
@@ -42,6 +43,17 @@ export interface ScanNotesRequest {
   spendingKey: string; // BigInt as string
   nullifyingKey: string; // BigInt as string
   masterPublicKey: string; // BigInt as string
+}
+
+/**
+ * Count total notes in a pool without decrypting (lightweight)
+ */
+export interface CountPoolNotesRequest {
+  type: "count_pool_notes";
+  id: string;
+  graphqlUrl: string;
+  packageId: string;
+  poolId: string;
 }
 
 /**
@@ -97,6 +109,7 @@ export interface GetMerkleProofRequest {
 export type WorkerResponse =
   | InitResponse
   | ScanNotesResponse
+  | CountPoolNotesResponse
   | BatchDecryptResponse
   | ComputeNullifierResponse
   | BuildMerkleTreeResponse
@@ -128,6 +141,15 @@ export interface ScanNotesResponse {
 
   // Total notes in pool (ShieldEvents - UnshieldEvents)
   totalNotesInPool?: number;
+}
+
+/**
+ * Count pool notes result
+ */
+export interface CountPoolNotesResponse {
+  type: "count_pool_notes_result";
+  id: string;
+  totalNotesInPool: number;
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   clearActiveKeypair,
   getActiveKeypair,
   setActiveKeypair,
+  updateKeypairLabel,
   type StoredKeypair,
 } from "@/lib/keypairStorage";
 
@@ -197,6 +198,18 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     [walletAddress, keypair]
   );
 
+  // Rename a keypair (set label)
+  const renameKeypair = useCallback(
+    (masterPublicKey: string, label: string) => {
+      if (!walletAddress) return;
+
+      const identifier = getDefaultIdentifier(walletAddress);
+      updateKeypairLabel(identifier, masterPublicKey, label);
+      setSavedKeypairs(getSavedKeypairs(identifier));
+    },
+    [walletAddress]
+  );
+
   // Restore keypair from existing spending key
   const restoreKeypair = useCallback(async (spendingKeyHex: string) => {
     if (!poseidonReady) {
@@ -258,6 +271,7 @@ export function useLocalKeypair(walletAddress: string | undefined) {
     clearKeypair,
     removeKeypair,
     restoreKeypair,
+    renameKeypair,
     hasKeypair: keypair !== null,
   };
 }

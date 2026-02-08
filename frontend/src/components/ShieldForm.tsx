@@ -7,8 +7,9 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { cn, parseSui, formatSui, truncateAddress } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
+import { cn, parseTokenAmount, formatTokenAmount, truncateAddress } from "@/lib/utils";
+import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   createNote,
@@ -22,10 +23,11 @@ import { NumberInput } from "@/components/NumberInput";
 
 interface ShieldFormProps {
   keypair: OctopusKeypair | null;
+  tokenConfig: TokenConfig;
   onSuccess?: () => void | Promise<void>;
 }
 
-export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
+export function ShieldForm({ keypair, tokenConfig, onSuccess }: ShieldFormProps) {
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,11 +35,12 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
   const [balance, setBalance] = useState<bigint | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
+  const { packageId, network } = useNetworkConfig();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
-  // Fetch wallet balance whenever account changes
+  // Fetch wallet balance whenever account or token changes
   useEffect(() => {
     const fetchBalance = async () => {
       if (!account?.address) {
@@ -49,7 +52,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       try {
         const balanceResult = await client.getBalance({
           owner: account.address,
-          coinType: SUI_COIN_TYPE,
+          coinType: tokenConfig.type,
         });
         setBalance(BigInt(balanceResult.totalBalance));
       } catch (err) {
@@ -61,7 +64,58 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
     };
 
     fetchBalance();
-  }, [account?.address, client]);
+  }, [account?.address, client, tokenConfig.type]);
+
+  // Derive token ID from coin type package address
+  function getTokenId(coinType: string): bigint {
+    const packageAddr = coinType.split("::")[0];
+    return poseidonHash([BigInt(packageAddr)]);
+  }
+
+  // Build coin argument for the shield transaction
+  async function buildCoinArg(tx: Transaction, amountBase: bigint) {
+    if (tokenConfig.type === "0x2::sui::SUI") {
+      // SUI: split from gas coin
+      const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(amountBase)]);
+      return coin;
+    }
+
+    // Non-SUI: select from owned coins
+    const coins = await client.getCoins({
+      owner: account!.address,
+      coinType: tokenConfig.type,
+    });
+
+    if (coins.data.length === 0) {
+      throw new Error(`No ${tokenConfig.symbol} coins found in wallet`);
+    }
+
+    // Sort descending by balance
+    const sorted = [...coins.data].sort(
+      (a, b) => Number(BigInt(b.balance) - BigInt(a.balance))
+    );
+
+    const total = coins.data.reduce((sum, c) => sum + BigInt(c.balance), 0n);
+    if (total < amountBase) {
+      throw new Error(
+        `Insufficient ${tokenConfig.symbol} balance: need ${formatTokenAmount(amountBase, tokenConfig.decimals)}, have ${formatTokenAmount(total, tokenConfig.decimals)}`
+      );
+    }
+
+    const primaryCoinId = sorted[0].coinObjectId;
+    if (BigInt(sorted[0].balance) >= amountBase) {
+      // Single coin is enough
+      const [coin] = tx.splitCoins(tx.object(primaryCoinId), [tx.pure.u64(amountBase)]);
+      return coin;
+    }
+
+    // Merge coins first, then split
+    const primaryCoin = tx.object(primaryCoinId);
+    const otherCoins = sorted.slice(1).map((c) => tx.object(c.coinObjectId));
+    tx.mergeCoins(primaryCoin, otherCoins);
+    const [coin] = tx.splitCoins(primaryCoin, [tx.pure.u64(amountBase)]);
+    return coin;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,19 +132,17 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
       return;
     }
 
-    // Pro-actively parse amount to enable robust checks
     const numericAmount = parseFloat(amount);
-    if (amount.trim() === '' || isNaN(numericAmount) || numericAmount <= 0) {
+    if (amount.trim() === "" || isNaN(numericAmount) || numericAmount <= 0) {
       setError("Please enter a valid amount");
       return;
     }
 
-    const amountMist = parseSui(amount);
+    const amountBase = parseTokenAmount(amount, tokenConfig.decimals);
 
-    // Validate against wallet balance
-    if (balance !== null && amountMist > balance) {
+    if (balance !== null && amountBase > balance) {
       setError(
-        `Insufficient balance. You have ${formatSui(balance)} SUI available.`
+        `Insufficient balance. You have ${formatTokenAmount(balance, tokenConfig.decimals)} ${tokenConfig.symbol} available.`
       );
       return;
     }
@@ -98,61 +150,44 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
     setIsSubmitting(true);
 
     try {
-      // Initialize Poseidon hash function
       await initPoseidon();
 
-      // Create a token identifier for SUI by hashing the coin type
-      const tokenId = poseidonHash([BigInt(0x2)]); // Simplified: use 0x2 for SUI
+      const tokenId = getTokenId(tokenConfig.type);
 
-      // Create a note using SDK crypto functions
-      const note = createNote(
-        keypair.masterPublicKey,
-        tokenId,
-        amountMist
-      );
+      const note = createNote(keypair.masterPublicKey, tokenId, amountBase);
 
-      // Encrypt the note for the recipient (self in this case)
-      // Derive viewing public key from spending key
       const viewingPk = deriveViewingPublicKey(keypair.spendingKey);
       const encryptedNoteData = encryptNote(note, viewingPk);
 
-      // Convert commitment to bytes (32 bytes, little-endian for Move contract)
       const commitmentBytes = bigIntToLE32(note.commitment);
 
-      // Build shield transaction
       const tx = new Transaction();
-
-      // Split coin for the amount to shield
-      const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(amountMist)]);
+      const coin = await buildCoinArg(tx, amountBase);
 
       tx.moveCall({
-        target: `${PACKAGE_ID}::pool::shield`,
-        typeArguments: [SUI_COIN_TYPE],
+        target: `${packageId}::pool::shield`,
+        typeArguments: [tokenConfig.type],
         arguments: [
-          tx.object(POOL_ID),
+          tx.object(tokenConfig.poolId),
           coin,
           tx.pure.vector("u8", Array.from(commitmentBytes)),
           tx.pure.vector("u8", Array.from(encryptedNoteData)),
         ],
       });
 
-      const result = await signAndExecute({
-        transaction: tx,
-      });
+      const result = await signAndExecute({ transaction: tx });
 
       setSuccess({
-        message: `Shielded ${formatSui(amountMist)} SUI!\nRefreshing balance...`,
-        txDigest: result.digest
+        message: `Shielded ${formatTokenAmount(amountBase, tokenConfig.decimals)} ${tokenConfig.symbol}!\nRefreshing balance...`,
+        txDigest: result.digest,
       });
       setAmount("");
 
-      // Call onSuccess callback to refresh balance
       await onSuccess?.();
 
-      // Update success message after refresh completes
       setSuccess({
-        message: `Successfully shielded ${formatSui(amountMist)} SUI!`,
-        txDigest: result.digest
+        message: `Successfully shielded ${formatTokenAmount(amountBase, tokenConfig.decimals)} ${tokenConfig.symbol}!`,
+        txDigest: result.digest,
       });
     } catch (err) {
       console.error("Shield failed:", err);
@@ -171,14 +206,14 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
               htmlFor="shield-amount"
               className="text-xs font-bold uppercase tracking-wider text-gray-400 font-mono"
             >
-              Amount (SUI)
+              Amount ({tokenConfig.symbol})
             </label>
             {account && (
               <span className="text-[10px] text-gray-500 font-mono">
                 {isLoadingBalance ? (
                   "// Loading..."
                 ) : balance !== null ? (
-                  <>BAL: {formatSui(balance)}</>
+                  <>BAL: {formatTokenAmount(balance, tokenConfig.decimals)}</>
                 ) : (
                   "// Unavailable"
                 )}
@@ -189,8 +224,8 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
             id="shield-amount"
             value={amount}
             onChange={setAmount}
-            placeholder="0.000000000"
-            step={0.000000001}
+            placeholder={`0.${"0".repeat(tokenConfig.decimals)}`}
+            step={1 / 10 ** tokenConfig.decimals}
             min={0}
             disabled={isSubmitting}
           />
@@ -213,9 +248,9 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
                 {success.message}
                 {success.txDigest && (
                   <>
-                    {' '}
+                    {" "}
                     <a
-                      href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                      href={`https://${network}.suivision.xyz/txblock/${success.txDigest}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-cyber-blue hover:text-cyber-blue/80 underline"
@@ -239,9 +274,9 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
           isSubmitting && "cursor-wait opacity-70"
         )}
         style={{
-          backgroundColor: 'transparent',
-          color: '#00d9ff',
-          borderColor: '#00d9ff',
+          backgroundColor: "transparent",
+          color: "#00d9ff",
+          borderColor: "#00d9ff",
         }}
       >
         {isSubmitting ? (
@@ -253,12 +288,7 @@ export function ShieldForm({ keypair, onSuccess }: ShieldFormProps) {
               stroke="currentColor"
               strokeWidth="3"
             >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-              />
+              <circle className="opacity-25" cx="12" cy="12" r="10" />
               <path
                 className="opacity-75"
                 fill="currentColor"

@@ -3,8 +3,36 @@ set -e
 
 cd ..
 
-echo "=== Creating Privacy Pool ==="
-echo ""
+# Parse arguments
+COIN_TYPE="both"
+NETWORK="testnet"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --network)
+            NETWORK="$2"
+            shift 2
+            ;;
+        --coin)
+            COIN_TYPE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [--coin sui|usdc|both] [--network testnet|mainnet]"
+            echo "Default: create both SUI and USDC pools on testnet"
+            exit 1
+            ;;
+    esac
+done
+
+if [ "$NETWORK" != "testnet" ] && [ "$NETWORK" != "mainnet" ]; then
+    echo "Error: --network must be 'testnet' or 'mainnet'"
+    exit 1
+fi
+
+if [ "$COIN_TYPE" != "sui" ] && [ "$COIN_TYPE" != "usdc" ] && [ "$COIN_TYPE" != "both" ]; then
+    echo "Error: --coin must be 'sui', 'usdc', or 'both'"
+    exit 1
+fi
 
 # Determine .env file path
 ENV_FILE=""
@@ -19,14 +47,22 @@ else
 fi
 
 echo "Using .env file: $ENV_FILE"
+echo "Network: $NETWORK"
+echo "Coin: $COIN_TYPE"
 
-# Load environment variables from .env file
-export $(cat "$ENV_FILE" | grep -v '^#' | xargs)
+# Switch to target network
+sui client switch --env "$NETWORK"
 
-# Validate required environment variables
+# Load environment variables from .env file (strip inline comments)
+export $(cat "$ENV_FILE" | sed 's/#.*//' | sed '/^$/d' | xargs)
+
+NETWORK_UPPER=$(echo "$NETWORK" | tr '[:lower:]' '[:upper:]')
+PACKAGE_ID_VAR="NEXT_PUBLIC_${NETWORK_UPPER}_PACKAGE_ID"
+PACKAGE_ID="${!PACKAGE_ID_VAR}"
+
 if [ -z "$PACKAGE_ID" ]; then
-    echo "Error: PACKAGE_ID not set in .env file"
-    echo "Please run scripts/deploy_package.sh first and update .env with the PACKAGE_ID"
+    echo "Error: $PACKAGE_ID_VAR not set in .env file"
+    echo "Please run scripts/deploy_package.sh --network $NETWORK first"
     exit 1
 fi
 
@@ -39,7 +75,7 @@ echo "Reading verification keys from circuit build output..."
 UNSHIELD_VK=$(cat ../circuits/build/unshield_vk_bytes.hex | tr -d '\n')
 if [ -z "$UNSHIELD_VK" ]; then
     echo "Error: Could not read unshield VK from ../circuits/build/unshield_vk_bytes.hex"
-    echo "Please run circuits/scripts/compile_unshield.sh first"
+    echo "Please run circuits/scripts/compile.sh unshield first"
     exit 1
 fi
 echo "✓ Unshield VK: ${#UNSHIELD_VK} bytes (expected: 720)"
@@ -47,7 +83,7 @@ echo "✓ Unshield VK: ${#UNSHIELD_VK} bytes (expected: 720)"
 TRANSFER_VK=$(cat ../circuits/build/transfer_vk_bytes.hex | tr -d '\n')
 if [ -z "$TRANSFER_VK" ]; then
     echo "Error: Could not read transfer VK from ../circuits/build/transfer_vk_bytes.hex"
-    echo "Please run circuits/scripts/compile_transfer.sh first"
+    echo "Please run circuits/scripts/compile.sh transfer first"
     exit 1
 fi
 echo "✓ Transfer VK: ${#TRANSFER_VK} bytes (expected: 848)"
@@ -55,75 +91,132 @@ echo "✓ Transfer VK: ${#TRANSFER_VK} bytes (expected: 848)"
 SWAP_VK=$(cat ../circuits/build/swap_vk_bytes.hex | tr -d '\n')
 if [ -z "$SWAP_VK" ]; then
     echo "Error: Could not read swap VK from ../circuits/build/swap_vk_bytes.hex"
-    echo "Please run circuits/scripts/compile_swap.sh first"
+    echo "Please run circuits/scripts/compile.sh swap first"
     exit 1
 fi
 echo "✓ Swap VK: ${#SWAP_VK} bytes (expected: 912)"
 echo ""
 
-# Create pool
-echo "Creating pool with verification keys..."
-POOL_OUTPUT=$(sui client call \
-    --package "$PACKAGE_ID" \
-    --module pool \
-    --function create_shared_pool \
-    --type-args "0x2::sui::SUI" \
-    --args "0x$UNSHIELD_VK" "0x$TRANSFER_VK" "0x$SWAP_VK" \
-    --gas-budget 100000000 \
-    --json)
-
-# Extract pool object ID
-POOL_ID=$(echo "$POOL_OUTPUT" | jq -r '.objectChanges[] | select(.objectType | contains("PrivacyPool")) | .objectId')
-
-if [ -z "$POOL_ID" ]; then
-    echo "Error: Failed to extract pool ID from pool creation output"
-    echo "$POOL_OUTPUT"
-    exit 1
-fi
-
-echo "✅ Privacy Pool created successfully!"
-echo "Pool ID: $POOL_ID"
-echo ""
-
-# Update .env file
-echo "Updating .env file with pool ID and verification keys..."
-
-# Function to update or append env variable
+# Update or append an env variable in a file
 update_env_var() {
     local key=$1
     local value=$2
     local file=$3
 
     if grep -q "^${key}=" "$file"; then
-        # Update existing variable (macOS compatible)
         if [[ "$OSTYPE" == "darwin"* ]]; then
             sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
         else
             sed -i "s|^${key}=.*|${key}=${value}|" "$file"
         fi
     else
-        # Append new variable
         echo "${key}=${value}" >> "$file"
     fi
 }
 
-update_env_var "POOL_ID" "$POOL_ID" "$ENV_FILE"
-update_env_var "NEXT_PUBLIC_POOL_ID" "$POOL_ID" "$ENV_FILE"
-update_env_var "UNSHIELD_VK" "$UNSHIELD_VK" "$ENV_FILE"
-update_env_var "TRANSFER_VK" "$TRANSFER_VK" "$ENV_FILE"
-update_env_var "SWAP_VK" "$SWAP_VK" "$ENV_FILE"
+# Create a single pool by coin type
+create_pool() {
+    local coin=$1
+    local type_args=$2
+    local coin_upper=$(echo "$coin" | tr '[:lower:]' '[:upper:]')
 
-echo "✓ Updated POOL_ID in $ENV_FILE"
-echo "✓ Updated NEXT_PUBLIC_POOL_ID in $ENV_FILE"
-echo "✓ Updated UNSHIELD_VK in $ENV_FILE"
-echo "✓ Updated TRANSFER_VK in $ENV_FILE"
-echo "✓ Updated SWAP_VK in $ENV_FILE"
-echo ""
+    echo "=== Creating $coin_upper Privacy Pool ($NETWORK) ==="
+    [ "$coin" = "usdc" ] && echo "Token Type: $type_args"
+    echo ""
 
-echo "=== Pool Creation Summary ==="
+    echo "Creating $coin_upper privacy pool..."
+    echo "Command: sui client call --function create_shared_pool --type-args \"$type_args\""
+    echo ""
+
+    set +e
+    RAW_OUTPUT=$(sui client call \
+        --package "$PACKAGE_ID" \
+        --module pool \
+        --function create_shared_pool \
+        --type-args "$type_args" \
+        --args "0x$UNSHIELD_VK" "0x$TRANSFER_VK" "0x$SWAP_VK" \
+        --json 2>&1)
+    EXIT_CODE=$?
+    POOL_OUTPUT=$(echo "$RAW_OUTPUT" | grep -v '^\[warning\]')
+    set -e
+
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "❌ Transaction failed with exit code: $EXIT_CODE"
+        echo "$POOL_OUTPUT"
+        return 1
+    fi
+
+    if ! echo "$POOL_OUTPUT" | jq empty 2>/dev/null; then
+        echo "❌ Transaction output is not valid JSON!"
+        echo "$POOL_OUTPUT"
+        return 1
+    fi
+
+    local tx_status
+    tx_status=$(echo "$POOL_OUTPUT" | jq -r '.effects.V2.status // .effects.status.status // "unknown"' 2>/dev/null)
+
+    if [ "$tx_status" != "success" ] && [ "$tx_status" != "Success" ]; then
+        echo "❌ Transaction executed but failed! (status: $tx_status)"
+        echo "$POOL_OUTPUT" | jq '.effects.V2.status // .effects.status // .clever_error'
+        return 1
+    fi
+
+    local pool_id
+    # Extract PrivacyPool shared object from top-level changed_objects
+    pool_id=$(echo "$POOL_OUTPUT" | jq -r '
+        .changed_objects[]?
+        | select(.objectType? | strings | contains("PrivacyPool"))
+        | .objectId' 2>/dev/null)
+
+    if [ -z "$pool_id" ] || [ "$pool_id" = "null" ]; then
+        echo "❌ Failed to extract pool ID from transaction output"
+        echo "$POOL_OUTPUT" | jq '.objectChanges // .changed_objects'
+        return 1
+    fi
+
+    echo "✅ $coin_upper Privacy Pool created: $pool_id"
+    echo ""
+
+    # Update .env with network-specific variable names
+    if [ "$coin" = "sui" ]; then
+        update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID" "$pool_id" "$ENV_FILE"
+        echo "✓ Updated NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID"
+    else
+        update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_USDC_POOL_ID" "$pool_id" "$ENV_FILE"
+        update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE" "$type_args" "$ENV_FILE"
+        echo "✓ Updated NEXT_PUBLIC_${NETWORK_UPPER}_USDC_POOL_ID, NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE"
+    fi
+    echo ""
+
+    # Export pool ID for summary
+    if [ "$coin" = "sui" ]; then
+        SUI_POOL_RESULT="$pool_id"
+    else
+        USDC_POOL_RESULT="$pool_id"
+    fi
+}
+
+SUI_TYPE="0x2::sui::SUI"
+if [ "$NETWORK" = "mainnet" ]; then
+    USDC_TYPE="0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC"
+else
+    USDC_TYPE="0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC"
+fi
+
+case "$COIN_TYPE" in
+    sui)  create_pool sui "$SUI_TYPE" ;;
+    usdc) create_pool usdc "$USDC_TYPE" ;;
+    both)
+        create_pool sui "$SUI_TYPE"
+        create_pool usdc "$USDC_TYPE"
+        ;;
+esac
+
+echo "=== Summary ==="
 echo "Package ID: $PACKAGE_ID"
-echo "Pool ID: $POOL_ID"
-echo "Network: testnet"
+[ -n "$SUI_POOL_RESULT" ]  && echo "SUI Pool ID:  $SUI_POOL_RESULT"
+[ -n "$USDC_POOL_RESULT" ] && echo "USDC Pool ID: $USDC_POOL_RESULT"
+echo "Network: $NETWORK"
 echo "Unshield VK: ${#UNSHIELD_VK} bytes"
 echo "Transfer VK: ${#TRANSFER_VK} bytes"
 echo "Swap VK: ${#SWAP_VK} bytes"

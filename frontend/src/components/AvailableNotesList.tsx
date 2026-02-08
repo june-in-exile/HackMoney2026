@@ -1,12 +1,14 @@
 "use client";
 
 import type { OwnedNote } from "@/hooks/useNotes";
-import { formatSui } from "@/lib/utils";
+import type { TokenConfig } from "@/lib/constants";
+import { formatTokenAmount } from "@/lib/utils";
 
 interface AvailableNotesListProps {
   notes: OwnedNote[];
   loading: boolean;
   error: string | null;
+  tokenConfig: TokenConfig;
   lastScanStats?: {
     eventsScanned: number;
     notesDecrypted: number;
@@ -14,7 +16,7 @@ interface AvailableNotesListProps {
   } | null;
 }
 
-export function AvailableNotesList({ notes, loading, error, lastScanStats }: AvailableNotesListProps) {
+export function AvailableNotesList({ notes, loading, error, tokenConfig, lastScanStats }: AvailableNotesListProps) {
   const unspentNotes = notes.filter((n) => !n.spent);
 
   if (loading) {
@@ -123,7 +125,7 @@ export function AvailableNotesList({ notes, loading, error, lastScanStats }: Ava
           {sortedNotes.map((note, i) => (
             <div key={i} className="flex justify-between font-mono p-1.5 bg-black/30 clip-corner">
               <span className="text-gray-500">NOTE #{(i + 1).toString().padStart(2, '0')}:</span>
-              <span className="text-cyber-blue">{formatSui(note.note.value)} SUI</span>
+              <span className="text-cyber-blue">{formatTokenAmount(note.note.value, tokenConfig.decimals)} {tokenConfig.symbol}</span>
             </div>
           ))}
         </div>

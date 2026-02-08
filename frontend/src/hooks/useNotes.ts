@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@june_zk/octopus-sdk";
-import { PACKAGE_ID, POOL_ID } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import { bigIntToLE32 } from "@june_zk/octopus-sdk";
 import { getWorkerManager } from "@/lib/workerManager";
 
@@ -70,9 +70,11 @@ function saveSpentNullifiers(mpk: bigint, nullifiers: Set<string>): void {
 
 export function useNotes(
   keypair: OctopusKeypair | null,
-  isInitializing = false
+  isInitializing = false,
+  poolId: string = ""
 ) {
   const client = useSuiClient();
+  const { packageId, graphqlUrl } = useNetworkConfig();
   const [notes, setNotes] = useState<OwnedNote[]>([]);
   const [loading, setLoading] = useState(true);  // Start with loading=true to avoid showing balance=0 before first scan
   const [error, setError] = useState<string | null>(null);
@@ -90,8 +92,9 @@ export function useNotes(
   } | null>(null);
   const [totalNotesInPool, setTotalNotesInPool] = useState<number>(0);
 
-  // Track current keypair to detect changes
+  // Track current keypair and poolId to detect changes
   const currentKeypairRef = useRef<bigint | null>(null);
+  const currentPoolIdRef = useRef<string | null>(null);
   // Track if a scan is currently in progress to prevent concurrent scans
   const isScanningRef = useRef(false);
 
@@ -129,13 +132,13 @@ export function useNotes(
 
   // Batch check multiple nullifiers for spent status (more efficient than one-by-one)
   const batchCheckNullifierStatus = useCallback(
-    async (nullifiers: bigint[]): Promise<Map<string, boolean>> => {
+    async (nullifiers: bigint[], pid: string): Promise<Map<string, boolean>> => {
       if (nullifiers.length === 0) return new Map();
 
       try {
         // Get nullifier registry ID (only query once)
         const poolObject = await client.getObject({
-          id: POOL_ID,
+          id: pid,
           options: { showContent: true },
         });
 
@@ -200,18 +203,17 @@ export function useNotes(
       return;
     }
 
-    // Check if keypair changed by comparing with previous value
+    // Check if keypair or pool changed
     const previousMPK = currentKeypairRef.current;
-    const keypairChanged = previousMPK !== null &&
-      previousMPK !== keypair.masterPublicKey;
+    const keypairChanged = previousMPK !== null && previousMPK !== keypair.masterPublicKey;
+    const poolChanged = currentPoolIdRef.current !== null && currentPoolIdRef.current !== poolId;
 
-    if (keypairChanged) {
-      // Keypair changed - clear notes immediately
+    if (keypairChanged || poolChanged) {
       setNotes([]);
     }
 
-    // Update ref to track current keypair
     currentKeypairRef.current = keypair.masterPublicKey;
+    currentPoolIdRef.current = poolId;
 
     let isCancelled = false;
 
@@ -235,9 +237,9 @@ export function useNotes(
 
         // Scan notes using Worker (GraphQL + decrypt + Merkle tree in background)
         const result = await worker.scanNotes(
-          "https://graphql.testnet.sui.io/graphql",
-          PACKAGE_ID,
-          POOL_ID,
+          graphqlUrl ?? "https://graphql.testnet.sui.io/graphql",
+          packageId ?? "",
+          poolId,
           keypair.spendingKey,
           keypair.nullifyingKey,
           keypair.masterPublicKey,
@@ -272,7 +274,7 @@ export function useNotes(
         const nullifiers = result.notes.map((s) => s.nullifier);
 
         // Batch check spent status (more efficient than one-by-one)
-        const spentMap = await batchCheckNullifierStatus(nullifiers);
+        const spentMap = await batchCheckNullifierStatus(nullifiers, poolId);
 
         // Build OwnedNote array with spent status from batch query
         const newOwnedNotes: OwnedNote[] = [];
@@ -391,7 +393,7 @@ export function useNotes(
       // Reset scanning flag when effect is cleaned up
       isScanningRef.current = false;
     };
-  }, [keypair?.masterPublicKey, client, refreshTrigger, isInitializing]);
+  }, [keypair?.masterPublicKey, poolId, client, refreshTrigger, isInitializing]);
 
   // Periodic reconciliation: re-check unspent notes to catch missed events
   useEffect(() => {
@@ -411,7 +413,7 @@ export function useNotes(
       if (unspentNotes.length === 0) return;
 
       const nullifiers = unspentNotes.map((n) => n.nullifier);
-      const spentMap = await batchCheckNullifierStatus(nullifiers);
+      const spentMap = await batchCheckNullifierStatus(nullifiers, poolId);
 
       // Check if any status changed
       let hasChanges = false;

@@ -1,13 +1,15 @@
 # Milestone 2: DeFi Integration - Private Swaps
 
-**Status:** 🚧 Frontend Integrated | Backend Mock Implementation
-**Last Updated:** 2026-02-03
+**Status:** Ready for DeepBook Integration
+**Last Updated:** 2026-02-07
 
 ---
 
 ## Overview
 
-This milestone adds private token swap functionality to Octopus, enabling users to exchange tokens while maintaining full privacy through ZK-SNARK proofs.
+This milestone adds private token swap functionality to Octopus, enabling users to exchange tokens while maintaining full privacy through ZK-SNARK proofs. Swaps are executed through **DeepBook V3**, Sui's native Central Limit Order Book (CLOB).
+
+> ⚠️ **DeepBook V3 is only available on Mainnet.** Swap functionality requires a Mainnet deployment.
 
 **Privacy Guarantee:** Swap amounts, token types, and user identities remain hidden on-chain. Only ZK proofs are verified publicly.
 
@@ -24,20 +26,20 @@ This milestone adds private token swap functionality to Octopus, enabling users 
 
 2. **Move Contract** ([contracts/sources/pool.move](../../contracts/sources/pool.move))
    - Test function: `swap()` with mock 1:1 exchange rate
-   - Production scaffold: `swap_production()` ready for Cetus integration
+   - Production scaffold: `swap_production()` ready for DeepBook integration
    - Full proof verification, nullifier tracking, event emission
 
 3. **TypeScript SDK** ([sdk/src/defi.ts](../../sdk/src/defi.ts))
    - Proof generation: `generateSwapProof()`
    - Transaction building: `buildSwapTransaction()`
    - Slippage calculation utilities
-   - DEX price estimation (placeholder)
+   - Ready for DeepBook price estimation module
 
 4. **Frontend UI** ([frontend/src/components/SwapForm.tsx](../../frontend/src/components/SwapForm.tsx))
    - ✅ **Now accessible in main UI** (SWAP tab)
    - Token pair selection (SUI ↔ USDC)
    - Slippage tolerance settings
-   - Real-time price estimation
+   - Real-time price estimation framework
 
 ## How to Use (Frontend)
 
@@ -50,7 +52,7 @@ This milestone adds private token swap functionality to Octopus, enabling users 
 7. **Set slippage tolerance** (0.1% - 5%)
 8. **Generate proof and execute** (takes 30-60 seconds)
 
-**Note:** The swap currently uses a mock 1:1 exchange rate for testing purposes.
+**Note:** The swap currently uses a mock 1:1 exchange rate for testing purposes. Real DeepBook integration coming soon.
 
 ---
 
@@ -61,15 +63,27 @@ User (private notes in pool_in)
     ↓
 Submit ZK Proof (proves ownership + swap parameters)
     ↓
-pool::swap() verifies proof
+pool::swap_production() verifies proof
     ↓
 Extract tokens from pool_in
     ↓
-[Mock: 1:1 swap] → [Production: Call Cetus DEX]
+[Current: Mock 1:1 swap] → [Next: Call DeepBook place_market_order()]
     ↓
 Shield swapped tokens into pool_out
     ↓
 User receives encrypted output note
+```
+
+### DeepBook Integration Flow
+
+```
+Privacy Pool Contract
+    ↓ (coin_in)
+DeepBook place_market_order()
+    ↓ (coin_out)
+Privacy Pool Contract (shield)
+    ↓ (encrypted note)
+User Wallet Scanner
 ```
 
 ---
@@ -128,19 +142,18 @@ public entry fun swap<TokenIn, TokenOut>(
 - Shields output into `pool_out`
 - Emits `SwapEvent` for scanning
 
-**Production Function (Cetus Integration Ready):**
+**Production Function (DeepBook Integration Ready):**
 
 ```move
 public entry fun swap_production<TokenIn, TokenOut>(
     pool_in: &mut PrivacyPool<TokenIn>,
     pool_out: &mut PrivacyPool<TokenOut>,
-    cetus_pool_obj: &mut CetusPool<TokenIn, TokenOut>,
-    cetus_config: &CetusGlobalConfig,
+    deepbook_pool: &mut DeepBookPool<TokenIn, TokenOut>,  // NEW
     // ... same parameters as above
 )
 ```
 
-⚠️ **Status:** Scaffolded, awaiting Cetus module integration
+⚠️ **Status:** Scaffolded, awaiting DeepBook module integration
 
 ---
 
@@ -160,10 +173,10 @@ public entry fun swap_production<TokenIn, TokenOut>(
 
 **For Real DEX Integration:**
 
-1. **Cetus CLMM Integration**
-   - Import Cetus modules in [pool.move](../../contracts/sources/pool.move)
-   - Call `cetus_pool::flash_swap()` for real market prices
-   - Handle token order (a_to_b vs b_to_a)
+1. **DeepBook V3 Integration**
+   - Import DeepBook modules in [pool.move](../../contracts/sources/pool.move)
+   - Call `deepbook_pool::place_market_order()` for real market prices
+   - Handle coin remainders and slippage
 
 2. **Multi-Pool Deployment**
    - Deploy separate privacy pools for SUI and USDC
@@ -171,7 +184,7 @@ public entry fun swap_production<TokenIn, TokenOut>(
    - Update SDK configuration with pool IDs
 
 3. **Price Oracle**
-   - Fetch live prices from Cetus pools
+   - Fetch live prices from DeepBook pools
    - Calculate accurate output amounts
    - Estimate price impact
 
@@ -179,3 +192,77 @@ public entry fun swap_production<TokenIn, TokenOut>(
    - Scan blockchain for user's encrypted notes
    - Build Merkle proofs for input notes
    - Select notes to cover swap amount
+
+**Implementation Plan:** See [DEEPBOOK_INTEGRATION.md](./DEEPBOOK_INTEGRATION.md) for detailed roadmap.
+
+---
+
+## Testing Strategy
+
+### Current Tests ✅
+
+- **Circuit Tests**: All proof generation tests passing
+- **Contract Tests**: 27 tests passing (including swap with mock)
+- **SDK Tests**: Proof serialization and transaction building verified
+
+### Required for DeepBook ⚠️
+
+- **Integration Tests**: Real DeepBook pool interaction
+- **E2E Tests**: Shield → Swap → Unshield flow
+- **Price Tests**: Accuracy of DeepBook price estimation
+- **Slippage Tests**: Protection works at various thresholds
+
+---
+
+## Deployment Checklist
+
+Before deploying to production:
+
+- [ ] Obtain DeepBook package ID for target network
+- [ ] Find active DeepBook pools for token pairs
+- [ ] Deploy USDC privacy pool
+- [ ] Update Move.toml with DeepBook dependency
+- [ ] Implement DeepBook integration in pool.move
+- [ ] Add DeepBook SDK functions (price, estimation)
+- [ ] Update frontend with real price fetching
+- [ ] Run full test suite
+- [ ] Verify privacy guarantees maintained
+
+---
+
+## Next Steps
+
+1. **Phase 1**: Implement DeepBook contract integration (2-3 days)
+2. **Phase 2**: Add DeepBook SDK module (2-3 days)
+3. **Phase 3**: Update frontend with real prices (2 days)
+4. **Phase 4**: Deploy and test on testnet (2-3 days)
+
+**Total Estimate**: 8-11 days
+
+See [DEEPBOOK_INTEGRATION.md](./DEEPBOOK_INTEGRATION.md) for detailed implementation plan.
+
+---
+
+## Key Differences: DeepBook vs Mock
+
+| Aspect | Current (Mock) | With DeepBook |
+|--------|---------------|---------------|
+| **Price** | Fixed 1:1 | Real market rate from order book |
+| **Liquidity** | Unlimited | Based on DeepBook pool depth |
+| **Slippage** | None | Real slippage based on order size |
+| **Fees** | None | 0.25% taker fee (or 0.2% with DEEP) |
+| **Speed** | Instant | Depends on order matching |
+
+---
+
+## Resources
+
+- [DeepBook V3 Documentation](https://docs.sui.io/standards/deepbook)
+- [DeepBook Integration Plan](./DEEPBOOK_INTEGRATION.md)
+- [Swap Circuit Source](../../circuits/swap.circom)
+- [Contract Source](../../contracts/sources/pool.move)
+
+---
+
+**Last Updated**: 2026-02-07
+**Status**: 🟡 85% Complete - Awaiting DeepBook Integration

@@ -613,7 +613,7 @@ export async function generateSwapProof(
   swapInput: SwapInput,
   config?: { wasmPath?: string; zkeyPath?: string }
 ): Promise<{ proof: snarkjs.Groth16Proof; publicSignals: string[] }> {
-  const { wasmPath, zkeyPath } = { ...getTransferCircuitPaths(), ...config };
+  const { wasmPath, zkeyPath } = { ...getSwapCircuitPaths(), ...config };
 
   // Build circuit input
   const input = buildSwapInput(swapInput);

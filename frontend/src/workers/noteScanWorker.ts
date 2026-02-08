@@ -183,6 +183,113 @@ class ClientMerkleTree {
   }
 }
 
+/**
+ * Query all pages of a specific event type
+ */
+async function queryAllEvents(
+  client: SuiGraphQLClient,
+  eventType: string,
+  eventName: string
+): Promise<any[]> {
+  let allNodes: any[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
+
+  while (hasNextPage && pageCount < MAX_PAGES) {
+    pageCount++;
+    const query: any = await withTimeout(
+      client.query({
+        query: graphql(`
+          query Events($eventType: String!, $first: Int, $after: String) {
+            events(first: $first, after: $after, filter: { type: $eventType }) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                transactionModule {
+                  package { address }
+                }
+                contents {
+                  json
+                }
+                transaction {
+                  digest
+                }
+              }
+            }
+          }
+        `),
+        variables: {
+          eventType,
+          first: 50,
+          after: cursor,
+        },
+      }),
+      30000,
+      `${eventName} GraphQL query`
+    );
+
+    const nodes = query.data?.events?.nodes || [];
+    allNodes.push(...nodes);
+
+    hasNextPage = query.data?.events?.pageInfo?.hasNextPage || false;
+    cursor = query.data?.events?.pageInfo?.endCursor || null;
+  }
+
+  return allNodes;
+}
+
+/**
+ * Count nullifiers spent in a pool
+ */
+async function countNullifiers(
+  client: SuiGraphQLClient,
+  poolId: string,
+  unshieldEvents: any[],
+  transferEvents: any[]
+): Promise<number> {
+  try {
+    const nullifierQuery = await withTimeout(
+      client.query({
+        query: graphql(`
+          query NullifierCount($poolId: SuiAddress!) {
+            object(address: $poolId) {
+              asMoveObject {
+                contents {
+                  json
+                }
+              }
+            }
+          }
+        `),
+        variables: { poolId },
+      }),
+      30000,
+      'Nullifier count query'
+    );
+
+    const poolData = nullifierQuery.data?.object?.asMoveObject?.contents?.json as any;
+    const count = poolData?.nullifiers?.count;
+
+    if (count == null) throw new Error('Nullifier count not found in pool data');
+
+    return Number(count);
+  } catch {
+    // Fallback: count from events
+    let count = unshieldEvents.length;
+    for (const e of transferEvents) {
+      const nullifiers = (e.contents?.json as any)?.input_nullifiers || [];
+      count += nullifiers.filter((n: any) =>
+        Array.isArray(n) ? n.some((b: number) => b !== 0) : n != null
+      ).length;
+    }
+    return count;
+  }
+}
+
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
 
@@ -223,72 +330,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           message: "Starting to scan blockchain events...",
         } as WorkerResponse);
 
-        // Query events with pagination
-        async function queryEvents(
-          eventType: string,
-          eventName: string
-        ): Promise<{ nodes: any[]; lastCursor: string | null }> {
-          let allNodes: any[] = [];
-          let hasNextPage = true;
-          let cursor: string | null = null;
-          let pageCount = 0;
-          const MAX_PAGES = 10;
-
-          while (hasNextPage && pageCount < MAX_PAGES) {
-            pageCount++;
-            const query: any = await withTimeout(
-              client.query({
-                query: graphql(`
-                  query Events($eventType: String!, $first: Int, $after: String) {
-                    events(first: $first, after: $after, filter: { type: $eventType }) {
-                      pageInfo {
-                        hasNextPage
-                        endCursor
-                      }
-                      nodes {
-                        transactionModule {
-                          package { address }
-                        }
-                        contents {
-                          json
-                        }
-                        transaction {
-                          digest
-                        }
-                      }
-                    }
-                  }
-                `),
-                variables: {
-                  eventType,
-                  first: 50,
-                  after: cursor,
-                },
-              }),
-              30000,
-              `${eventName} GraphQL query`
-            );
-
-            const nodes = query.data?.events?.nodes || [];
-            allNodes.push(...nodes);
-
-            hasNextPage = query.data?.events?.pageInfo?.hasNextPage || false;
-            cursor = query.data?.events?.pageInfo?.endCursor || null;
-          }
-
-          return { nodes: allNodes, lastCursor: cursor };
-        }
-
         // Parallel query of Shield, Transfer, and Unshield events
-        const [shieldResult, transferResult, unshieldResult] = await Promise.all([
-          queryEvents(`${request.packageId}::pool::ShieldEvent`, 'ShieldEvents'),
-          queryEvents(`${request.packageId}::pool::TransferEvent`, 'TransferEvents'),
-          queryEvents(`${request.packageId}::pool::UnshieldEvent`, 'UnshieldEvents'),
+        const [allShieldNodes, allTransferNodes, allUnshieldNodes] = await Promise.all([
+          queryAllEvents(client, `${request.packageId}::pool::ShieldEvent`, 'ShieldEvents'),
+          queryAllEvents(client, `${request.packageId}::pool::TransferEvent`, 'TransferEvents'),
+          queryAllEvents(client, `${request.packageId}::pool::UnshieldEvent`, 'UnshieldEvents'),
         ]);
-
-        const allShieldNodes = shieldResult.nodes;
-        const allTransferNodes = transferResult.nodes;
-        const allUnshieldNodes = unshieldResult.nodes;
 
         // Filter events by pool_id
         const filterByPool = (nodes: any[]) =>
@@ -706,6 +753,45 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
           id: request.id,
           treeId,
           root: tree.getRoot().toString(),
+        };
+        postMessage(response);
+        break;
+      }
+
+      case "count_pool_notes": {
+        const client = new SuiGraphQLClient({ url: request.graphqlUrl });
+
+        const [shieldNodes, transferNodes, unshieldNodes] = await Promise.all([
+          queryAllEvents(client, `${request.packageId}::pool::ShieldEvent`, 'ShieldEvents'),
+          queryAllEvents(client, `${request.packageId}::pool::TransferEvent`, 'TransferEvents'),
+          queryAllEvents(client, `${request.packageId}::pool::UnshieldEvent`, 'UnshieldEvents'),
+        ]);
+
+        const filterByPool = (nodes: any[]) =>
+          nodes.filter(node => (node.contents?.json as any)?.pool_id === request.poolId);
+
+        const shieldEventsInPool = filterByPool(shieldNodes);
+        const transferEventsInPool = filterByPool(transferNodes);
+        const unshieldEventsInPool = filterByPool(unshieldNodes);
+
+        const transferOutputNotesCount = transferEventsInPool.reduce((sum, node) => {
+          const output_notes = (node.contents?.json as any)?.output_notes || [];
+          return sum + output_notes.length;
+        }, 0);
+
+        const nullifierCount = await countNullifiers(
+          client,
+          request.poolId,
+          unshieldEventsInPool,
+          transferEventsInPool
+        );
+
+        const totalNotesInPool = shieldEventsInPool.length + transferOutputNotesCount - nullifierCount;
+
+        const response: WorkerResponse = {
+          type: "count_pool_notes_result",
+          id: request.id,
+          totalNotesInPool: Math.max(0, totalNotesInPool),
         };
         postMessage(response);
         break;

@@ -43,8 +43,7 @@ The circuits must be compiled first, as their artifacts (WASM, proving keys, ver
 ```bash
 cd circuits
 npm install
-cd scripts
-./compile_all.sh
+./scripts/compile.sh
 ```
 
 *This process is slow and generates large `_final.zkey` files.*
@@ -129,11 +128,11 @@ nullifier = Poseidon(nullifying_key, leaf_index)
 * Public inputs (160 bytes): root, 2 input nullifiers, 2 output commitments.
 * Spends two input notes and creates two new output notes within the pool.
 
-**Swap** (private swap): `pool::swap<TokenIn, TokenOut>(pool_in, pool_out, proof_bytes, ...)`
+**Swap** (private swap): `pool::swap<TokenIn, TokenOut>(pool_in, pool_out, deepbook_pool, proof_bytes, public_inputs_bytes, amount_in, min_amount_out, encrypted_output_note, encrypted_change_note, ctx)`
 
-* Requires Groth16 proof for a private swap. Public inputs (192 bytes) include root, nullifiers, and commitments.
-* Spends input notes, performs a swap (currently mock), and creates new output and change notes.
-* Note: Current implementation is `#[test_only]`. A `swap_production` function exists for full DEX integration.
+* Requires Groth16 proof for a private swap. Public inputs (256 bytes, 8 field elements): `token_in, token_out, merkle_root` (public inputs) + `nullifiers[2], swap_data_hash, output_commitment, change_commitment` (public outputs).
+* Verifies proof, spends input notes, executes swap via DeepBook pool, creates output and change notes.
+* For testing without a real DeepBook pool, use `pool::swap_for_testing` (skips proof verification, uses 1:1 mock swap).
 
 ### Milestones
 
@@ -145,7 +144,7 @@ Detailed implementation plans are available in the [milestones/](milestones/) di
    * 2-input, 2-output transfer circuit
 
 2. **[DeFi Integration](milestones/02-defi-integration.md)** (Fixing)
-   * Private swaps through Cetus DEX
+   * Private swaps through DeepBook
    * Increases transaction volume and anonymity set
    * Requires Private Transfers first
 

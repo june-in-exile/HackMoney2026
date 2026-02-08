@@ -6,8 +6,9 @@ import {
   useSignAndExecuteTransaction,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { cn, parseSui, formatSui, truncateAddress } from "@/lib/utils";
-import { PACKAGE_ID, POOL_ID, SUI_COIN_TYPE } from "@/lib/constants";
+import { cn, parseTokenAmount, formatTokenAmount, truncateAddress } from "@/lib/utils";
+import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -21,6 +22,7 @@ import { NumberInput } from "@/components/NumberInput";
 
 interface UnshieldFormProps {
   keypair: OctopusKeypair | null;
+  tokenConfig: TokenConfig;
   maxAmount: bigint;
   notes: OwnedNote[];
   onSuccess?: () => void | Promise<void>;
@@ -36,6 +38,7 @@ type UnshieldState =
 
 export function UnshieldForm({
   keypair,
+  tokenConfig,
   maxAmount,
   notes,
   onSuccess,
@@ -53,6 +56,7 @@ export function UnshieldForm({
   const [currentTxIndex, setCurrentTxIndex] = useState(0);
   const [totalTxs, setTotalTxs] = useState(0);
 
+  const { packageId, network } = useNetworkConfig();
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
@@ -71,7 +75,7 @@ export function UnshieldForm({
     const totalBalance = unspent.reduce((sum, n) => sum + n.note.value, 0n);
     if (targetAmount > totalBalance) {
       throw new Error(
-        `Insufficient balance: need ${formatSui(targetAmount)} SUI, have ${formatSui(totalBalance)} SUI`
+        `Insufficient balance: need ${formatTokenAmount(targetAmount, tokenConfig.decimals)} ${tokenConfig.symbol}, have ${formatTokenAmount(totalBalance, tokenConfig.decimals)} ${tokenConfig.symbol}`
       );
     }
 
@@ -144,7 +148,7 @@ export function UnshieldForm({
         ? encryptNote(changeNote, viewingPk)
         : new Uint8Array(0);
       
-      const tx = buildUnshieldTransaction(PACKAGE_ID, POOL_ID, SUI_COIN_TYPE, suiProof, recipientAddr, encryptedChangeNote);
+      const tx = buildUnshieldTransaction(packageId!, tokenConfig.poolId, tokenConfig.type, suiProof, recipientAddr, encryptedChangeNote);
 
       const result = await signAndExecute({ transaction: tx });
       txDigests.push(result.digest);
@@ -189,7 +193,7 @@ export function UnshieldForm({
       return;
     }
 
-    const amountMist = parseSui(amount);
+    const amountMist = parseTokenAmount(amount, tokenConfig.decimals);
     if (amountMist > maxAmount) {
       setError("Insufficient shielded balance");
       return;
@@ -215,12 +219,12 @@ export function UnshieldForm({
       setState("success");
 
       // Build success message
-      let successMessage = `Successfully unshielded ${formatSui(amountMist)} SUI`;
+      let successMessage = `Successfully unshielded ${formatTokenAmount(amountMist, tokenConfig.decimals)} ${tokenConfig.symbol}`;
       if (selectedNotes.length > 1) {
         successMessage += ` in ${txDigests.length} transaction(s)`;
       }
       if (totalChange > 0n) {
-        successMessage += ` (Change: ${formatSui(totalChange)} SUI)`;
+        successMessage += ` (Change: ${formatTokenAmount(totalChange, tokenConfig.decimals)} ${tokenConfig.symbol})`;
       }
 
       setSuccess({
@@ -261,7 +265,7 @@ export function UnshieldForm({
             htmlFor="unshield-amount"
             className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono"
           >
-            Amount (SUI)
+            Amount ({tokenConfig.symbol})
           </label>
           <NumberInput
             id="unshield-amount"
@@ -275,7 +279,7 @@ export function UnshieldForm({
           <p className="mt-2 text-[10px] text-gray-500 font-mono">
             {notes.length > 0 ? (
               <>
-                TOTAL: {formatSui(maxAmount)}
+                TOTAL: {formatTokenAmount(maxAmount, tokenConfig.decimals)}
                 {notes.filter((n: OwnedNote) => !n.spent).length > 1 && (
                   <span className="text-gray-600">
                     {" "}// {notes.filter((n: OwnedNote) => !n.spent).length} NOTES
@@ -283,7 +287,7 @@ export function UnshieldForm({
                 )}
               </>
             ) : (
-              <>MAX: {formatSui(maxAmount)}</>
+              <>MAX: {formatTokenAmount(maxAmount, tokenConfig.decimals)}</>
             )}
           </p>
         </div>
@@ -383,7 +387,7 @@ export function UnshieldForm({
                     <>
                       TX:{' '}
                       <a
-                        href={`https://testnet.suivision.xyz/txblock/${success.txDigests[0]}`}
+                        href={`https://${network}.suivision.xyz/txblock/${success.txDigests[0]}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-cyber-blue hover:text-cyber-blue/80 underline"
@@ -398,7 +402,7 @@ export function UnshieldForm({
                         <span key={digest}>
                           {i > 0 && ', '}
                           <a
-                            href={`https://testnet.suivision.xyz/txblock/${digest}`}
+                            href={`https://${network}.suivision.xyz/txblock/${digest}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-cyber-blue hover:text-cyber-blue/80 underline"

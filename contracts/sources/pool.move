@@ -8,10 +8,10 @@ module octopus::pool {
     use octopus::merkle_tree::{Self, MerkleTree};
     use octopus::nullifier::{Self, NullifierRegistry};
 
-    // Cetus DEX integration (uncomment when Cetus package is available)
-    // Note: Cetus package address is configured in Move.toml
-    // use cetus_clmm::pool::{Self as cetus_pool, Pool as CetusPool};
-    // use cetus_clmm::config::GlobalConfig as CetusGlobalConfig;
+    // DeepBook V3 integration (scaffolded for future implementation)
+    // Note: DeepBook V3 API requires BalanceManager setup, which needs additional research
+    // For now, we maintain the function signature but use a simplified mock
+    use deepbook::pool::{Pool as DeepBookPool};
 
     // ============ Errors ============
 
@@ -27,6 +27,8 @@ module octopus::pool {
     const E_INVALID_PUBLIC_INPUTS: u64 = 5;
     /// Cannot shield zero amount
     const E_ZERO_AMOUNT: u64 = 6;
+    /// Price too low (slippage protection)
+    const E_PRICE_TOO_LOW: u64 = 7;
 
     // ============ Constants ============
 
@@ -434,129 +436,23 @@ module octopus::pool {
         });
     }
 
-    /// Swap tokens privately through external DEX (e.g., Cetus).
-    ///
-    /// The ZK proof proves:
-    /// 1. Knowledge of spending_key and nullifying_key (ownership of input notes)
-    /// 2. Both input notes exist in Merkle tree (2 Merkle proofs)
-    /// 3. Correct nullifier computation for both inputs
-    /// 4. Sufficient balance: sum(input_values) >= amount_in + change_value
-    /// 5. Swap parameters hash correctly
-    /// 6. Output and change commitments correctly computed
-    ///
-    /// Public inputs format (192 bytes total):
-    /// - merkle_root (32 bytes): Merkle tree root
-    /// - input_nullifiers[2] (64 bytes): Nullifiers for both input notes
-    /// - output_commitment (32 bytes): Commitment for output note (token_out)
-    /// - change_commitment (32 bytes): Commitment for change note (token_in)
-    /// - swap_data_hash (32 bytes): Hash of swap parameters
-    ///
-    /// NOTE: This is a TEST-ONLY version using 1:1 swap ratio.
-    /// For production use, implement execute_cetus_swap() with real Cetus DEX integration.
-    #[test_only]
-    public fun swap<TokenIn, TokenOut>(
-        pool_in: &mut PrivacyPool<TokenIn>,
-        pool_out: &mut PrivacyPool<TokenOut>,
-        proof_bytes: vector<u8>,
-        public_inputs_bytes: vector<u8>,
-        amount_in: u64,
-        min_amount_out: u64,
-        encrypted_output_note: vector<u8>,
-        encrypted_change_note: vector<u8>,
-        ctx: &mut TxContext,
-    ) {
-        // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 192, E_INVALID_PUBLIC_INPUTS);
-
-        // 0. Validate amount_in is greater than zero
-        assert!(amount_in > 0, E_ZERO_AMOUNT);
-
-        // 1. Parse public inputs
-        let (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, _swap_data_hash) =
-            parse_swap_public_inputs(&public_inputs_bytes);
-
-        // 2. Verify merkle root is valid (current or in history)
-        assert!(is_valid_root(pool_in, &merkle_root), E_INVALID_ROOT);
-
-        // 3. Check both nullifiers have not been spent (prevent double-spend)
-        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier1), E_DOUBLE_SPEND);
-        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier2), E_DOUBLE_SPEND);
-
-        // 4. Verify Groth16 ZK proof using swap verification key
-        // NOTE: Proof verification skipped in test-only version since we use placeholder proofs
-        // In production, this would verify the real ZK proof
-        let _pvk = groth16::prepare_verifying_key(&groth16::bn254(), &pool_in.swap_vk_bytes);
-        let _public_inputs = groth16::public_proof_inputs_from_bytes(public_inputs_bytes);
-        let _proof_points = groth16::proof_points_from_bytes(proof_bytes);
-
-        // assert!(
-        //     groth16::verify_groth16_proof(&groth16::bn254(), &pvk, &public_inputs, &proof_points),
-        //     E_INVALID_PROOF
-        // );
-
-        // 5. Extract tokens from pool_in
-        assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
-        let coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
-
-        // 6. Execute swap through DEX
-        // TODO: Replace with real Cetus DEX integration
-        // For now, using simplified 1:1 swap ratio for testing
-        let amount_out = execute_mock_swap<TokenIn, TokenOut>(
-            coin_in,
-            min_amount_out,
-            pool_out,
-            ctx
-        );
-
-        // 7. Mark both nullifiers as spent
-        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
-        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
-
-        // 8. Save current roots before inserting (so existing proofs remain valid)
-        save_historical_root(pool_in);
-        save_historical_root(pool_out);
-
-        // 9. Insert output commitment into pool_out's Merkle tree
-        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
-        merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
-
-        // 10. Insert change commitment into pool_in's Merkle tree
-        let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
-        merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
-
-        // 11. Emit event for wallet scanning
-        event::emit(SwapEvent {
-            pool_in_id: object::id(pool_in),
-            pool_out_id: object::id(pool_out),
-            input_nullifiers: vector[nullifier1, nullifier2],
-            output_commitment,
-            change_commitment,
-            output_position,
-            change_position,
-            amount_in,
-            amount_out,
-            encrypted_output_note,
-            encrypted_change_note,
-        });
-    }
-
     /// Execute private swap through external DEX (Production Version)
     ///
-    /// This function enables private swaps through Cetus DEX while maintaining privacy.
+    /// This function enables private swaps through DeepBook V3 while maintaining privacy.
     /// Users prove ownership of input notes via ZK proof, swap through DEX at market price,
     /// and receive output as a new private note.
     ///
     /// Flow:
     /// 1. Verify ZK proof (proves ownership of input notes and swap parameters)
     /// 2. Extract input tokens from pool_in
-    /// 3. Call external DEX (Cetus) to execute swap
+    /// 3. Call external DEX (DeepBook V3) to execute swap
     /// 4. Shield output tokens into pool_out
     /// 5. Return change to pool_in if applicable
     ///
     /// NOTE: This is a production-ready scaffold. To complete integration:
-    /// 1. Import Cetus modules: `use cetus_clmm::pool as cetus_pool;`
-    /// 2. Add `cetus_pool_obj: &mut CetusPool<TokenIn, TokenOut>` parameter
-    /// 3. Replace TODO comments with actual Cetus calls
+    /// 1. DeepBook modules are already imported (line 14)
+    /// 2. deepbook_pool parameter is already added
+    /// 3. Replace TODO comments with actual DeepBook V3 API calls
     ///
     /// For detailed implementation guide, see: docs/PRODUCTION_SWAP_IMPLEMENTATION.md
     ///
@@ -570,28 +466,26 @@ module octopus::pool {
     /// * `encrypted_output_note` - Encrypted note for recipient
     /// * `encrypted_change_note` - Encrypted change note
     /// * `ctx` - Transaction context
-    public fun swap_production<TokenIn, TokenOut>(
+    public fun swap<TokenIn, TokenOut>(
         pool_in: &mut PrivacyPool<TokenIn>,
-        _pool_out: &mut PrivacyPool<TokenOut>,
-        // TODO: Uncomment when Cetus modules are imported:
-        // cetus_pool: &mut CetusPool<TokenIn, TokenOut>,
-        // cetus_config: &CetusGlobalConfig,
+        pool_out: &mut PrivacyPool<TokenOut>,
+        deepbook_pool: &mut DeepBookPool<TokenIn, TokenOut>,
         proof_bytes: vector<u8>,
         public_inputs_bytes: vector<u8>,
         amount_in: u64,
-        _min_amount_out: u64,
-        _encrypted_output_note: vector<u8>,
-        _encrypted_change_note: vector<u8>,
+        min_amount_out: u64,
+        encrypted_output_note: vector<u8>,
+        encrypted_change_note: vector<u8>,
         ctx: &mut TxContext,
     ) {
-        // Validate public inputs length (6 field elements × 32 bytes = 192 bytes)
-        assert!(vector::length(&public_inputs_bytes) == 192, E_INVALID_PUBLIC_INPUTS);
+        // Validate public inputs length (8 field elements × 32 bytes = 256 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 256, E_INVALID_PUBLIC_INPUTS);
 
         // 0. Validate amount_in is greater than zero
         assert!(amount_in > 0, E_ZERO_AMOUNT);
 
         // 1. Parse public inputs
-        let (merkle_root, nullifier1, nullifier2, _output_commitment, _change_commitment, _swap_data_hash) =
+        let (_token_in, _token_out, merkle_root, nullifier1, nullifier2, _swap_data_hash, output_commitment, change_commitment) =
             parse_swap_public_inputs(&public_inputs_bytes);
 
         // 2. Verify merkle root is valid (current or in history)
@@ -611,56 +505,35 @@ module octopus::pool {
             E_INVALID_PROOF
         );
 
-        // 5. Extract tokens from pool_in
+        // 5. Execute swap
+        // TODO: Implement actual DeepBook V3 integration
+        // Note: DeepBook V3 requires:
+        //   - BalanceManager creation and management
+        //   - Different API: place_market_order returns OrderInfo, not coins directly
+        //   - Additional parameters: client_order_id, self_matching_option, etc.
+        // For reference: https://docs.sui.io/standards/deepbookv3
+        //
+        // For now, using simplified mock (1:1 ratio) until DeepBook API is fully researched
+        let _ = deepbook_pool; // Suppress unused parameter warning
+
         assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
         let coin_in = coin::take(&mut pool_in.balance, amount_in, ctx);
 
-        // 6. Execute swap through Cetus DEX
-        // TODO: Replace with real Cetus integration when modules are imported
-        //
-        // Production Cetus call (uncomment when cetus_clmm modules are available):
-        // let (coin_out, coin_remainder) = cetus_pool::flash_swap<TokenIn, TokenOut>(
-        //     cetus_pool,
-        //     true,  // a_to_b direction (adjust based on token pair order)
-        //     true,  // by_amount_in
-        //     amount_in,
-        //     0,     // sqrt_price_limit (0 = no limit, adjust for slippage control)
-        //     ctx
-        // );
-        //
-        // // Repay flash swap
-        // cetus_pool::repay_flash_swap<TokenIn, TokenOut>(
-        //     cetus_pool,
-        //     coin_in,
-        //     coin_remainder,
-        //     coin::zero<TokenOut>(ctx),
-        //     coin_out
-        // );
-        //
-        // let amount_out = coin::value(&coin_out);
+        // Mock 1:1 swap (will be replaced with real DeepBook integration)
+        let amount_out = amount_in;
 
-        // ============================================================
-        // PHASE 1: MOCK SWAP (1:1 ratio)
-        // ============================================================
-        // Using simplified 1:1 swap for initial testing
-        // TODO Phase 2: Replace with real Cetus DEX integration
-        // ============================================================
-
-        // Mock 1:1 swap - in production this would call Cetus DEX
-        let amount_out = amount_in; // 1:1 ratio for Phase 1 testing
-
-        // Destroy input coin (would go to DEX in production)
+        // Destroy input coin (simulating DEX consumption)
         balance::join(&mut pool_in.balance, coin::into_balance(coin_in));
 
-        // Mint output coin from pool_out (would come from DEX in production)
-        assert!(balance::value(&_pool_out.balance) >= amount_out, E_INSUFFICIENT_BALANCE);
-        let _coin_out = coin::take(&mut _pool_out.balance, amount_out, ctx);
+        // Take output from pool_out (simulating DEX providing tokens)
+        assert!(balance::value(&pool_out.balance) >= amount_out, E_INSUFFICIENT_BALANCE);
+        let coin_out = coin::take(&mut pool_out.balance, amount_out, ctx);
 
-        // Shield output back into pool_out (simulating DEX output -> pool)
-        balance::join(&mut _pool_out.balance, coin::into_balance(_coin_out));
+        // Shield output back into pool_out
+        balance::join(&mut pool_out.balance, coin::into_balance(coin_out));
 
         // 7. Verify slippage protection
-        assert!(amount_out >= _min_amount_out, E_INSUFFICIENT_BALANCE);
+        assert!(amount_out >= min_amount_out, E_PRICE_TOO_LOW);
 
         // 8. Mark both nullifiers as spent
         nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
@@ -668,29 +541,29 @@ module octopus::pool {
 
         // 9. Save current roots before inserting (so existing proofs remain valid)
         save_historical_root(pool_in);
-        save_historical_root(_pool_out);
+        save_historical_root(pool_out);
 
         // 10. Add output commitment to pool_out Merkle tree
-        let output_position = merkle_tree::get_next_index(&_pool_out.merkle_tree);
-        merkle_tree::insert(&mut _pool_out.merkle_tree, _output_commitment);
+        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
+        merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
 
         // 11. Add change commitment to pool_in Merkle tree
         let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
-        merkle_tree::insert(&mut pool_in.merkle_tree, _change_commitment);
+        merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
 
         // 12. Emit event for wallet scanning
         event::emit(SwapEvent {
             pool_in_id: object::id(pool_in),
-            pool_out_id: object::id(_pool_out),
+            pool_out_id: object::id(pool_out),
             input_nullifiers: vector[nullifier1, nullifier2],
-            output_commitment: _output_commitment,
-            change_commitment: _change_commitment,
+            output_commitment: output_commitment,
+            change_commitment: change_commitment,
             output_position,
             change_position,
             amount_in,
             amount_out,
-            encrypted_output_note: _encrypted_output_note,
-            encrypted_change_note: _encrypted_change_note,
+            encrypted_output_note: encrypted_output_note,
+            encrypted_change_note: encrypted_change_note,
         });
     }
 
@@ -878,46 +751,52 @@ module octopus::pool {
     }
 
     /// Parse swap public inputs from concatenated bytes (for swap).
-    /// Returns (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash)
+    /// Returns (token_in, token_out, merkle_root, nullifier1, nullifier2, swap_data_hash, output_commitment, change_commitment)
     /// each as 32-byte vectors.
+    ///
+    /// Public signal order (8 × 32 = 256 bytes):
+    /// - Public inputs (token_in, token_out, merkle_root) come first
+    /// - Public outputs (nullifiers, swap_data_hash, output_commitment, change_commitment) follow
     fun parse_swap_public_inputs(bytes: &vector<u8>):
-        (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
+        (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) {
 
+        let mut token_in = vector::empty<u8>();
+        let mut token_out = vector::empty<u8>();
         let mut merkle_root = vector::empty<u8>();
         let mut nullifier1 = vector::empty<u8>();
         let mut nullifier2 = vector::empty<u8>();
+        let mut swap_data_hash = vector::empty<u8>();
         let mut output_commitment = vector::empty<u8>();
         let mut change_commitment = vector::empty<u8>();
-        let mut swap_data_hash = vector::empty<u8>();
 
-        // Extract merkle_root (bytes 0-31)
+        // Extract token_in (bytes 0-31)
         let mut i = 0;
         while (i < 32) {
+            vector::push_back(&mut token_in, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract token_out (bytes 32-63)
+        while (i < 64) {
+            vector::push_back(&mut token_out, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract merkle_root (bytes 64-95)
+        while (i < 96) {
             vector::push_back(&mut merkle_root, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
-        // Extract nullifier1 (bytes 32-63)
-        while (i < 64) {
+        // Extract nullifier1 (bytes 96-127)
+        while (i < 128) {
             vector::push_back(&mut nullifier1, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
-        // Extract nullifier2 (bytes 64-95)
-        while (i < 96) {
-            vector::push_back(&mut nullifier2, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        // Extract output_commitment (bytes 96-127)
-        while (i < 128) {
-            vector::push_back(&mut output_commitment, *vector::borrow(bytes, i));
-            i = i + 1;
-        };
-
-        // Extract change_commitment (bytes 128-159)
+        // Extract nullifier2 (bytes 128-159)
         while (i < 160) {
-            vector::push_back(&mut change_commitment, *vector::borrow(bytes, i));
+            vector::push_back(&mut nullifier2, *vector::borrow(bytes, i));
             i = i + 1;
         };
 
@@ -927,15 +806,27 @@ module octopus::pool {
             i = i + 1;
         };
 
-        (merkle_root, nullifier1, nullifier2, output_commitment, change_commitment, swap_data_hash)
+        // Extract output_commitment (bytes 192-223)
+        while (i < 224) {
+            vector::push_back(&mut output_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        // Extract change_commitment (bytes 224-255)
+        while (i < 256) {
+            vector::push_back(&mut change_commitment, *vector::borrow(bytes, i));
+            i = i + 1;
+        };
+
+        (token_in, token_out, merkle_root, nullifier1, nullifier2, swap_data_hash, output_commitment, change_commitment)
     }
 
     /// Execute a mock swap (1:1 ratio) for testing.
-    /// TODO: Replace with real Cetus DEX integration.
+    /// TODO: Replace with real DeepBook V3 integration.
     ///
     /// In production, this should:
-    /// 1. Call Cetus pool's swap function
-    /// 2. Get real market price
+    /// 1. Call DeepBook V3 place_market_order function
+    /// 2. Get real market price from order book
     /// 3. Apply slippage protection
     /// 4. Return actual output amount
     #[test_only]
@@ -953,7 +844,7 @@ module octopus::pool {
 
         // Mock 1:1 swap (simplified for testing)
         // In production, this would call:
-        // let coin_out = cetus::swap<TokenIn, TokenOut>(dex_pool, coin_in, min_amount_out, ctx);
+        // let (coin_out, _) = deepbook::place_market_order<TokenIn, TokenOut>(pool, true, amount_in, coin_in, ...);
         let amount_out = amount_in; // 1:1 ratio for testing
 
         // Check slippage protection
@@ -969,6 +860,68 @@ module octopus::pool {
     }
 
     // ============ Test Helpers ============
+
+    /// Test-only swap that skips ZK proof verification and DeepBook integration.
+    /// Mirrors the production swap logic with a mock 1:1 exchange rate.
+    #[test_only]
+    public fun swap_for_testing<TokenIn, TokenOut>(
+        pool_in: &mut PrivacyPool<TokenIn>,
+        pool_out: &mut PrivacyPool<TokenOut>,
+        proof_bytes: vector<u8>,
+        public_inputs_bytes: vector<u8>,
+        amount_in: u64,
+        min_amount_out: u64,
+        encrypted_output_note: vector<u8>,
+        encrypted_change_note: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        // Validate public inputs length (8 field elements × 32 bytes = 256 bytes)
+        assert!(vector::length(&public_inputs_bytes) == 256, E_INVALID_PUBLIC_INPUTS);
+        assert!(amount_in > 0, E_ZERO_AMOUNT);
+
+        let (_token_in, _token_out, merkle_root, nullifier1, nullifier2, _swap_data_hash, output_commitment, change_commitment) =
+            parse_swap_public_inputs(&public_inputs_bytes);
+
+        assert!(is_valid_root(pool_in, &merkle_root), E_INVALID_ROOT);
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier1), E_DOUBLE_SPEND);
+        assert!(!nullifier::is_spent(&pool_in.nullifiers, nullifier2), E_DOUBLE_SPEND);
+
+        // Skip proof verification — use execute_mock_swap instead of real DEX
+        let _ = proof_bytes;
+        assert!(balance::value(&pool_in.balance) >= amount_in, E_INSUFFICIENT_BALANCE);
+        let amount_out = execute_mock_swap<TokenIn, TokenOut>(
+            coin::take(&mut pool_in.balance, amount_in, ctx),
+            min_amount_out,
+            pool_out,
+            ctx,
+        );
+
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier1);
+        nullifier::mark_spent(&mut pool_in.nullifiers, nullifier2);
+
+        save_historical_root(pool_in);
+        save_historical_root(pool_out);
+
+        let output_position = merkle_tree::get_next_index(&pool_out.merkle_tree);
+        merkle_tree::insert(&mut pool_out.merkle_tree, output_commitment);
+
+        let change_position = merkle_tree::get_next_index(&pool_in.merkle_tree);
+        merkle_tree::insert(&mut pool_in.merkle_tree, change_commitment);
+
+        event::emit(SwapEvent {
+            pool_in_id: object::id(pool_in),
+            pool_out_id: object::id(pool_out),
+            input_nullifiers: vector[nullifier1, nullifier2],
+            output_commitment,
+            change_commitment,
+            output_position,
+            change_position,
+            amount_in,
+            amount_out,
+            encrypted_output_note,
+            encrypted_change_note,
+        });
+    }
 
     #[test_only]
     public fun destroy_for_testing<T>(pool: PrivacyPool<T>) {
