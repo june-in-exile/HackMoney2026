@@ -149,6 +149,31 @@ export function setActiveKeypair(
 }
 
 /**
+ * Update the label of a specific keypair
+ */
+export function updateKeypairLabel(
+  identifier: KeypairIdentifier,
+  masterPublicKey: string,
+  label: string
+): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const key = getStorageKey(identifier);
+    const existing = getSavedKeypairs(identifier);
+    const index = existing.findIndex((kp) => kp.masterPublicKey === masterPublicKey);
+
+    if (index >= 0) {
+      existing[index] = { ...existing[index], label };
+      localStorage.setItem(key, JSON.stringify(existing));
+    }
+  } catch (error) {
+    console.error("Failed to update keypair label:", error);
+    throw error;
+  }
+}
+
+/**
  * Clear active keypair for a wallet address and pool
  */
 export function clearActiveKeypair(identifier: KeypairIdentifier): void {

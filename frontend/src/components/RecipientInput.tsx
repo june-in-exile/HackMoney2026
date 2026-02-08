@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { isValidViewingPublicKey, type RecipientProfile, type RecipientProfileStored } from "@june_zk/octopus-sdk";
+import { isValidViewingPublicKey, exportViewingPublicKey, type RecipientProfile, type RecipientProfileStored } from "@june_zk/octopus-sdk";
 import {
   saveRecipient,
   getRecipients,
   deleteRecipient,
 } from "@/lib/recipientStorage";
+import { getSavedKeypairs, getDefaultIdentifier } from "@/lib/keypairStorage";
+import { hexToBigInt } from "@/lib/utils";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 
 interface RecipientInputProps {
@@ -25,13 +27,24 @@ export function RecipientInput({
   const [viewingKeyInput, setViewingKeyInput] = useState("");
   const [labelInput, setLabelInput] = useState("");
   const [savedRecipients, setSavedRecipients] = useState<RecipientProfileStored[]>([]);
+  const [ownKeypairs, setOwnKeypairs] = useState<Array<{ mpk: string; vpk: string; label?: string }>>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [showSaveForm, setShowSaveForm] = useState(false);
 
-  // Load saved recipients on mount and when wallet changes
+  // Load saved recipients and own keypairs on mount and when wallet changes
   useEffect(() => {
     if (walletAddress) {
       setSavedRecipients(getRecipients(walletAddress));
+
+      const identifier = getDefaultIdentifier(walletAddress);
+      const keypairs = getSavedKeypairs(identifier);
+      setOwnKeypairs(
+        keypairs.map((kp) => ({
+          mpk: kp.masterPublicKey,
+          vpk: exportViewingPublicKey(hexToBigInt(kp.spendingKey)),
+          label: kp.label,
+        }))
+      );
     }
   }, [walletAddress]);
 
@@ -69,7 +82,6 @@ export function RecipientInput({
   const handleLoadRecipient = (mpk: string) => {
     setSelectedRecipient(mpk);
     if (!mpk) {
-      // Clear selection
       setMpkInput("");
       setViewingKeyInput("");
       setLabelInput("");
@@ -81,6 +93,15 @@ export function RecipientInput({
       setMpkInput(recipient.mpk);
       setViewingKeyInput(recipient.viewingPublicKey);
       setLabelInput(recipient.label || "");
+      return;
+    }
+
+    // Fallback: check own keypairs
+    const own = ownKeypairs.find((kp) => kp.mpk === mpk);
+    if (own) {
+      setMpkInput(own.mpk);
+      setViewingKeyInput(own.vpk);
+      setLabelInput(own.label || "");
     }
   };
 
@@ -111,7 +132,7 @@ export function RecipientInput({
   return (
     <div className="space-y-4">
       {/* Saved Recipients Dropdown */}
-      {savedRecipients.length > 0 && (
+      {(savedRecipients.length > 0 || ownKeypairs.length > 0) && (
         <div>
           <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
             Saved Recipients
@@ -124,11 +145,24 @@ export function RecipientInput({
               disabled={disabled}
             >
               <option value="">Select a recipient...</option>
-              {savedRecipients.map((r) => (
-                <option key={r.mpk} value={r.mpk}>
-                  {r.label || `${r.mpk.slice(0, 10)}...${r.mpk.slice(-6)}`}
-                </option>
-              ))}
+              {ownKeypairs.length > 0 && (
+                <optgroup label="My Keypairs">
+                  {ownKeypairs.map((kp) => (
+                    <option key={kp.mpk} value={kp.mpk}>
+                      {kp.label || `${kp.mpk.slice(0, 10)}...${kp.mpk.slice(-6)}`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {savedRecipients.length > 0 && (
+                <optgroup label="Contacts">
+                  {savedRecipients.map((r) => (
+                    <option key={r.mpk} value={r.mpk}>
+                      {r.label || `${r.mpk.slice(0, 10)}...${r.mpk.slice(-6)}`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             {selectedRecipient && (
               <button

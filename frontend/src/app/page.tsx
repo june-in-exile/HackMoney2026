@@ -45,6 +45,7 @@ export default function Home() {
     clearKeypair,
     removeKeypair,
     restoreKeypair,
+    renameKeypair,
   } = useLocalKeypair(account?.address);
 
   // Fetch all notes from blockchain (includes Merkle proofs)
@@ -228,6 +229,7 @@ export default function Home() {
                 onClear={clearKeypair}
                 onRemove={removeKeypair}
                 onRestore={restoreKeypair}
+                onRename={renameKeypair}
               />
               <BalanceCard
                 shieldedBalance={shieldedBalance}
