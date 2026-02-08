@@ -59,7 +59,12 @@ RAW_OUTPUT=$(sui client publish --gas-budget 500000000 --json)
 PUBLISH_OUTPUT=$(echo "$RAW_OUTPUT" | sed -n '/{/,$p')
 
 # Extract package ID from publish output
-NEXT_PUBLIC_PACKAGE_ID=$(echo "$PUBLISH_OUTPUT" | jq -r '.objectChanges[] | select(.type == "published") | .packageId')
+NEXT_PUBLIC_PACKAGE_ID=$(echo "$PUBLISH_OUTPUT" | jq -r '.objectChanges[]? | select(.type == "published") | .packageId' 2>/dev/null)
+
+# Fallback: read from Published.toml if jq extraction failed
+if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
+    NEXT_PUBLIC_PACKAGE_ID=$(awk '/\[published\.'"$NETWORK"'\]/{found=1} found && /published-at =/{match($0, /0x[a-f0-9]+/); print substr($0, RSTART, RLENGTH); exit}' Published.toml)
+fi
 
 if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
     echo "Error: Failed to extract package ID from publish output"
