@@ -4,7 +4,7 @@ set -e
 cd ..
 
 # Parse arguments
-TOKEN_TYPE="both"
+COIN_TYPE="sui"
 NETWORK="testnet"
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -12,13 +12,13 @@ while [[ $# -gt 0 ]]; do
             NETWORK="$2"
             shift 2
             ;;
-        sui|usdc|both)
-            TOKEN_TYPE="$1"
-            shift
+        --coin)
+            COIN_TYPE="$2"
+            shift 2
             ;;
         *)
-            echo "Usage: $0 [sui|usdc|both] [--network testnet|mainnet]"
-            echo "Default: create both SUI and USDC pools on testnet"
+            echo "Usage: $0 [--coin sui|usdc|both] [--network testnet|mainnet]"
+            echo "Default: create SUI pool on testnet"
             exit 1
             ;;
     esac
@@ -26,6 +26,11 @@ done
 
 if [ "$NETWORK" != "testnet" ] && [ "$NETWORK" != "mainnet" ]; then
     echo "Error: --network must be 'testnet' or 'mainnet'"
+    exit 1
+fi
+
+if [ "$COIN_TYPE" != "sui" ] && [ "$COIN_TYPE" != "usdc" ] && [ "$COIN_TYPE" != "both" ]; then
+    echo "Error: --coin must be 'sui', 'usdc', or 'both'"
     exit 1
 fi
 
@@ -43,6 +48,7 @@ fi
 
 echo "Using .env file: $ENV_FILE"
 echo "Network: $NETWORK"
+echo "Coin: $COIN_TYPE"
 
 # Switch to target network
 sui client switch --env "$NETWORK"
@@ -50,13 +56,17 @@ sui client switch --env "$NETWORK"
 # Load environment variables from .env file (strip inline comments)
 export $(cat "$ENV_FILE" | sed 's/#.*//' | sed '/^$/d' | xargs)
 
-if [ -z "$NEXT_PUBLIC_PACKAGE_ID" ]; then
-    echo "Error: NEXT_PUBLIC_PACKAGE_ID not set in .env file"
-    echo "Please run scripts/deploy_package.sh first"
+NETWORK_UPPER=$(echo "$NETWORK" | tr '[:lower:]' '[:upper:]')
+PACKAGE_ID_VAR="NEXT_PUBLIC_${NETWORK_UPPER}_PACKAGE_ID"
+PACKAGE_ID="${!PACKAGE_ID_VAR}"
+
+if [ -z "$PACKAGE_ID" ]; then
+    echo "Error: $PACKAGE_ID_VAR not set in .env file"
+    echo "Please run scripts/deploy_package.sh --network $NETWORK first"
     exit 1
 fi
 
-echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
+echo "Package ID: $PACKAGE_ID"
 echo ""
 
 # Read verification keys from circuit build output
@@ -104,23 +114,23 @@ update_env_var() {
     fi
 }
 
-# Create a single pool by token type
+# Create a single pool by coin type
 create_pool() {
-    local token=$1
+    local coin=$1
     local type_args=$2
-    local token_upper=$(echo "$token" | tr '[:lower:]' '[:upper:]')
+    local coin_upper=$(echo "$coin" | tr '[:lower:]' '[:upper:]')
 
-    echo "=== Creating $token_upper Privacy Pool ==="
-    [ "$token" = "usdc" ] && echo "Token Type: $type_args"
+    echo "=== Creating $coin_upper Privacy Pool ($NETWORK) ==="
+    [ "$coin" = "usdc" ] && echo "Token Type: $type_args"
     echo ""
 
-    echo "Creating $token_upper privacy pool..."
+    echo "Creating $coin_upper privacy pool..."
     echo "Command: sui client call --function create_shared_pool --type-args \"$type_args\""
     echo ""
 
     set +e
     POOL_OUTPUT=$(sui client call \
-        --package "$NEXT_PUBLIC_PACKAGE_ID" \
+        --package "$PACKAGE_ID" \
         --module pool \
         --function create_shared_pool \
         --type-args "$type_args" \
@@ -159,7 +169,7 @@ create_pool() {
     local pool_id
     # Try old format first (objectChanges with objectType containing PrivacyPool)
     pool_id=$(echo "$POOL_OUTPUT" | jq -r '
-        (.objectChanges // [])[]
+        (.objectChanges // [])[]\
         | select(.objectType? | strings | contains("PrivacyPool"))
         | .objectId' 2>/dev/null)
 
@@ -177,26 +187,26 @@ create_pool() {
         return 1
     fi
 
-    echo "✅ $token_upper Privacy Pool created: $pool_id"
+    echo "✅ $coin_upper Privacy Pool created: $pool_id"
     echo ""
 
-    # Update .env
-    if [ "$token" = "sui" ]; then
-        update_env_var "NEXT_PUBLIC_SUI_POOL_ID" "$pool_id" "$ENV_FILE"
-        update_env_var "UNSHIELD_VK" "$UNSHIELD_VK" "$ENV_FILE"
-        update_env_var "TRANSFER_VK" "$TRANSFER_VK" "$ENV_FILE"
-        update_env_var "SWAP_VK" "$SWAP_VK" "$ENV_FILE"
-        echo "✓ Updated NEXT_PUBLIC_SUI_POOL_ID"
-        echo "✓ Updated UNSHIELD_VK, TRANSFER_VK, SWAP_VK"
+    # Update .env with network-specific variable names
+    if [ "$coin" = "sui" ]; then
+        update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID" "$pool_id" "$ENV_FILE"
+        update_env_var "${NETWORK_UPPER}_UNSHIELD_VK" "$UNSHIELD_VK" "$ENV_FILE"
+        update_env_var "${NETWORK_UPPER}_TRANSFER_VK" "$TRANSFER_VK" "$ENV_FILE"
+        update_env_var "${NETWORK_UPPER}_SWAP_VK" "$SWAP_VK" "$ENV_FILE"
+        echo "✓ Updated NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID"
+        echo "✓ Updated ${NETWORK_UPPER}_UNSHIELD_VK, ${NETWORK_UPPER}_TRANSFER_VK, ${NETWORK_UPPER}_SWAP_VK"
     else
-        update_env_var "NEXT_PUBLIC_USDC_POOL_ID" "$pool_id" "$ENV_FILE"
-        update_env_var "NEXT_PUBLIC_USDC_TYPE" "$type_args" "$ENV_FILE"
-        echo "✓ Updated NEXT_PUBLIC_USDC_POOL_ID, NEXT_PUBLIC_USDC_TYPE"
+        update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_USDC_POOL_ID" "$pool_id" "$ENV_FILE"
+        update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE" "$type_args" "$ENV_FILE"
+        echo "✓ Updated NEXT_PUBLIC_${NETWORK_UPPER}_USDC_POOL_ID, NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE"
     fi
     echo ""
 
     # Export pool ID for summary
-    if [ "$token" = "sui" ]; then
+    if [ "$coin" = "sui" ]; then
         SUI_POOL_RESULT="$pool_id"
     else
         USDC_POOL_RESULT="$pool_id"
@@ -204,9 +214,13 @@ create_pool() {
 }
 
 SUI_TYPE="0x2::sui::SUI"
-USDC_TYPE="0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC"
+if [ "$NETWORK" = "mainnet" ]; then
+    USDC_TYPE="0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC"
+else
+    USDC_TYPE="0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC"
+fi
 
-case "$TOKEN_TYPE" in
+case "$COIN_TYPE" in
     sui)  create_pool sui "$SUI_TYPE" ;;
     usdc) create_pool usdc "$USDC_TYPE" ;;
     both)
@@ -216,7 +230,7 @@ case "$TOKEN_TYPE" in
 esac
 
 echo "=== Summary ==="
-echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
+echo "Package ID: $PACKAGE_ID"
 [ -n "$SUI_POOL_RESULT" ]  && echo "SUI Pool ID:  $SUI_POOL_RESULT"
 [ -n "$USDC_POOL_RESULT" ] && echo "USDC Pool ID: $USDC_POOL_RESULT"
 echo "Network: $NETWORK"
