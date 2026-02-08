@@ -21,9 +21,9 @@ This document outlines the integration of DeepBook V3 into the Octopus privacy p
 
 ### Current Implementation State
 
-- **ZK Circuit**: ✅ Production-ready (22,553 constraints), no changes needed
-- **Smart Contract**: Mock swap at `pool.move:650`, ready for DEX integration
-- **SDK**: Proof generation working, needs DeepBook price estimation
+- **ZK Circuit**: ✅ Production-ready (22,553 constraints), public signals refactored (256 bytes, 8 fields)
+- **Smart Contract**: `pool::swap` is now the production entry point with DeepBook pool parameter and real proof verification. Mock swap logic pending replacement with real `place_market_order`.
+- **SDK**: `buildSwapTransaction` calls `pool::swap` with `deepbookPoolId` parameter
 - **Frontend**: UI complete, uses hardcoded mock prices
 
 ---
@@ -78,17 +78,15 @@ use deepbook::pool::{Self as deepbook_pool, Pool as DeepBookPool};
 use deepbook::clob_v2::{Self as deepbook_clob};
 ```
 
-#### Change 2: Update `swap_production()` Function Signature (line 573)
-
-**Add parameter for DeepBook pool:**
+#### Current `swap()` Function Signature ✅
 
 ```move
-public fun swap_production<TokenIn, TokenOut>(
+public fun swap<TokenIn, TokenOut>(
     pool_in: &mut PrivacyPool<TokenIn>,
     pool_out: &mut PrivacyPool<TokenOut>,
-    deepbook_pool: &mut DeepBookPool<TokenIn, TokenOut>,  // NEW
+    deepbook_pool: &mut DeepBookPool<TokenIn, TokenOut>,
     proof_bytes: vector<u8>,
-    public_inputs_bytes: vector<u8>,
+    public_inputs_bytes: vector<u8>,  // 256 bytes (8 × 32)
     amount_in: u64,
     min_amount_out: u64,
     encrypted_output_note: vector<u8>,
@@ -96,6 +94,8 @@ public fun swap_production<TokenIn, TokenOut>(
     ctx: &mut TxContext,
 )
 ```
+
+Public inputs order: `token_in | token_out | merkle_root | nullifier[0] | nullifier[1] | swap_data_hash | output_commitment | change_commitment`
 
 #### Change 3: Replace Mock Swap Logic (lines 618-660)
 

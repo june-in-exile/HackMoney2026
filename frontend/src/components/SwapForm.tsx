@@ -9,7 +9,8 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseSui, formatSui } from "@/lib/utils";
-import { PACKAGE_ID, SUI_POOL_ID, SUI_COIN_TYPE, TOKENS, DEEPBOOK_POOLS, CIRCUIT_URLS } from "@/lib/constants";
+import { SUI_COIN_TYPE, DEEPBOOK_POOLS, CIRCUIT_URLS } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import type { OwnedNote } from "@/hooks/useNotes";
 import {
@@ -53,6 +54,7 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
   const [success, setSuccess] = useState<string | null>(null);
   const [priceImpact, setPriceImpact] = useState<number>(0);
 
+  const { packageId, suiPoolId, tokens } = useNetworkConfig();
   const account = useCurrentAccount();
   const { network } = useSuiClientContext();
   const isMainnet = network === "mainnet";
@@ -98,7 +100,7 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
 
         // Convert to smallest units
         const amountInBigInt = BigInt(
-          Math.floor(amountInFloat * Math.pow(10, TOKENS[tokenIn].decimals))
+          Math.floor(amountInFloat * Math.pow(10, tokens![tokenIn].decimals))
         );
 
         // Estimate swap using DeepBook
@@ -112,9 +114,9 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
 
         // Convert output to display units
         const amountOutFloat = Number(estimation.amountOut) /
-          Math.pow(10, TOKENS[tokenOut].decimals);
+          Math.pow(10, tokens![tokenOut].decimals);
 
-        setAmountOut(amountOutFloat.toFixed(TOKENS[tokenOut].decimals));
+        setAmountOut(amountOutFloat.toFixed(tokens![tokenOut].decimals));
         setPriceImpact(estimation.priceImpact);
       } catch (err) {
         console.error("Failed to estimate output:", err);
@@ -293,9 +295,9 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
         transactionBlock: (() => {
           const tx = new Transaction();
           tx.moveCall({
-            target: `${PACKAGE_ID}::pool::get_merkle_root`,
+            target: `${packageId}::pool::get_merkle_root`,
             typeArguments: [SUI_COIN_TYPE],
-            arguments: [tx.object(SUI_POOL_ID)],
+            arguments: [tx.object(suiPoolId!)],
           });
           return tx;
         })(),
@@ -370,12 +372,12 @@ export function SwapForm({ keypair, notes, loading: notesLoading, error: notesEr
 
       // 11. Build and execute transaction
       const tx = buildSwapTransaction(
-        PACKAGE_ID,
-        TOKENS[tokenIn].poolId,
-        TOKENS[tokenOut].poolId,
+        packageId!,
+        tokens![tokenIn].poolId,
+        tokens![tokenOut].poolId,
         deepbookPoolId,
-        TOKENS[tokenIn].type,
-        TOKENS[tokenOut].type,
+        tokens![tokenIn].type,
+        tokens![tokenOut].type,
         suiProof,
         amountInBigInt,
         minAmountOut,

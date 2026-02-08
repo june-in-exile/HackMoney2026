@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import type { OctopusKeypair } from "./useLocalKeypair";
 import type { Note } from "@june_zk/octopus-sdk";
-import { PACKAGE_ID } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import { bigIntToLE32 } from "@june_zk/octopus-sdk";
 import { getWorkerManager } from "@/lib/workerManager";
 
@@ -74,6 +74,7 @@ export function useNotes(
   poolId: string = ""
 ) {
   const client = useSuiClient();
+  const { packageId, graphqlUrl } = useNetworkConfig();
   const [notes, setNotes] = useState<OwnedNote[]>([]);
   const [loading, setLoading] = useState(true);  // Start with loading=true to avoid showing balance=0 before first scan
   const [error, setError] = useState<string | null>(null);
@@ -236,8 +237,8 @@ export function useNotes(
 
         // Scan notes using Worker (GraphQL + decrypt + Merkle tree in background)
         const result = await worker.scanNotes(
-          "https://graphql.testnet.sui.io/graphql",
-          PACKAGE_ID,
+          graphqlUrl ?? "https://graphql.testnet.sui.io/graphql",
+          packageId ?? "",
           poolId,
           keypair.spendingKey,
           keypair.nullifyingKey,

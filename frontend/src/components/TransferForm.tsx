@@ -16,8 +16,9 @@ import {
   encryptNote,
   type RecipientProfile,
 } from "@june_zk/octopus-sdk";
-import { PACKAGE_ID, CIRCUIT_URLS } from "@/lib/constants";
+import { CIRCUIT_URLS } from "@/lib/constants";
 import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import { NumberInput } from "@/components/NumberInput";
 import { RecipientInput } from "@/components/RecipientInput";
 
@@ -40,6 +41,7 @@ type TransferState =
   | "error";
 
 export function TransferForm({ keypair, tokenConfig, notes, loading: notesLoading, onSuccess, onRefresh, markNoteSpent }: TransferFormProps) {
+  const { packageId, network } = useNetworkConfig();
   const [recipientProfile, setRecipientProfile] = useState<RecipientProfile | null>(null);
   const [amount, setAmount] = useState("");
   const [state, setState] = useState<TransferState>("idle");
@@ -192,7 +194,7 @@ export function TransferForm({ keypair, tokenConfig, notes, loading: notesLoadin
       // 8. Build and submit transaction
       setState("submitting");
       const tx = buildTransferTransaction(
-        PACKAGE_ID,
+        packageId!,
         tokenConfig.poolId,
         tokenConfig.type,
         suiProof,
@@ -339,7 +341,7 @@ export function TransferForm({ keypair, tokenConfig, notes, loading: notesLoadin
                 <>
                   {' '}
                   <a
-                    href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                    href={`https://${network}.suivision.xyz/txblock/${success.txDigest}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-cyber-blue hover:text-cyber-blue/80 underline"

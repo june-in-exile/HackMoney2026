@@ -13,8 +13,8 @@ import { SwapForm } from "@/components/SwapForm";
 import { useLocalKeypair } from "@/hooks/useLocalKeypair";
 import { useNotes } from "@/hooks/useNotes";
 import { usePoolInfo } from "@/hooks/usePoolInfo";
-import { PACKAGE_ID, NETWORK, TOKENS } from "@/lib/constants";
 import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import { getWorkerManager } from "@/lib/workerManager";
 import { initPoseidon } from "@/lib/poseidon";
 
@@ -24,10 +24,11 @@ type TokenSymbol = "SUI" | "USDC";
 export default function Home() {
   const account = useCurrentAccount();
   const { network } = useSuiClientContext();
+  const { packageId, tokens, graphqlUrl, isConfigured } = useNetworkConfig();
   const isMainnet = network === "mainnet";
   const [activeTab, setActiveTab] = useState<TabType>("shield");
   const [selectedToken, setSelectedToken] = useState<TokenSymbol>("SUI");
-  const tokenConfig: TokenConfig = TOKENS[selectedToken];
+  const tokenConfig: TokenConfig | null = tokens?.[selectedToken] ?? null;
 
   // Initialize Poseidon early to prevent race conditions
   useEffect(() => {
@@ -58,17 +59,17 @@ export default function Home() {
     refresh: refreshNotes,
     markNoteSpent,
     lastScanStats,
-  } = useNotes(keypair, isLoading, tokenConfig.poolId);
+  } = useNotes(keypair, isLoading, tokenConfig?.poolId ?? "");
 
   // Pool note counts — scanned once at startup for all pools, updated after operations
   const [workerNoteCounts, setWorkerNoteCounts] = useState<Record<string, number>>({});
 
   const refreshAllPoolCounts = useCallback(async () => {
+    if (!tokens || !packageId || !graphqlUrl) return;
     const worker = getWorkerManager();
-    const graphqlUrl = "https://graphql.testnet.sui.io/graphql";
     const results = await Promise.allSettled(
-      Object.values(TOKENS).map(async (token) => {
-        const count = await worker.countPoolNotes(graphqlUrl, PACKAGE_ID, token.poolId);
+      Object.values(tokens).map(async (token) => {
+        const count = await worker.countPoolNotes(graphqlUrl, packageId, token.poolId);
         return { poolId: token.poolId, count };
       })
     );
@@ -79,7 +80,7 @@ export default function Home() {
       }
     }
     setWorkerNoteCounts((prev) => ({ ...prev, ...updates }));
-  }, []);
+  }, [tokens, packageId, graphqlUrl]);
 
   // Scan all pools at startup
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function Home() {
   }, [refreshAllPoolCounts]);
 
   // Fetch pool information for refresh only
-  const { refresh: refreshPoolInfo } = usePoolInfo(tokenConfig.poolId);
+  const { refresh: refreshPoolInfo } = usePoolInfo(tokenConfig?.poolId ?? "");
 
   // Calculate balance and note count from loaded notes
   const unspentNotes = notes.filter((n) => !n.spent);
@@ -163,23 +164,25 @@ export default function Home() {
                 On-Chain Transaction Obfuscation Protocol Underlying Sui
               </p>
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="text-gray-500 uppercase tracking-wider">Package:</span>
-                  <a
-                    href={`https://${NETWORK}.suivision.xyz/package/${PACKAGE_ID}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyber-blue hover:text-cyber-purple/80 transition-colors truncate max-w-md"
-                    title={PACKAGE_ID}
-                  >
-                    {PACKAGE_ID.slice(0, 8)}...{PACKAGE_ID.slice(-6)}
-                  </a>
-                </div>
-                {Object.values(TOKENS).map((token) => (
+                {packageId && (
+                  <div className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-gray-500 uppercase tracking-wider">Package:</span>
+                    <a
+                      href={`https://${network}.suivision.xyz/package/${packageId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyber-blue hover:text-cyber-purple/80 transition-colors truncate max-w-md"
+                      title={packageId}
+                    >
+                      {packageId.slice(0, 8)}...{packageId.slice(-6)}
+                    </a>
+                  </div>
+                )}
+                {tokens && Object.values(tokens).map((token) => (
                   <div key={token.symbol} className="flex items-center gap-2 text-xs font-mono">
                     <span className="text-gray-500 uppercase tracking-wider">{token.symbol} Pool:</span>
                     <a
-                      href={`https://${NETWORK}.suivision.xyz/object/${token.poolId}`}
+                      href={`https://${network}.suivision.xyz/object/${token.poolId}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-cyber-blue hover:text-cyber-purple/80 transition-colors"

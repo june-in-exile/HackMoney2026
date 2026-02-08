@@ -8,8 +8,8 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { cn, parseTokenAmount, formatTokenAmount, truncateAddress } from "@/lib/utils";
-import { PACKAGE_ID } from "@/lib/constants";
 import type { TokenConfig } from "@/lib/constants";
+import { useNetworkConfig } from "@/providers/NetworkConfigProvider";
 import type { OctopusKeypair } from "@/hooks/useLocalKeypair";
 import {
   createNote,
@@ -35,6 +35,7 @@ export function ShieldForm({ keypair, tokenConfig, onSuccess }: ShieldFormProps)
   const [balance, setBalance] = useState<bigint | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
+  const { packageId, network } = useNetworkConfig();
   const account = useCurrentAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
@@ -164,7 +165,7 @@ export function ShieldForm({ keypair, tokenConfig, onSuccess }: ShieldFormProps)
       const coin = await buildCoinArg(tx, amountBase);
 
       tx.moveCall({
-        target: `${PACKAGE_ID}::pool::shield`,
+        target: `${packageId}::pool::shield`,
         typeArguments: [tokenConfig.type],
         arguments: [
           tx.object(tokenConfig.poolId),
@@ -249,7 +250,7 @@ export function ShieldForm({ keypair, tokenConfig, onSuccess }: ShieldFormProps)
                   <>
                     {" "}
                     <a
-                      href={`https://testnet.suivision.xyz/txblock/${success.txDigest}`}
+                      href={`https://${network}.suivision.xyz/txblock/${success.txDigest}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-cyber-blue hover:text-cyber-blue/80 underline"

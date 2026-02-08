@@ -9,6 +9,8 @@ import {
 } from "@mysten/dapp-kit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
+import { NETWORK } from "@/lib/constants";
+import { NetworkConfigProvider } from "@/providers/NetworkConfigProvider";
 
 import "@mysten/dapp-kit/dist/index.css";
 
@@ -86,9 +88,9 @@ export function SuiProvider({ children }: SuiProviderProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
+      <SuiClientProvider networks={networkConfig} defaultNetwork={NETWORK === "mainnet" ? "mainnet" : "testnet"}>
         <WalletProvider autoConnect theme={octopusTheme}>
-          {children}
+          <NetworkConfigProvider>{children}</NetworkConfigProvider>
         </WalletProvider>
       </SuiClientProvider>
     </QueryClientProvider>

@@ -12,7 +12,6 @@ module octopus::swap_tests {
     // Test addresses
     const ADMIN: address = @0xAD;
     const ALICE: address = @0xA11CE;
-    const BOB: address = @0xB0B;
 
     // Test verification keys (using same VK for all circuits for testing)
     const TEST_VK: vector<u8> = x"e2f26dbea299f5223b646cb1fb33eadb059d9407559d7441dfd902e3a79a4d2dabb73dc17fbc13021e2471e0c08bd67d8401f52b73d6d07483794cad4778180e0c06f33bbc4c79a9cadef253a68084d382f17788f885c9afd176f7cb2f036789edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e198f1ca32b8c078cd1ecfc4a467d8db364b3757d39102fa1ed9255e280333144297c184af83775c6ea998cfb4d59fbd7317b3435e152bace861d478fe0bbcf148f0400000000000000191f71d49c7ecfcc3643957f0d503d24e713cf91937a8a33b7c118a6afef44891ef0fa65bcfbe5a8f6a5a1bb098b6e508467a66a10af02338ce1560ff9609f1588d71006852b8f431fd5d3de34357325e41f3252748926d16c27ed7cb789478068d1e927470885642b8adcd4b38f20583984d85f9274e93b39f834daacf80b0b";
@@ -28,6 +27,10 @@ module octopus::swap_tests {
     // Test output commitments (for swap outputs)
     const TEST_OUTPUT_COMMITMENT: vector<u8> = x"2ce085bcaac45e2f4e54b4bda0c2a59d6f10f6e4e41e5e3f0e4e2e0e8e6e4e60";
     const TEST_CHANGE_COMMITMENT: vector<u8> = x"2015cf64f6a59f63a4f6e4e41e5e3f0e4e2e0e8e6e4e602ce085bcaac45e2f4e";
+
+    // Placeholder token identifiers (32 bytes each)
+    const TEST_TOKEN_IN: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000001";
+    const TEST_TOKEN_OUT: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000002";
 
     // Placeholder swap proof (128 bytes for Groth16)
     const TEST_SWAP_PROOF: vector<u8> = x"aca940a9ad7c4beb620beb1b67cd111a2ff32b2f33945bd12cc017c721ec1b91083135faffb3ff4b3cfdcdd0a075154e80b245fa42d14655880096b4ef29fe13f274371b7b8b1d8382f61ba9b61d2901b3557944195ee34771eaee3f0019571cba7b3a4b43ffdd48945edd122d141734a262be4b49e6baf28abeea0c1484050a";
@@ -73,23 +76,27 @@ module octopus::swap_tests {
         };
     }
 
-    // Build swap public inputs (192 bytes)
-    // Format: merkle_root || nullifiers[2] || output_commitment || change_commitment || swap_data_hash
+    // Build swap public inputs (256 bytes)
+    // Format: token_in || token_out || merkle_root || nullifier1 || nullifier2 || swap_data_hash || output_commitment || change_commitment
     fun build_swap_public_inputs(
+        token_in: vector<u8>,
+        token_out: vector<u8>,
         root: vector<u8>,
         nullifier1: vector<u8>,
         nullifier2: vector<u8>,
+        swap_data_hash: vector<u8>,
         output_commitment: vector<u8>,
         change_commitment: vector<u8>,
-        swap_data_hash: vector<u8>,
     ): vector<u8> {
         let mut public_inputs = vector::empty<u8>();
+        vector::append(&mut public_inputs, token_in);
+        vector::append(&mut public_inputs, token_out);
         vector::append(&mut public_inputs, root);
         vector::append(&mut public_inputs, nullifier1);
         vector::append(&mut public_inputs, nullifier2);
+        vector::append(&mut public_inputs, swap_data_hash);
         vector::append(&mut public_inputs, output_commitment);
         vector::append(&mut public_inputs, change_commitment);
-        vector::append(&mut public_inputs, swap_data_hash);
         public_inputs
     }
 
@@ -144,15 +151,17 @@ module octopus::swap_tests {
             let swap_data_hash = x"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
             let public_inputs = build_swap_public_inputs(
+                TEST_TOKEN_IN,
+                TEST_TOKEN_OUT,
                 root,
                 TEST_NULLIFIER_1,
                 TEST_NULLIFIER_2,
+                swap_data_hash,
                 TEST_OUTPUT_COMMITMENT,
                 TEST_CHANGE_COMMITMENT,
-                swap_data_hash,
             );
 
-            pool::swap<SUI, USDC>(
+            pool::swap_for_testing<SUI, USDC>(
                 &mut pool_sui,
                 &mut pool_usdc,
                 TEST_SWAP_PROOF,
@@ -207,15 +216,17 @@ module octopus::swap_tests {
             let swap_data_hash = x"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
             let public_inputs = build_swap_public_inputs(
+                TEST_TOKEN_IN,
+                TEST_TOKEN_OUT,
                 root,
                 TEST_NULLIFIER_1,
                 TEST_NULLIFIER_2,
+                swap_data_hash,
                 TEST_OUTPUT_COMMITMENT,
                 TEST_CHANGE_COMMITMENT,
-                swap_data_hash,
             );
 
-            pool::swap<SUI, USDC>(
+            pool::swap_for_testing<SUI, USDC>(
                 &mut pool_sui,
                 &mut pool_usdc,
                 TEST_SWAP_PROOF,
@@ -242,15 +253,17 @@ module octopus::swap_tests {
             let swap_data_hash = x"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
             let public_inputs = build_swap_public_inputs(
+                TEST_TOKEN_IN,
+                TEST_TOKEN_OUT,
                 root,
                 TEST_NULLIFIER_1, // Same nullifier - should fail
                 TEST_NULLIFIER_2,
+                swap_data_hash,
                 TEST_OUTPUT_COMMITMENT,
                 TEST_CHANGE_COMMITMENT,
-                swap_data_hash,
             );
 
-            pool::swap<SUI, USDC>(
+            pool::swap_for_testing<SUI, USDC>(
                 &mut pool_sui,
                 &mut pool_usdc,
                 TEST_SWAP_PROOF,
@@ -290,15 +303,17 @@ module octopus::swap_tests {
             let swap_data_hash = x"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
             let public_inputs = build_swap_public_inputs(
+                TEST_TOKEN_IN,
+                TEST_TOKEN_OUT,
                 root,
                 TEST_NULLIFIER_1,
                 TEST_NULLIFIER_2,
+                swap_data_hash,
                 TEST_OUTPUT_COMMITMENT,
                 TEST_CHANGE_COMMITMENT,
-                swap_data_hash,
             );
 
-            pool::swap<SUI, USDC>(
+            pool::swap_for_testing<SUI, USDC>(
                 &mut pool_sui,
                 &mut pool_usdc,
                 TEST_SWAP_PROOF,
@@ -326,17 +341,16 @@ module octopus::swap_tests {
         mint_sui(&mut scenario, 100_000_000_000, ALICE);
         shield_sui(&mut scenario, ALICE, 100_000_000_000, TEST_COMMITMENT_1);
 
-        // Try swap with wrong public inputs length
+        // Try swap with wrong public inputs length (192 bytes instead of 256)
         ts::next_tx(&mut scenario, ALICE);
         {
             let mut pool_sui = ts::take_shared<PrivacyPool<SUI>>(&scenario);
             let mut pool_usdc = ts::take_shared<PrivacyPool<USDC>>(&scenario);
             let ctx = ts::ctx(&mut scenario);
 
-            // Wrong length (should be 192 bytes, but provide only 96)
             let invalid_public_inputs = x"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
-            pool::swap<SUI, USDC>(
+            pool::swap_for_testing<SUI, USDC>(
                 &mut pool_sui,
                 &mut pool_usdc,
                 TEST_SWAP_PROOF,
@@ -377,15 +391,17 @@ module octopus::swap_tests {
             let dummy_nullifier = x"0000000000000000000000000000000000000000000000000000000000000000";
 
             let public_inputs = build_swap_public_inputs(
+                TEST_TOKEN_IN,
+                TEST_TOKEN_OUT,
                 root,
                 TEST_NULLIFIER_1,
                 dummy_nullifier, // Second input is dummy (value = 0)
+                swap_data_hash,
                 TEST_OUTPUT_COMMITMENT,
                 TEST_CHANGE_COMMITMENT, // Change commitment for zero value
-                swap_data_hash,
             );
 
-            pool::swap<SUI, USDC>(
+            pool::swap_for_testing<SUI, USDC>(
                 &mut pool_sui,
                 &mut pool_usdc,
                 TEST_SWAP_PROOF,
@@ -435,15 +451,17 @@ module octopus::swap_tests {
             let swap_data_hash = x"abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
 
             let public_inputs = build_swap_public_inputs(
+                TEST_TOKEN_OUT, // token_in is now USDC
+                TEST_TOKEN_IN,  // token_out is now SUI
                 root,
                 TEST_NULLIFIER_1,
                 TEST_NULLIFIER_2,
+                swap_data_hash,
                 TEST_OUTPUT_COMMITMENT,
                 TEST_CHANGE_COMMITMENT,
-                swap_data_hash,
             );
 
-            pool::swap<USDC, SUI>(
+            pool::swap_for_testing<USDC, SUI>(
                 &mut pool_usdc,
                 &mut pool_sui,
                 TEST_SWAP_PROOF,

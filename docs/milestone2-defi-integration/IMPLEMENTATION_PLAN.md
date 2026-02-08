@@ -20,9 +20,9 @@ Based on user preferences:
 
 ### Current Implementation State
 
-- **ZK Circuit**: ✅ Production-ready (22,553 constraints), no changes needed
-- **Smart Contract**: Mock swap at `pool.move:650`, ready for DEX integration
-- **SDK**: Proof generation working, needs DeepBook price estimation
+- **ZK Circuit**: ✅ Production-ready (22,553 constraints), public signals refactored (256 bytes, 8 fields)
+- **Smart Contract**: `pool::swap` is now the production entry point with `deepbook_pool` parameter and real proof verification. Inner swap logic still uses mock 1:1 — replace with `place_market_order`.
+- **SDK**: `buildSwapTransaction` calls `pool::swap` with `deepbookPoolId` parameter
 - **Frontend**: UI complete, uses hardcoded mock prices
 
 ---

@@ -150,9 +150,10 @@ The circuit proves:
 | Property | Value |
 |----------|-------|
 | Constraints | 22,553 |
-| Public Inputs | 6 (merkle_root, 2 nullifiers, 2 commitments) |
-| Private Inputs | 15 (input notes, output notes, swap params) |
-| Status | Circuit complete, awaiting DeepBook integration |
+| Public Inputs | 3 (token_in, token_out, merkle_root) |
+| Public Outputs | 5 (nullifiers[2], swap_data_hash, output_commitment, change_commitment) |
+| Private Inputs | 12 (keys, input notes, swap params, output/change randoms) |
+| Total public signal bytes | 256 (8 × 32) |
 
 The circuit proves:
 
