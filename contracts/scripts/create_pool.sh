@@ -3,12 +3,29 @@ set -e
 
 cd ..
 
-# Parse argument - default to both
-TOKEN_TYPE="${1:-both}"
+# Parse arguments
+TOKEN_TYPE="both"
+NETWORK="testnet"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --network)
+            NETWORK="$2"
+            shift 2
+            ;;
+        sui|usdc|both)
+            TOKEN_TYPE="$1"
+            shift
+            ;;
+        *)
+            echo "Usage: $0 [sui|usdc|both] [--network testnet|mainnet]"
+            echo "Default: create both SUI and USDC pools on testnet"
+            exit 1
+            ;;
+    esac
+done
 
-if [ "$TOKEN_TYPE" != "sui" ] && [ "$TOKEN_TYPE" != "usdc" ] && [ "$TOKEN_TYPE" != "both" ]; then
-    echo "Usage: $0 [sui|usdc]"
-    echo "Default: create both SUI and USDC pools"
+if [ "$NETWORK" != "testnet" ] && [ "$NETWORK" != "mainnet" ]; then
+    echo "Error: --network must be 'testnet' or 'mainnet'"
     exit 1
 fi
 
@@ -25,6 +42,10 @@ else
 fi
 
 echo "Using .env file: $ENV_FILE"
+echo "Network: $NETWORK"
+
+# Switch to target network
+sui client switch --env "$NETWORK"
 
 # Load environment variables from .env file (strip inline comments)
 export $(cat "$ENV_FILE" | sed 's/#.*//' | sed '/^$/d' | xargs)
@@ -198,7 +219,7 @@ echo "=== Summary ==="
 echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
 [ -n "$SUI_POOL_RESULT" ]  && echo "SUI Pool ID:  $SUI_POOL_RESULT"
 [ -n "$USDC_POOL_RESULT" ] && echo "USDC Pool ID: $USDC_POOL_RESULT"
-echo "Network: testnet"
+echo "Network: $NETWORK"
 echo "Unshield VK: ${#UNSHIELD_VK} bytes"
 echo "Transfer VK: ${#TRANSFER_VK} bytes"
 echo "Swap VK: ${#SWAP_VK} bytes"

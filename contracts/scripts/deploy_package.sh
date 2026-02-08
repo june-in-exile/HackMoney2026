@@ -1,7 +1,28 @@
 #!/bin/bash
 set -e
 
+# Parse arguments
+NETWORK="testnet"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --network)
+            NETWORK="$2"
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [--network testnet|mainnet]"
+            exit 1
+            ;;
+    esac
+done
+
+if [ "$NETWORK" != "testnet" ] && [ "$NETWORK" != "mainnet" ]; then
+    echo "Error: --network must be 'testnet' or 'mainnet'"
+    exit 1
+fi
+
 echo "=== Deploying Octopus Privacy Pool Package ==="
+echo "Network: $NETWORK"
 
 # Change to contracts directory (parent of scripts/)
 cd "$(dirname "$0")/.."
@@ -21,11 +42,15 @@ if [ -n "$ENV_FILE" ]; then
 fi
 
 echo ""
-echo "Step 1: Building Move package..."
+echo "Step 1: Switching to $NETWORK..."
+sui client switch --env "$NETWORK"
+
+echo ""
+echo "Step 2: Building Move package..."
 sui move build
 
 echo ""
-echo "Step 2: Publishing package to testnet..."
+echo "Step 3: Publishing package to $NETWORK..."
 
 # Remove old Published.toml if exists
 rm -f Published.toml
@@ -77,8 +102,8 @@ fi
 
 echo "=== Deployment Complete ==="
 echo "Package ID: $NEXT_PUBLIC_PACKAGE_ID"
-echo "Network: testnet"
+echo "Network: $NETWORK"
 echo ""
 echo "=== Next Steps ==="
 echo "1. Create privacy pools by running:"
-echo "   ./create_pool.sh"
+echo "   ./create_pool.sh --network $NETWORK"

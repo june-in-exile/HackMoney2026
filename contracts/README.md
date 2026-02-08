@@ -44,14 +44,18 @@ cd ../../contracts/scripts
 # TRANSFER_VK=<hex from circuits/build/transfer_vk_bytes.hex>
 # SWAP_VK=<hex from circuits/build/swap_vk_bytes.hex>
 
-# 3. Deploy package to testnet
+# 3. Deploy package (default: testnet)
 ./deploy_package.sh
+# Or deploy to mainnet:
+./deploy_package.sh --network mainnet
 
 # 4. Update .env with PACKAGE_ID from deploy output
 # PACKAGE_ID=<package_id from deploy output>
 
 # 5. Create privacy pools (SUI + USDC by default)
 ./create_pool.sh
+# Or for mainnet:
+./create_pool.sh --network mainnet
 
 # 6. Update .env and frontend with SUI_POOL_ID and USDC_POOL_ID
 # SUI_POOL_ID=<auto-updated by create_pool.sh>
@@ -68,11 +72,16 @@ cd ../../contracts/scripts
 - Contract code changes (Move source files modified)
 - Adding new functions or changing contract logic
 
+**Options:**
+
+- `--network testnet|mainnet` — target network (default: `testnet`)
+
 **What it does:**
 
-1. Builds Move package (`sui move build`)
-2. Publishes package to testnet (`sui client publish`)
-3. Returns `PACKAGE_ID`
+1. Switches active Sui client env to the target network
+2. Builds Move package (`sui move build`)
+3. Publishes package (`sui client publish`)
+4. Returns `PACKAGE_ID`
 
 **Note:** Publishing creates a new immutable package. To upgrade an existing package, use `sui client upgrade` instead.
 
@@ -86,9 +95,11 @@ cd ../../contracts/scripts
 **Usage:**
 
 ```bash
-./create_pool.sh        # Create both SUI and USDC pools (default)
-./create_pool.sh sui    # Create only SUI pool
-./create_pool.sh usdc   # Create only USDC pool
+./create_pool.sh                        # Both pools, testnet (default)
+./create_pool.sh sui                    # SUI pool only, testnet
+./create_pool.sh usdc                   # USDC pool only, testnet
+./create_pool.sh --network mainnet      # Both pools, mainnet
+./create_pool.sh usdc --network mainnet # USDC pool only, mainnet
 ```
 
 **What it does:**
@@ -187,8 +198,8 @@ All scripts are located in the `scripts/` directory.
 
 | Script | Purpose | Usage | When to Use |
 |--------|---------|-------|-------------|
-| `deploy_package.sh` | Publish Move package | `./deploy_package.sh` | Initial deploy, contract changes |
-| `create_pool.sh` | Create privacy pool(s) | `./create_pool.sh [sui\|usdc]` | After package deploy (defaults to both) |
+| `deploy_package.sh` | Publish Move package | `./deploy_package.sh [--network testnet\|mainnet]` | Initial deploy, contract changes |
+| `create_pool.sh` | Create privacy pool(s) | `./create_pool.sh [sui\|usdc\|both] [--network testnet\|mainnet]` | After package deploy (defaults to both) |
 | `update_vk.sh` | Update verification key(s) | `./update_vk.sh [vk] [pool]` | After modifying any circuit |
 
 **`update_vk.sh` arguments:** `vk` = `unshield` \| `transfer` \| `swap` \| `all` (default), `pool` = `sui` \| `usdc` \| `both` (default).
