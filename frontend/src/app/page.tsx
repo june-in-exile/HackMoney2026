@@ -220,6 +220,14 @@ export default function Home() {
           </div>
         ) : (
           // Connected state
+          <>
+          {!isConfigured && (
+            <div className="mb-6 p-3 border border-amber-600/40 bg-amber-900/20 clip-corner">
+              <p className="text-xs text-amber-400 font-mono">
+                ⚠ No contract deployed on <span className="font-bold uppercase">{network}</span>. Switch to Testnet or deploy contracts first.
+              </p>
+            </div>
+          )}
           <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
             {/* Left Column */}
             <div className="space-y-6">
@@ -234,21 +242,25 @@ export default function Home() {
                 onRestore={restoreKeypair}
                 onRename={renameKeypair}
               />
-              <BalanceCard
-                shieldedBalance={shieldedBalance}
-                noteCount={noteCount}
-                tokenConfig={tokenConfig}
-                isLoading={isLoading}
-                isRefreshing={isLoadingNotes}
-                onRefresh={refreshNotes}
-              />
-              <AvailableNotesList
-                notes={notes}
-                loading={isLoadingNotes}
-                error={notesError}
-                tokenConfig={tokenConfig}
-                lastScanStats={lastScanStats}
-              />
+              {tokenConfig && (
+                <>
+                  <BalanceCard
+                    shieldedBalance={shieldedBalance}
+                    noteCount={noteCount}
+                    tokenConfig={tokenConfig}
+                    isLoading={isLoading}
+                    isRefreshing={isLoadingNotes}
+                    onRefresh={refreshNotes}
+                  />
+                  <AvailableNotesList
+                    notes={notes}
+                    loading={isLoadingNotes}
+                    error={notesError}
+                    tokenConfig={tokenConfig}
+                    lastScanStats={lastScanStats}
+                  />
+                </>
+              )}
             </div>
 
             {/* Right Column */}
@@ -321,45 +333,54 @@ export default function Home() {
 
                 {/* Tab Content */}
                 <div className="p-6">
-                  {activeTab === "shield" && (
-                    <ShieldForm keypair={keypair} tokenConfig={tokenConfig} onSuccess={handleOperationSuccess} />
-                  )}
-                  {activeTab === "transfer" && (
-                    <TransferForm
-                      keypair={keypair}
-                      tokenConfig={tokenConfig}
-                      notes={notes}
-                      loading={isLoadingNotes}
-                      onSuccess={handleOperationSuccess}
-                      onRefresh={refreshNotes}
-                      markNoteSpent={markNoteSpent}
-                    />
-                  )}
-                  {activeTab === "swap" && (
-                    <SwapForm
-                      keypair={keypair}
-                      notes={notes}
-                      loading={isLoadingNotes}
-                      error={notesError}
-                      onSuccess={handleOperationSuccess}
-                      onRefresh={refreshNotes}
-                      markNoteSpent={markNoteSpent}
-                    />
-                  )}
-                  {activeTab === "unshield" && (
-                    <UnshieldForm
-                      keypair={keypair}
-                      tokenConfig={tokenConfig}
-                      maxAmount={shieldedBalance}
-                      notes={notes}
-                      onSuccess={handleOperationSuccess}
-                      markNoteSpent={markNoteSpent}
-                    />
+                  {!tokenConfig ? (
+                    <p className="text-xs text-amber-400 font-mono text-center py-4">
+                      ⚠ No contract on {network}
+                    </p>
+                  ) : (
+                    <>
+                      {activeTab === "shield" && (
+                        <ShieldForm keypair={keypair} tokenConfig={tokenConfig} onSuccess={handleOperationSuccess} />
+                      )}
+                      {activeTab === "transfer" && (
+                        <TransferForm
+                          keypair={keypair}
+                          tokenConfig={tokenConfig}
+                          notes={notes}
+                          loading={isLoadingNotes}
+                          onSuccess={handleOperationSuccess}
+                          onRefresh={refreshNotes}
+                          markNoteSpent={markNoteSpent}
+                        />
+                      )}
+                      {activeTab === "swap" && (
+                        <SwapForm
+                          keypair={keypair}
+                          notes={notes}
+                          loading={isLoadingNotes}
+                          error={notesError}
+                          onSuccess={handleOperationSuccess}
+                          onRefresh={refreshNotes}
+                          markNoteSpent={markNoteSpent}
+                        />
+                      )}
+                      {activeTab === "unshield" && (
+                        <UnshieldForm
+                          keypair={keypair}
+                          tokenConfig={tokenConfig}
+                          maxAmount={shieldedBalance}
+                          notes={notes}
+                          onSuccess={handleOperationSuccess}
+                          markNoteSpent={markNoteSpent}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             </div>
           </div>
+          </>
         )}
 
         {/* Info Section */}

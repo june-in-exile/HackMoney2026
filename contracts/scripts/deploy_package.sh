@@ -53,10 +53,7 @@ sui move build
 echo ""
 echo "Step 3: Publishing package to $NETWORK..."
 
-# Remove old Published.toml if exists
-rm -f Published.toml
-
-RAW_OUTPUT=$(sui client publish --gas-budget 500000000 --json)
+RAW_OUTPUT=$(sui client publish --json --no-lint)
 PUBLISH_OUTPUT=$(echo "$RAW_OUTPUT" | sed -n '/{/,$p')
 
 # Extract package ID from publish output

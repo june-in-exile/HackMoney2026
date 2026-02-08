@@ -788,11 +788,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
         const totalNotesInPool = shieldEventsInPool.length + transferOutputNotesCount - nullifierCount;
 
-        console.log("shieldEventsInPool.length:", shieldEventsInPool.length);
-        console.log("transferOutputNotesCount:", transferOutputNotesCount);
-        console.log("nullifierCount:", nullifierCount);
-        console.log("totalNotesInPool:", totalNotesInPool);
-
         const response: WorkerResponse = {
           type: "count_pool_notes_result",
           id: request.id,

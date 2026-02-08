@@ -3,7 +3,7 @@
  */
 
 // Network configuration - must be defined first
-export const NETWORK = (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
+export const NETWORK = "testnet" as "testnet" | "mainnet" | "devnet" | "localnet";
 
 // Per-network contract addresses (all baked into the bundle at build time)
 export const NETWORK_CONFIG = {

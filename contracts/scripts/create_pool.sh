@@ -135,7 +135,6 @@ create_pool() {
         --function create_shared_pool \
         --type-args "$type_args" \
         --args "0x$UNSHIELD_VK" "0x$TRANSFER_VK" "0x$SWAP_VK" \
-        --gas-budget 200000000 \
         --json 2>&1)
     EXIT_CODE=$?
     POOL_OUTPUT=$(echo "$RAW_OUTPUT" | grep -v '^\[warning\]')
@@ -181,11 +180,7 @@ create_pool() {
     # Update .env with network-specific variable names
     if [ "$coin" = "sui" ]; then
         update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID" "$pool_id" "$ENV_FILE"
-        update_env_var "${NETWORK_UPPER}_UNSHIELD_VK" "$UNSHIELD_VK" "$ENV_FILE"
-        update_env_var "${NETWORK_UPPER}_TRANSFER_VK" "$TRANSFER_VK" "$ENV_FILE"
-        update_env_var "${NETWORK_UPPER}_SWAP_VK" "$SWAP_VK" "$ENV_FILE"
         echo "✓ Updated NEXT_PUBLIC_${NETWORK_UPPER}_SUI_POOL_ID"
-        echo "✓ Updated ${NETWORK_UPPER}_UNSHIELD_VK, ${NETWORK_UPPER}_TRANSFER_VK, ${NETWORK_UPPER}_SWAP_VK"
     else
         update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_USDC_POOL_ID" "$pool_id" "$ENV_FILE"
         update_env_var "NEXT_PUBLIC_${NETWORK_UPPER}_USDC_TYPE" "$type_args" "$ENV_FILE"
