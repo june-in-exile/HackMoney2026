@@ -35,9 +35,7 @@ The pool includes an admin capability system (`PoolAdminCap`) that allows updati
 ```bash
 # 1. Compile circuits and generate verification keys
 cd circuits/scripts
-./compile_unshield.sh
-./compile_transfer.sh
-./compile_swap.sh
+./compile.sh
 
 # 2. Update .env with VK hex strings
 cd ../../contracts/scripts
@@ -52,11 +50,12 @@ cd ../../contracts/scripts
 # 4. Update .env with PACKAGE_ID from deploy output
 # PACKAGE_ID=<package_id from deploy output>
 
-# 5. Create privacy pool
+# 5. Create privacy pools (SUI + USDC by default)
 ./create_pool.sh
 
-# 6. Update .env and frontend with POOL_ID
-# POOL_ID=<pool_id from create_pool output>
+# 6. Update .env and frontend with SUI_POOL_ID and USDC_POOL_ID
+# SUI_POOL_ID=<auto-updated by create_pool.sh>
+# USDC_POOL_ID=<auto-updated by create_pool.sh>
 ```
 
 ### When to Use Each Script
@@ -82,29 +81,39 @@ cd ../../contracts/scripts
 **Use when:**
 
 - After deploying a new package
-- Creating a new pool instance (different token type or fresh state)
+- Creating pool instances for SUI and/or USDC tokens
+
+**Usage:**
+
+```bash
+./create_pool.sh        # Create both SUI and USDC pools (default)
+./create_pool.sh sui    # Create only SUI pool
+./create_pool.sh usdc   # Create only USDC pool
+```
 
 **What it does:**
 
-1. Calls `pool::create_shared_pool()` with verification keys from .env
-2. Creates shared `PrivacyPool<T>` object
+1. Calls `pool::create_shared_pool<T>()` with verification keys from .env
+2. Creates shared `PrivacyPool<T>` object(s)
 3. Transfers `PoolAdminCap` to caller
-4. Returns `POOL_ID` and `ADMIN_CAP_ID`
+4. Updates `SUI_POOL_ID` / `USDC_POOL_ID` in `.env` automatically
 
-**Note:** Each pool instance has its own Merkle tree and nullifier registry. Multiple pools can share the same package.
+**Note:** Each pool instance has its own Merkle tree and nullifier registry. USDC pool enables private swaps via DeepBook.
+
+> ⚠️ **DeepBook V3 is only available on Mainnet.** Swap functionality requires a Mainnet deployment.
 
 ## Updating Verification Keys
 
 When you modify a circuit (e.g., fixing bugs or adding features), you need to update the verification key in the deployed pool.
 
 ```bash
-cd circuits/scripts
+cd circuits
 
 # Edit the circuit file (e.g., transfer.circom)
 # Make your changes...
 
 # Recompile the circuit
-./compile_transfer.sh
+./compile.sh transfer
 
 # This generates new files in build/:
 # - transfer_js/transfer.wasm (circuit logic)
@@ -117,16 +126,25 @@ cd circuits/scripts
 # cp circuits/build/transfer_final.zkey ../frontend/public/circuits/
 # cp circuits/build/transfer_vk.json ../frontend/public/circuits/
 
-cd contracts/scripts
+cd ../contracts/scripts
 
-# For transfer circuit
-./update_transfer_vk.sh
+# Update transfer VK for both pools (default)
+./update_vk.sh transfer
 
-# For unshield circuit
-./update_unshield_vk.sh
+# Update for specific pool only
+./update_vk.sh transfer sui
+./update_vk.sh transfer usdc
+```
 
-# For swap circuit
-./update_swap_vk.sh
+### Update Script Usage
+
+`update_vk.sh` accepts an optional VK type and pool type:
+
+```bash
+./update_vk.sh                    # all VKs, both pools (default)
+./update_vk.sh unshield           # unshield VK, both pools
+./update_vk.sh transfer sui       # transfer VK, SUI pool only
+./update_vk.sh swap usdc          # swap VK, USDC pool only
 ```
 
 **What the script does:**
@@ -155,33 +173,25 @@ sui client object <ADMIN_CAP_ID>
 
 ```bash
 # Example 1: Update transfer VK after circuit modification
-cd circuits/scripts
-./compile_transfer.sh
-cd ../../contracts/scripts
-./update_transfer_vk.sh
+cd circuits && ./scripts/compile.sh transfer
+cd ../contracts/scripts && ./update_vk.sh transfer
 
 # Example 2: Update all VKs after major circuit refactor
-cd circuits/scripts
-./compile_unshield.sh
-./compile_transfer.sh
-./compile_swap.sh
-cd ../../contracts/scripts
-./update_unshield_vk.sh
-./update_transfer_vk.sh
-./update_swap_vk.sh
+cd circuits && ./scripts/compile.sh
+cd ../contracts/scripts && ./update_vk.sh
 ```
 
 ## Scripts Reference
 
 All scripts are located in the `scripts/` directory.
 
-| Script | Purpose | When to Use |
-|--------|---------|-------------|
-| `deploy_package.sh` | Publish Move package | Initial deploy, contract changes |
-| `create_pool.sh` | Create privacy pool | After package deploy, new pool instance |
-| `update_unshield_vk.sh` | Update unshield VK | After modifying unshield circuit |
-| `update_transfer_vk.sh` | Update transfer VK | After modifying transfer circuit |
-| `update_swap_vk.sh` | Update swap VK | After modifying swap circuit |
+| Script | Purpose | Usage | When to Use |
+|--------|---------|-------|-------------|
+| `deploy_package.sh` | Publish Move package | `./deploy_package.sh` | Initial deploy, contract changes |
+| `create_pool.sh` | Create privacy pool(s) | `./create_pool.sh [sui\|usdc]` | After package deploy (defaults to both) |
+| `update_vk.sh` | Update verification key(s) | `./update_vk.sh [vk] [pool]` | After modifying any circuit |
+
+**`update_vk.sh` arguments:** `vk` = `unshield` \| `transfer` \| `swap` \| `all` (default), `pool` = `sui` \| `usdc` \| `both` (default).
 
 ## Testing
 

@@ -43,8 +43,7 @@ The circuits must be compiled first, as their artifacts (WASM, proving keys, ver
 ```bash
 cd circuits
 npm install
-cd scripts
-./compile_all.sh
+./scripts/compile.sh
 ```
 
 *This process is slow and generates large `_final.zkey` files.*
@@ -145,7 +144,7 @@ Detailed implementation plans are available in the [milestones/](milestones/) di
    * 2-input, 2-output transfer circuit
 
 2. **[DeFi Integration](milestones/02-defi-integration.md)** (Fixing)
-   * Private swaps through Cetus DEX
+   * Private swaps through DeepBook
    * Increases transaction volume and anonymity set
    * Requires Private Transfers first
 

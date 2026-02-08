@@ -8,7 +8,7 @@ This directory contains the Zero-Knowledge Succinct Non-Interactive Argument of 
   - **Public Input**: `unshield_amount` (amount to withdraw)
   - **Public Outputs**: `nullifier`, `merkle_root`, `change_commitment`
 - `transfer.circom`: A private transfer circuit. Allows a user to transfer funds privately between two notes (which can belong to the same or different users), preserving balance conservation. Supports 2-input, 2-output transfers.
-- `swap.circom`: A private swap circuit. Enables users to perform private token swaps through an external DEX (e.g., Cetus), proving ownership of input notes and correct swap parameters.
+- `swap.circom`: A private swap circuit. Enables users to perform private token swaps through an external DEX (e.g., DeepBook), proving ownership of input notes and correct swap parameters.
 
 ## Scripts Usage
 
@@ -16,12 +16,19 @@ The following scripts, located in the `circuits/scripts/` directory, are used fo
 
 ### Compilation Scripts
 
-| Script                        | Purpose                                                        | When to Use                                                                                                                 |
-| ----------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/compile_all.sh`      | Compiles all circuits in sequence (unshield, transfer, swap). | Run when setting up the project for the first time or when all circuits need to be recompiled. |
-| `scripts/compile_unshield.sh` | Compiles `unshield.circom`.                                    | Run when `unshield.circom` is modified or to regenerate its proving/verification keys.                                      |
-| `scripts/compile_transfer.sh` | Compiles `transfer.circom`.                                    | Run when `transfer.circom` is modified or to regenerate its proving/verification keys.                                      |
-| `scripts/compile_swap.sh`     | Compiles `swap.circom`.                                        | Run when `swap.circom` is modified or to regenerate its proving/verification keys.                                          |
+Use `scripts/compile.sh` to compile one or more circuits:
+
+```bash
+./scripts/compile.sh                    # compile all three (default)
+./scripts/compile.sh unshield           # compile only unshield
+./scripts/compile.sh transfer swap      # compile transfer and swap
+```
+
+Multiple circuits are compiled in parallel. Single circuit shows inline output.
+
+| Script               | Purpose                                               |
+| -------------------- | ----------------------------------------------------- |
+| `scripts/compile.sh` | Compile any combination of unshield / transfer / swap |
 
 ### Test Input Generation Scripts
 

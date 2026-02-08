@@ -1,0 +1,197 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR/.."
+
+BUILD_DIR="build"
+FRONTEND="../frontend/public/circuits"
+
+# Capitalize first letter (macOS bash 3 compatible)
+capitalize() {
+    echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'
+}
+
+# Parse arguments - default to all
+CIRCUITS=()
+if [ $# -eq 0 ]; then
+    CIRCUITS=("unshield" "transfer" "swap")
+else
+    for arg in "$@"; do
+        case "$arg" in
+            unshield|transfer|swap)
+                [[ " ${CIRCUITS[*]} " != *" $arg "* ]] && CIRCUITS+=("$arg")
+                ;;
+            *)
+                echo "Error: Unknown circuit '$arg'"
+                echo "Usage: $0 [unshield] [transfer] [swap]"
+                echo "Default: compile all three"
+                exit 1
+                ;;
+        esac
+    done
+fi
+
+echo "========================================"
+echo "  Compiling Octopus ZK Circuits"
+echo "========================================"
+echo ""
+echo "Targets: ${CIRCUITS[*]}"
+echo ""
+if [ ${#CIRCUITS[@]} -gt 1 ]; then
+    echo "⚠️  This process is computationally intensive and will take significant time."
+    echo ""
+fi
+
+mkdir -p "$BUILD_DIR"
+
+# Determine which PTAU files are needed
+NEED_POT14=false
+NEED_POT15=false
+for c in "${CIRCUITS[@]}"; do
+    if [ "$c" = "unshield" ]; then
+        NEED_POT14=true
+    else
+        NEED_POT15=true
+    fi
+done
+
+if [ "$NEED_POT14" = "true" ] && [ ! -f "$BUILD_DIR/pot14_final.ptau" ]; then
+    echo "Downloading pot14_final.ptau (~200MB)..."
+    curl -L https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_14.ptau \
+        -o "$BUILD_DIR/pot14_final.ptau" --progress-bar
+    echo "✓ pot14 downloaded"
+    echo ""
+fi
+
+if [ "$NEED_POT15" = "true" ] && [ ! -f "$BUILD_DIR/pot15_final.ptau" ]; then
+    echo "Downloading pot15_final.ptau (~400MB)..."
+    curl -L https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_15.ptau \
+        -o "$BUILD_DIR/pot15_final.ptau" --progress-bar
+    echo "✓ pot15 downloaded"
+    echo ""
+fi
+
+# Map circuit name to PTAU file
+ptau_for() {
+    [ "$1" = "unshield" ] && echo "pot14_final.ptau" || echo "pot15_final.ptau"
+}
+
+# Compile a single circuit
+compile_circuit() {
+    local name=$1
+    local ptau=$2
+    local cap
+    cap=$(capitalize "$name")
+
+    echo "[1/10] Compiling $name.circom..."
+    circom $name.circom --r1cs --wasm --sym -o $BUILD_DIR
+
+    echo "[2/10] Circuit info:"
+    snarkjs r1cs info $BUILD_DIR/${name}.r1cs
+
+    echo "[3/10] Generating zkey (Groth16 setup)..."
+    snarkjs groth16 setup \
+        $BUILD_DIR/${name}.r1cs \
+        $BUILD_DIR/${ptau} \
+        $BUILD_DIR/${name}_0000.zkey
+
+    echo "[4/10] Contributing to ceremony..."
+    snarkjs zkey contribute \
+        $BUILD_DIR/${name}_0000.zkey \
+        $BUILD_DIR/${name}_final.zkey \
+        --name="Octopus Dev" \
+        -v -e="random entropy $(date +%s)"
+
+    echo "[5/10] Exporting verification key..."
+    snarkjs zkey export verificationkey \
+        $BUILD_DIR/${name}_final.zkey \
+        $BUILD_DIR/${name}_vk.json
+
+    echo "[6/10] Constraint count:"
+    snarkjs r1cs info $BUILD_DIR/${name}.r1cs | grep "# of Constraints"
+
+    echo "[7/10] Generating test input..."
+    node scripts/generate${cap}TestInput.js
+
+    echo "[8/10] Generating witness and proof..."
+    snarkjs groth16 fullprove \
+        ${BUILD_DIR}/${name}_input.json \
+        ${BUILD_DIR}/${name}_js/${name}.wasm \
+        ${BUILD_DIR}/${name}_final.zkey \
+        ${BUILD_DIR}/${name}_proof.json \
+        ${BUILD_DIR}/${name}_public.json
+
+    echo "[9/10] Verifying proof..."
+    snarkjs groth16 verify \
+        ${BUILD_DIR}/${name}_vk.json \
+        ${BUILD_DIR}/${name}_public.json \
+        ${BUILD_DIR}/${name}_proof.json
+
+    echo "[10/10] Converting VK to Sui format and copying to frontend..."
+    node scripts/arkworksConverter${cap}.js
+    mkdir -p ${FRONTEND}/${name}_js
+    cp ${BUILD_DIR}/${name}_js/${name}.wasm ${FRONTEND}/${name}_js/
+    cp ${BUILD_DIR}/${name}_final.zkey ${FRONTEND}
+    cp ${BUILD_DIR}/${name}_vk.json ${FRONTEND}
+
+    echo "✅ $name compiled successfully"
+}
+
+# Single circuit: inline output; multiple: parallel with logs
+if [ ${#CIRCUITS[@]} -eq 1 ]; then
+    name="${CIRCUITS[0]}"
+    echo "=== Compiling $name ==="
+    echo ""
+    compile_circuit "$name" "$(ptau_for "$name")"
+else
+    echo "Starting parallel compilation..."
+    echo ""
+    PIDS=()
+    for name in "${CIRCUITS[@]}"; do
+        compile_circuit "$name" "$(ptau_for "$name")" > "$BUILD_DIR/compile_${name}.log" 2>&1 &
+        PIDS+=($!)
+    done
+
+    ALL_OK=true
+    for i in "${!CIRCUITS[@]}"; do
+        echo "⏳ Waiting for ${CIRCUITS[$i]} (PID: ${PIDS[$i]})..."
+        if wait "${PIDS[$i]}"; then
+            echo "  ✓ ${CIRCUITS[$i]} done"
+        else
+            echo "  ✗ ${CIRCUITS[$i]} failed — see: $BUILD_DIR/compile_${CIRCUITS[$i]}.log"
+            ALL_OK=false
+        fi
+    done
+
+    if [ "$ALL_OK" = "false" ]; then
+        echo ""
+        echo "❌ Some compilations failed!"
+        exit 1
+    fi
+fi
+
+echo ""
+echo "========================================"
+echo "  ✅ All Circuits Compiled Successfully!"
+echo "========================================"
+echo ""
+echo "Compiled: ${CIRCUITS[*]}"
+echo "Artifacts copied to frontend/public/circuits/"
+echo ""
+echo "Next steps:"
+echo ""
+echo "  First-time deployment:"
+echo "    cd ../../contracts/scripts"
+echo "    ./deploy_package.sh"
+echo "    ./create_pool.sh"
+echo ""
+echo "  Update existing deployment (VK changes only):"
+echo "    cd ../../contracts/scripts"
+if [ ${#CIRCUITS[@]} -eq 3 ]; then
+    echo "    ./update_vk.sh"
+else
+    for name in "${CIRCUITS[@]}"; do
+        echo "    ./update_vk.sh $name"
+    done
+fi

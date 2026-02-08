@@ -8,6 +8,8 @@ A privacy protocol implementation for the Sui blockchain, enabling shielded tran
 
 ## Overview
 
+![concept](frontend/public/concept.svg)
+
 Octopus enables private token operations on Sui by implementing a UTXO-based privacy pool with Groth16 ZK-SNARKs verification. Users can:
 
 - **Shield**: Deposit tokens into the privacy pool, creating encrypted notes
@@ -23,22 +25,11 @@ Octopus enables private token operations on Sui by implementing a UTXO-based pri
   - ZKP proves
     1. you own the Notes
     2. total input amount = total output amount
-- **Swap**: Exchange tokens privately through integrated DEXs 🚧 **85% Complete**
+- **Swap**: Exchange tokens privately through integrated DEXs 🚧 **85% Complete** (DeepBook V3 Mainnet only)
 
-```
-┌─────────────┐     Shield      ┌────────────────────────────┐
-│  Public     │ ───────────────►│  Privacy Pool              │
-│  Wallet     │                 │  (Merkle Tree)             │
-│             │                 │                            │
-│             │                 │  Transfer (2-in, 2-out)    │
-│             │                 │  Swap (DEX Integration) 🚧 │
-│             │                 │                            │
-│             │ ◄───────────────│                            │
-└─────────────┘     Unshield    └────────────────────────────┘
-                   (ZK Proof)
-```
+### Cryptographic Primitives
 
-![Cryptographic Primitives Overview](docs/technical.svg)
+![Cryptographic Primitives Overview](frontend/public//technical.svg)
 
 ```
 MPK = Poseidon(spending_key, nullifying_key)   // Master Public Key
@@ -65,8 +56,7 @@ nullifier = Poseidon(nullifying_key, leaf_index) // Prevents double-spend
 ```bash
 cd circuits
 npm install
-cd scripts
-./compile_all.sh
+./scripts/compile.sh
 ```
 
 This generates for each circuit:
@@ -155,12 +145,14 @@ The circuit proves:
 
 ### Swap Circuit (`swap.circom`) 🚧 **In Progress**
 
+> ⚠️ **DeepBook V3 is only available on Mainnet.** Swap functionality is currently limited to Mainnet deployments.
+
 | Property | Value |
 |----------|-------|
 | Constraints | 22,553 |
 | Public Inputs | 6 (merkle_root, 2 nullifiers, 2 commitments) |
 | Private Inputs | 15 (input notes, output notes, swap params) |
-| Status | Circuit complete, awaiting Cetus DEX integration |
+| Status | Circuit complete, awaiting DeepBook integration |
 
 The circuit proves:
 
@@ -182,7 +174,7 @@ The circuit proves:
 
 ### 🚧 In Progress (85% Complete)
 
-- **Private Swaps**: Circuit and SDK complete, awaiting Cetus CLMM integration
+- **Private Swaps**: Circuit and SDK complete, awaiting DeepBook integration
   - Mock 1:1 swap working in test environment
   - Production swap function scaffolded in contracts
   - Frontend UI complete with slippage protection
