@@ -21,10 +21,12 @@
 **Dependencies:** Private Transfers
 **Why Second:** Dramatically increases utility and anonymity set size.
 
+> ⚠️ **DeepBook V3 is only available on Mainnet.** Swap functionality requires a Mainnet deployment.
+
 **Key Deliverables:**
 
 - `swap.circom` circuit
-- Cetus DEX integration
+- DeepBook integration
 - Cross-contract call pattern
 - Multi-token pool support
 - Private swap UI

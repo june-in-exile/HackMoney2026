@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
-import { POOL_ID } from "@/lib/constants";
 
 /**
  * Pool information from on-chain
@@ -12,6 +11,8 @@ export interface PoolInfo {
   tokenType: string;
   /** Pool balance in base units */
   balance: bigint;
+  /** Total notes inserted into the Merkle tree */
+  noteCount: number;
 }
 
 /**
@@ -19,7 +20,7 @@ export interface PoolInfo {
  *
  * @returns Pool info, loading state, error, and refresh function
  */
-export function usePoolInfo() {
+export function usePoolInfo(poolId: string) {
   const client = useSuiClient();
   const [poolInfo, setPoolInfo] = useState<PoolInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ export function usePoolInfo() {
 
         // Fetch pool object with full content
         const poolObject = await client.getObject({
-          id: POOL_ID,
+          id: poolId,
           options: {
             showContent: true,
             showType: true,
@@ -74,9 +75,13 @@ export function usePoolInfo() {
           // Balance is in the Balance<T> object
           const balance = BigInt(fields.balance || "0");
 
+          // Note count from merkle_tree.next_index
+          const noteCount = Number(fields.merkle_tree?.fields?.next_index ?? 0);
+
           setPoolInfo({
             tokenType,
             balance,
+            noteCount,
           });
         } else {
           throw new Error("Invalid pool content structure");
@@ -98,7 +103,7 @@ export function usePoolInfo() {
     return () => {
       isCancelled = true;
     };
-  }, [client, refreshTrigger]);
+  }, [client, poolId, refreshTrigger]);
 
   return {
     poolInfo,

@@ -10,6 +10,7 @@ import type {
   WorkerResponse,
   SerializedNote,
   ScanNotesResponse,
+  CountPoolNotesResponse,
   BatchDecryptResponse,
   ComputeNullifierResponse,
   BuildMerkleTreeResponse,
@@ -84,6 +85,7 @@ class NoteScanWorkerManager {
       }
 
       case "scan_notes_result":
+      case "count_pool_notes_result":
       case "batch_decrypt_result":
       case "compute_nullifier_result":
       case "build_merkle_tree_result":
@@ -217,6 +219,27 @@ class NoteScanWorkerManager {
       notes: processedNotes,
       totalNotesInPool: response.totalNotesInPool,
     };
+  }
+
+  /**
+   * Public API: Count total notes in a pool (lightweight, no keypair needed)
+   */
+  async countPoolNotes(
+    graphqlUrl: string,
+    packageId: string,
+    poolId: string
+  ): Promise<number> {
+    await this.initialize();
+
+    const response = await this.sendRequest<CountPoolNotesResponse>({
+      type: "count_pool_notes",
+      id: this.generateId(),
+      graphqlUrl,
+      packageId,
+      poolId,
+    });
+
+    return response.totalNotesInPool;
   }
 
   /**

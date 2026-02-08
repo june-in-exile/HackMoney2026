@@ -1,11 +1,13 @@
 "use client";
 
 import { useCurrentAccount } from "@mysten/dapp-kit";
-import { formatSui } from "@/lib/utils";
+import { formatTokenAmount } from "@/lib/utils";
+import type { TokenConfig } from "@/lib/constants";
 
 interface BalanceCardProps {
   shieldedBalance: bigint;
   noteCount: number;
+  tokenConfig: TokenConfig;
   isLoading?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
@@ -14,6 +16,7 @@ interface BalanceCardProps {
 export function BalanceCard({
   shieldedBalance,
   noteCount,
+  tokenConfig,
   isLoading,
   isRefreshing,
   onRefresh,
@@ -78,10 +81,10 @@ export function BalanceCard({
               {!isRefreshing && (
                 <div className="flex items-baseline gap-3">
                   <span className="text-5xl font-black text-cyber-blue text-cyber tabular-nums">
-                    {formatSui(shieldedBalance)}
+                    {formatTokenAmount(shieldedBalance, tokenConfig.decimals)}
                   </span>
                   <span className="text-xl text-gray-500 font-mono uppercase tracking-wider">
-                    SUI
+                    {tokenConfig.symbol}
                   </span>
                 </div>
               )}

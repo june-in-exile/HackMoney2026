@@ -13,7 +13,7 @@ Octopus is a privacy protocol for the Sui blockchain that enables on-chain trans
 - **Note Encryption**: ECDH + ChaCha20-Poly1305 encryption for private notes
 - **Merkle Trees**: Client-side Merkle tree construction and proof generation
 - **Sui Integration**: Transaction builders for all privacy operations
-- **DEX Integration**: Price fetching and swap estimation for Cetus DEX
+- **DEX Integration**: Price fetching and swap estimation for DeepBook
 - **Cross-Platform**: Works in both Node.js and browser environments
 
 ## Installation
@@ -358,11 +358,11 @@ tree.root: bigint  // Current Merkle root
 
 ### DEX Integration
 
-#### `getCetusPrice(pool: CetusPoolConfig): Promise<number>`
+#### `getDeepBookPrice(pool: DeepBookPoolConfig): Promise<number>`
 
-Get current price from Cetus pool.
+Get current price from DeepBook pool.
 
-#### `estimateCetusSwap(pool: CetusPoolConfig, amountIn: bigint, slippageBps: number): Promise<SwapEstimation>`
+#### `estimateDeepBookSwap(pool: DeepBookPoolConfig, amountIn: bigint, slippageBps: number): Promise<SwapEstimation>`
 
 Estimate swap output with slippage protection.
 
@@ -913,7 +913,7 @@ For swap operations, always set reasonable slippage tolerance:
 
 ```typescript
 const slippageBps = 50; // 0.5%
-const estimation = await estimateCetusSwap(pool, amountIn, slippageBps);
+const estimation = await estimateDeepBookSwap(pool, amountIn, slippageBps);
 
 // Use minAmountOut in swap proof
 const minAmountOut = estimation.minAmountOut;

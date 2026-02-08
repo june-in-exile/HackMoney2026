@@ -6,7 +6,7 @@ include "node_modules/circomlib/circuits/comparators.circom";
 include "./lib/merkle_proof.circom";
 
 /// Swap circuit for private DEX swaps on Sui
-/// Implements private token swaps through external DEX (e.g., Cetus)
+/// Implements private token swaps through external DEX (e.g., DeepBook)
 ///
 /// Proves:
 /// 1. Knowledge of spending_key and nullifying_key (ownership)

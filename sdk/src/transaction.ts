@@ -122,6 +122,7 @@ export function buildTransferTransaction<T extends string>(
  * @param packageId - Octopus package ID
  * @param poolInId - Input token pool ID
  * @param poolOutId - Output token pool ID
+ * @param deepbookPoolId - DeepBook pool ID for swap execution
  * @param coinTypeIn - Input token type (e.g., "0x2::sui::SUI")
  * @param coinTypeOut - Output token type (e.g., "0x...::usdc::USDC")
  * @param proof - Swap ZK proof
@@ -134,6 +135,7 @@ export function buildSwapTransaction<TokenIn extends string, TokenOut extends st
   packageId: string,
   poolInId: string,
   poolOutId: string,
+  deepbookPoolId: string,
   coinTypeIn: TokenIn,
   coinTypeOut: TokenOut,
   proof: SuiSwapProof,
@@ -150,6 +152,7 @@ export function buildSwapTransaction<TokenIn extends string, TokenOut extends st
     arguments: [
       tx.object(poolInId),
       tx.object(poolOutId),
+      tx.object(deepbookPoolId),
       tx.pure.vector("u8", Array.from(proof.proofBytes)),
       tx.pure.vector("u8", Array.from(proof.publicInputsBytes)),
       tx.pure.u64(amountIn),

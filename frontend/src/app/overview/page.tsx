@@ -147,7 +147,7 @@ export default function OverviewPage() {
                   <p className="text-gray-400 text-sm font-mono leading-relaxed mb-3">
                     Exchange tokens privately through integrated DEXs. The swap happens within the
                     privacy pool, maintaining anonymity while leveraging external liquidity sources
-                    like Cetus.
+                    like DeepBook V3.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <span className="px-2 py-1 text-xs font-mono bg-yellow-500/10 text-yellow-500 border border-yellow-500/30">

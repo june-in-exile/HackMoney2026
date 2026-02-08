@@ -52,63 +52,52 @@ export function Header() {
                 className="object-contain"
               />
             </div>
-            <button
-              onClick={() => selectNetwork(isMainnet ? "testnet" : "mainnet")}
-              title={
-                account
-                  ? "Switch network in your wallet to change"
-                  : `Switch to ${isMainnet ? "testnet" : "mainnet"}`
-              }
-              className="cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <span
-                className={cn(
-                  "px-3 py-1 text-[11px] font-bold tracking-widest uppercase border clip-corner font-mono",
-                  isMainnet
-                    ? "border-cyber-purple-light/60 text-cyber-purple-light/90"
-                    : "border-amber-500/50 text-amber-400/80"
-                )}
-              >
-                {isMainnet ? "MAINNET" : "TESTNET"}
-              </span>
-            </button>
           </div>
 
           {/* Navigation Links */}
           <nav className="flex items-center gap-1">
             <Link
               href="/"
-              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${
-                pathname === "/"
+              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${pathname === "/"
                   ? "text-cyber-blue border-b-2 border-cyber-blue"
                   : "text-gray-500 hover:text-gray-300 border-b-2 border-transparent"
-              }`}
+                }`}
             >
               APP
             </Link>
             <Link
               href="/overview"
-              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${
-                pathname === "/overview"
+              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${pathname === "/overview"
                   ? "text-cyber-blue border-b-2 border-cyber-blue"
                   : "text-gray-500 hover:text-gray-300 border-b-2 border-transparent"
-              }`}
+                }`}
             >
               OVERVIEW
             </Link>
             <Link
               href="/developer"
-              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${
-                pathname === "/developer"
+              className={`px-4 py-2 text-s font-bold uppercase tracking-wider transition-all ${pathname === "/developer"
                   ? "text-cyber-blue border-b-2 border-cyber-blue"
                   : "text-gray-500 hover:text-gray-300 border-b-2 border-transparent"
-              }`}
+                }`}
             >
               DEVELOPER
             </Link>
           </nav>
         </div>
-        <ConnectButton />
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "px-3 py-1 text-[11px] font-bold tracking-widest uppercase border clip-corner font-mono",
+              isMainnet
+                ? "border-cyber-purple-light/60 text-cyber-purple-light/90"
+                : "border-amber-500/50 text-amber-400/80"
+            )}
+          >
+            {isMainnet ? "MAINNET" : "TESTNET"}
+          </span>
+          <ConnectButton />
+        </div>
       </div>
 
       {/* Bottom accent line with purple gradient */}
