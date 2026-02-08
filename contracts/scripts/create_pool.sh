@@ -121,14 +121,34 @@ create_pool() {
         return 1
     fi
 
-    if echo "$POOL_OUTPUT" | jq -e '.effects.status.status != "success"' >/dev/null 2>&1; then
-        echo "❌ Transaction executed but failed!"
-        echo "$POOL_OUTPUT" | jq '.effects.status'
+    # Support both old format (effects.status.status) and new format (effects.V2.status)
+    local tx_status
+    tx_status=$(echo "$POOL_OUTPUT" | jq -r '
+        if .effects.status.status then .effects.status.status
+        elif .effects.V2.status then .effects.V2.status
+        else "unknown"
+        end' 2>/dev/null)
+
+    if [ "$tx_status" != "success" ] && [ "$tx_status" != "Success" ]; then
+        echo "❌ Transaction executed but failed! (status: $tx_status)"
+        echo "$POOL_OUTPUT" | jq '.effects.status // .effects.V2.status // .clever_error'
         return 1
     fi
 
     local pool_id
-    pool_id=$(echo "$POOL_OUTPUT" | jq -r '(.objectChanges // .changed_objects)[]? | select(.objectType? | contains("PrivacyPool"))? | .objectId' 2>/dev/null)
+    # Try old format first (objectChanges with objectType containing PrivacyPool)
+    pool_id=$(echo "$POOL_OUTPUT" | jq -r '
+        (.objectChanges // [])[]
+        | select(.objectType? | strings | contains("PrivacyPool"))
+        | .objectId' 2>/dev/null)
+
+    # New format: find shared object in effects.V2.changed_objects
+    if [ -z "$pool_id" ] || [ "$pool_id" = "null" ]; then
+        pool_id=$(echo "$POOL_OUTPUT" | jq -r '
+            .effects.V2.changed_objects[]?
+            | select(.[1].output_state.ObjectWrite?[1].Shared?)
+            | .[0]' 2>/dev/null)
+    fi
 
     if [ -z "$pool_id" ] || [ "$pool_id" = "null" ]; then
         echo "❌ Failed to extract pool ID from transaction output"
@@ -154,11 +174,11 @@ create_pool() {
         update_env_var "NEXT_PUBLIC_USDC_TYPE" "$type_args" "$ENV_FILE"
         echo "✓ Updated USDC_POOL_ID, NEXT_PUBLIC_USDC_POOL_ID, NEXT_PUBLIC_USDC_TYPE"
 
-        local frontend_env="../frontend/.env.local"
-        if [ -f "$frontend_env" ]; then
-            update_env_var "NEXT_PUBLIC_USDC_POOL_ID" "$pool_id" "$frontend_env"
-            update_env_var "NEXT_PUBLIC_USDC_TYPE" "$type_args" "$frontend_env"
-            echo "✓ Updated frontend/.env.local"
+        local root_env="../.env"
+        if [ -f "$root_env" ]; then
+            update_env_var "NEXT_PUBLIC_USDC_POOL_ID" "$pool_id" "$root_env"
+            update_env_var "NEXT_PUBLIC_USDC_TYPE" "$type_args" "$root_env"
+            echo "✓ Updated .env"
         fi
     fi
     echo ""
